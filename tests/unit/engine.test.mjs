@@ -598,6 +598,25 @@ test('Angriffsmenge unter 1 und leere Zielliste erzeugen keine Ereignisse; Leben
   assert.equal(t.all.length, 1);
 });
 
+test('Review: Runde zählt auch, wenn der Startsitz ausgeschieden ist (Main.dc.html:2077–2081)', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'eliminate', target: 'A', by: null });
+  assert.deepEqual([t.s.turn, t.s.round], [1, 1]);
+  t.do({ type: 'endTurn', at: 1000 });
+  t.do({ type: 'endTurn', at: 2000 });
+  assert.deepEqual([t.s.turn, t.s.round], [3, 1]);
+  t.do({ type: 'endTurn', at: 3000 });
+  assert.deepEqual([t.s.turn, t.s.round], [1, 2]);
+});
+
+test('Review: killerCandidates – bei gleichem Schaden entscheidet Gift, dann Sitz', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'attack', from: 'D', to: ['B'], kind: 'poison', amount: 3 }, 'D');
+  t.do({ type: 'attack', from: 'C', to: ['B'], kind: 'poison', amount: 1 }, 'C');
+  const k = E.killerCandidates(t.s, 'B');
+  assert.deepEqual(k.map((x) => [x.id, x.damage, x.poison, x.top]), [['D', 0, 3, true], ['C', 0, 1, false], ['A', 0, 0, false]]);
+});
+
 test('Hinweis: replay von 2000 Ereignissen (Zeitmessung, kein harter Fall)', async () => {
   const E = await load(); const t = table(E);
   let at = 0;
