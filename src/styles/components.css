@@ -180,3 +180,48 @@
 .guest-card { background: var(--hero); color: var(--hero-ink); border-radius: var(--r-lg); padding: 18px; display: flex; flex-direction: column; gap: 10px; }
 .guest-card .hint { color: var(--hero-mu); }
 .guest-card .btn { background: var(--hero-ink); color: var(--hero); }
+
+/* ================= Decks ================= */
+/* Suchergebnisse */
+.results { display: flex; flex-direction: column; gap: 8px; min-height: 24px; }
+.result { display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; min-height: 64px; border: 0; background: transparent; color: var(--ink); text-align: left; width: 100%; }
+.result + .result { box-shadow: inset 0 1px 0 var(--ln); }
+.result:active { background: var(--sf2); }
+.result .thumb { width: 64px; height: 48px; border-radius: 10px; background-size: cover; background-position: center 25%; flex-shrink: 0; background-color: var(--sf2); }
+.result .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.result .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result .meta { display: flex; align-items: center; gap: 8px; }
+.result > svg { color: var(--mu); flex-shrink: 0; }
+
+/* Deck-Kopf: Commander-Art groß, ungetönt; Partner nebeneinander */
+.deck-hero { position: relative; border-radius: var(--r-xl); overflow: hidden; min-height: 260px; display: grid; grid-template-columns: 1fr; background: var(--sf2); }
+.deck-hero.split { grid-template-columns: 1fr 1fr; }
+.deck-hero .art { background-size: cover; background-position: center 25%; min-height: 260px; }
+.deck-hero.split .art + .art { box-shadow: inset 2px 0 0 var(--bg); }
+.deck-hero-text { position: absolute; inset: auto 0 0 0; padding: 60px 18px 16px; display: flex; flex-direction: column; gap: 6px; color: #fff;
+  background: linear-gradient(180deg, rgba(var(--scrim), 0) 0%, rgba(var(--scrim), .78) 45%, rgba(var(--scrim), .92) 100%); }
+.deck-hero-text h2 { font-size: 26px; letter-spacing: -.03em; line-height: 1.05; max-width: none; }
+.deck-hero-text .by { font-size: 14px; color: rgba(255,255,255,.8); }
+.deck-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.deck-hero .chip { background: rgba(255,255,255,.16); color: #fff; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+
+/* Bracket-Auswahl */
+.bracket { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.bracket button { min-height: 60px; border: 0; border-radius: 14px; background: var(--sf); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 2px; }
+.sheet .bracket button { background: var(--sf2); }
+.bracket button b { font-family: var(--f-display); font-size: 20px; font-weight: 700; line-height: 1; }
+.bracket button span { font-size: 10.5px; color: var(--mu); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.bracket button[aria-checked="true"] { background: var(--act); color: var(--act-ink); }
+.bracket button[aria-checked="true"] span { color: inherit; opacity: .8; }
+
+/* Deck-Karten im Profil: Bild oben, Farbstreifen, Name */
+.decks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.deck-card { display: flex; flex-direction: column; border-radius: 18px; overflow: hidden; background: var(--sf); color: var(--ink); text-decoration: none; }
+.deck-card .arts { display: grid; grid-template-columns: 1fr; height: 104px; position: relative; }
+.deck-card .arts.split { grid-template-columns: 1fr 1fr; }
+.deck-card .arts > span { background-size: cover; background-position: center 25%; }
+.deck-card .arts::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--c); }
+.deck-card .info { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.deck-card .info b { font-family: var(--f-display); font-size: 17px; font-weight: 700; letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-card .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--mu); flex-wrap: wrap; }
+.deck-card:active { transform: scale(.98); }

@@ -88,5 +88,20 @@ export default {
     tooBig: 'The picture could not be read.',
   },
 
+  decks: {
+    add: 'Add commander', addFor: 'for {name}', search: 'Search commander', searchPh: 'Type a name, e.g. Atraxa',
+    searchPartner: 'Search partner', noResults: 'No commander found.', searching: 'Searching …', searchError: 'Scryfall is not reachable right now. Please try again shortly.',
+    typeMore: 'Type at least two letters.', change: 'Choose another', partnerTag: 'Partner',
+    addPartner: 'Add partner', partnerHint: { partner: 'Has “Partner”: you can add a second commander with Partner.', with: 'Belongs together with {name}.', friends: 'Has “Friends forever”.', background: 'Can choose a Background.', doctor: 'Can add a Doctor’s companion.', companion: 'Can add a Doctor.' },
+    removePartner: 'Remove partner', bracket: 'Bracket', bracketHint: 'How strong is the deck? 1 = Exhibition, 5 = cEDH.',
+    link: 'Link to decklist', linkPh: 'moxfield.com/decks/…', linkHint: 'Optional. Moxfield and Archidekt are recognised.', linkBad: 'That does not look like a link.',
+    save: 'Save deck', saved: 'Deck saved.', none: 'No deck yet.', noneOther: '{name} has no deck yet.',
+    games: 'Games', wins: 'Wins', winrate: 'Win rate', place: 'Avg place', noGames: 'No games yet', list: 'Decklist',
+    open: 'Open', editLink: 'Change link', addLink: 'Add link', noLink: 'No link to a decklist yet.',
+    changeBracket: 'Change bracket', remove: 'Remove deck', removed: 'Deck removed.', archived: 'Deck archived because it already appears in games.',
+    removeConfirm: 'Really remove?', removeYes: 'Yes, remove', by: 'by {name}', notFound: 'This deck does not exist or is not visible to you.',
+    art: 'Art: {artist} · Scryfall',
+  },
+
   common: { back: 'Back', close: 'Close', cancel: 'Cancel', loading: 'Loading …', error: 'Something went wrong.' },
 };

@@ -23,6 +23,8 @@ route('/profil', v('profile'), { nav: 'me', group: true });
 route('/profil/:memberId', v('profile'), { nav: 'me', group: true });
 route('/gruppen', v('groups'));
 route('/spieler-neu', v('add-player'), { group: true });
+route('/deck-neu/:memberId', v('add-deck'), { group: true });
+route('/deck/:id', v('deck'), { nav: 'me', group: true });
 
 const NAV = [
   ['start', '#/start', 'home'], ['play', '#/spielen', 'play'], ['history', '#/historie', 'history'],

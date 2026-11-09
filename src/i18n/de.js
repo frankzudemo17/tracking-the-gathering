@@ -88,5 +88,20 @@ export default {
     tooBig: 'Das Bild ließ sich nicht lesen.',
   },
 
+  decks: {
+    add: 'Commander hinzufügen', addFor: 'für {name}', search: 'Commander suchen', searchPh: 'Name eintippen, z. B. Atraxa',
+    searchPartner: 'Partner suchen', noResults: 'Kein Commander gefunden.', searching: 'Sucht …', searchError: 'Scryfall ist gerade nicht erreichbar. Bitte versuch es gleich nochmal.',
+    typeMore: 'Mindestens zwei Buchstaben eintippen.', change: 'Anderen wählen', partnerTag: 'Partner',
+    addPartner: 'Partner hinzufügen', partnerHint: { partner: 'Hat „Partner“: du kannst einen zweiten Commander mit Partner dazunehmen.', with: 'Gehört zusammen mit {name}.', friends: 'Hat „Friends forever“.', background: 'Kann einen Hintergrund wählen.', doctor: 'Kann einen Companion des Doctors dazunehmen.', companion: 'Kann einen Doctor dazunehmen.' },
+    removePartner: 'Partner entfernen', bracket: 'Bracket', bracketHint: 'Wie stark ist das Deck? 1 = Exhibition, 5 = cEDH.',
+    link: 'Link zur Deckliste', linkPh: 'moxfield.com/decks/…', linkHint: 'Optional. Moxfield und Archidekt werden erkannt.', linkBad: 'Das sieht nicht nach einem Link aus.',
+    save: 'Deck speichern', saved: 'Deck gespeichert.', none: 'Noch kein Deck.', noneOther: '{name} hat noch kein Deck.',
+    games: 'Spiele', wins: 'Siege', winrate: 'Siegquote', place: 'Ø Platz', noGames: 'Noch keine Spiele', list: 'Deckliste',
+    open: 'Öffnen', editLink: 'Link ändern', addLink: 'Link hinzufügen', noLink: 'Noch kein Link zur Deckliste.',
+    changeBracket: 'Bracket ändern', remove: 'Deck entfernen', removed: 'Deck entfernt.', archived: 'Deck archiviert, weil es schon in Spielen vorkommt.',
+    removeConfirm: 'Wirklich entfernen?', removeYes: 'Ja, entfernen', by: 'von {name}', notFound: 'Dieses Deck gibt es nicht oder du siehst es nicht.',
+    art: 'Bild: {artist} · Scryfall',
+  },
+
   common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.' },
 };

@@ -320,18 +320,21 @@ Franco gibt keinen Schlüssel in den Chat, sondern meldet sich selbst an. Ablauf
 
 ## 9. Etappen
 
-1. **Fundament:** Repo, PWA-Grundgerüst, Design-Tokens, Supabase verbunden, Login/Registrierung, Profil mit Profilbild, Playgroups (anlegen, beitreten, Einladungscode), Spieler ohne Konto anlegen und per Code übernehmen.
-2. **Decks:** Scryfall-Suche inkl. Partner, Bracket, Deck-Link, Deckprofil-Grundgerüst.
+1. ✅ **Fundament** (09.11.2026): Repo, PWA-Grundgerüst, Design-Tokens, Supabase verbunden, Login/Registrierung, Profil mit Profilbild, Playgroups (anlegen, beitreten, Einladungscode), Spieler ohne Konto anlegen und per Code übernehmen. Dazu Sicherheits-Migration und Design-Durchgang (Abschnitt 4).
+2. ✅ **Decks** (10.11.2026): Scryfall-Suche inkl. Partner (Partner, Partner with, Friends forever, Background, Doctor/Companion), Bracket, Deck-Link, Deckprofil-Grundgerüst, Spielerfarbe aus dem Commander.
 3. **Spielen:** Setup mit Sitzordnung und Layouts, Feldfarben, Lifecounter komplett (Tippen, Zähler, Pins, Mittelknopf, Verlauf, Rückgängig), Angriff per Ziehen mit Zielfernrohr, Würfeltisch, Ereignisse speichern, K.O.-Screens.
 4. **Spielende und Historie:** Ergebnis, Bewertungen, Deck-Salt, Play of the Game, Foto, Historie nach Abenden, Spieldetail.
 5. **Statistik:** Rangliste (Spieler, Decks, Salt), Profile mit Tempo und Nemesis, Deckprofile, Spieleabend-Karte zum Teilen.
-6. **Live und Feinschliff:** Realtime auf mehreren Handys, Offline-Warteschlange, Wake Lock, Englisch, Looks Gletscher/Obsidian, Barrierefreiheit prüfen.
+6. **Live und Feinschliff:** Realtime auf mehreren Handys, Offline-Warteschlange, Wake Lock, Englisch fertig übersetzen, Barrierefreiheit prüfen, Bestätigungsmail bei Registrierung wieder einschalten (in der Testphase aus).
 
 Nach jeder Etappe kurz mit Franco abstimmen und auf GitHub Pages veröffentlichen.
 
 ---
 
 ## 10. Noch offen oder später
+
+- **Für Etappe 3 zu klären:** `decks.field_color` und `counter_pins` darf laut RLS nur der Deck-Besitzer ändern. Am Tisch setzt aber oft der Host die Feldfarbe für alle. Lösung vorschlagen (z. B. RPC, die das für Decks der eigenen Gruppe erlaubt).
+- **Deckliste in der App + Bracket-Rechner + ManaBox-Import** (Wunsch von Franco, nach Etappe 2 je nach Aufwand): Text-/CSV-Export aus ManaBox einlesen, über Scryfall `/cards/collection` auflösen, Game Changers zählen. Vorher echten ManaBox-Export von Franco holen.
 
 - **Token-Druck** (ausdrücklich später, wenn alles andere fertig ist): Token eintippen oder per Sprache eingeben, wird auf einen Bon-Thermodrucker gedruckt. Gedruckt wird ein eigenes Layout, kein offizielles Kartendesign; Daten von Scryfall, Symbole z. B. von game-icons.net. Druckwege:
   - BLE-Drucker per Web Bluetooth (Android direkt, iPhone über den Bluefy-Browser)

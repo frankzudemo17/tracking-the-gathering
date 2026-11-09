@@ -3,7 +3,8 @@ import { sb, must, avatarUrls, appUrl } from '../supabase.js';
 import { state, currentMembership, currentGroup, isAdmin, updateProfile, loadMe } from '../state.js';
 import { html, mount, on, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
-import { avatar, backHead, empty, memberName, memberAvatarPath, roleChip } from '../lib/parts.js';
+import { avatar, backHead, empty, memberName, memberAvatarPath, roleChip, manaPips } from '../lib/parts.js';
+import { decksOf, playerColor, sortColors, bracketName } from '../lib/decks.js';
 import { sheet, toast, errText, copyText } from '../lib/ui.js';
 import { setAvatar, removeAvatar } from '../lib/avatar.js';
 import { t, fmtDate, getLang } from '../i18n/index.js';
@@ -22,9 +23,10 @@ export default async function profile(el, { params, isStale }) {
   if (isStale()) return;
   if (!m) { mount(el, html`${backHead(t('nav.me'), '#/gruppen')}${empty('user', t('profile.notFound'), '')}`); return; }
 
-  const [statsRows, urls] = await Promise.all([
+  const [statsRows, urls, decks] = await Promise.all([
     sb.from('v_member_stats').select('*').eq('member_id', m.id).then(must),
     avatarUrls([memberAvatarPath(m)]),
+    decksOf(m),
   ]);
   if (isStale()) return;
 
@@ -39,7 +41,7 @@ export default async function profile(el, { params, isStale }) {
   const target = isMe ? { kind: 'profile', id: state.profile.id } : { kind: 'member', id: m.id };
   const showBack = !!params.memberId && params.memberId !== mineId;
 
-  const av = avatar({ name, url: urls[avPath], size: 72 });
+  const av = avatar({ name, url: urls[avPath], size: 72, ring: decks.length > 0, color: decks[0] ? playerColor(decks[0]) : '' });
   mount(el, html`
     ${showBack ? html`<div class="head"><a class="icon-btn" href="#/gruppen" aria-label="${t('common.back')}">${icon('back')}</a></div>` : ''}
     <div class="prof-head">
@@ -72,7 +74,12 @@ export default async function profile(el, { params, isStale }) {
 
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('profile.decks')}</h3></div>
-      <div class="card">${empty('play', t('profile.decks'), t('profile.decksSoon'))}</div>
+      ${decks.length ? html`<div class="decks">${decks.map((d) => html`
+        <a class="deck-card" href="#/deck/${d.id}" style="--c:${playerColor(d)}">
+          <span class="arts ${d.partner_image_url ? 'split' : ''}">${[d.image_url, d.partner_image_url].filter(Boolean).map((a) => html`<span style="background-image:url('${a}')"></span>`)}</span>
+          <span class="info"><b>${d.short_name}</b><span class="meta">${manaPips(sortColors(d.color_identity), 10)}<span>${t('decks.bracket')} ${d.bracket} · ${bracketName(d.bracket)}</span></span></span>
+        </a>`)}</div>` : html`<div class="card">${empty('play', t('decks.none'), isMe || isGuest ? '' : t('decks.noneOther', { name }))}</div>`}
+      ${canEdit ? html`<a class="btn soft" href="#/deck-neu/${m.id}">${icon('plus', 20)}${t('decks.add')}</a>` : ''}
     </div>
 
     ${isAdmin() && !isGuest && !isMe ? html`
