@@ -12,7 +12,7 @@ import path from 'node:path';
 import { freshDb, tools, U, MIGRATIONS } from './harness.mjs';
 
 const FILE = '20261111000000_spielen.sql';
-const EXPECTED = 38;
+const EXPECTED = 41;
 let db, as, su, q, err;
 let ran = 0;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
@@ -346,32 +346,45 @@ check('F5 Fremder B beendet ⇒ Fehler (wie unbekanntes Spiel), Spiel bleibt liv
 
 // ---------------------------------------------------------------- D: Feldfarbe und Pins
 const deckRow = async (id) => { await su(); return (await q(`select * from decks where id = $1`, [id]))[0]; };
-check('D1 Feldfarbe fremdes Konto-Deck: C setzt A1 ⇒ ok, nur field_color geändert', async () => {
+const FIELD = `select * from set_deck_field_color($1, $2, $3)`;
+const field = (deck, mode, color = null) => q(FIELD, [deck, mode, color]).then((r) => r[0]);
+const fieldErr = (deck, mode, color = null) => err(FIELD, [deck, mode, color]);
+const bg = (r) => `${r.field_mode}|${r.field_color}`;
+check('D1 Feldhintergrund fremdes Konto-Deck: neues Deck = art; C setzt A1 auf color #2D6DB5 ⇒ ok, nur field_mode/field_color geändert', async () => {
   const before0 = await deckRow(D.A1);
+  ok(bg(before0) === 'art|null', bg(before0));
   await as(U.C);
-  const [r] = await q(`select * from set_deck_field_color($1, '#2D6DB5')`, [D.A1]);
+  const r = await field(D.A1, 'color', '#2D6DB5');
   const after0 = await deckRow(D.A1);
-  ok(r.field_color === '#2D6DB5' && after0.field_color === '#2D6DB5');
-  ok(JSON.stringify({ ...before0, field_color: null }) === JSON.stringify({ ...after0, field_color: null }));
+  ok(bg(r) === 'color|#2D6DB5' && bg(after0) === 'color|#2D6DB5', `${bg(r)} ${bg(after0)}`);
+  const rest = (x) => JSON.stringify({ ...x, field_color: null, field_mode: null });
+  ok(rest(before0) === rest(after0));
 });
-check('D2 Feldfarbe zurück auf null', async () => {
+check('D2 alle drei Modi setzbar: commander, color, art (mit/ohne Farbe), zurück auf art/null', async () => {
   await as(U.C);
-  await q(`select * from set_deck_field_color($1, null)`, [D.A1]);
-  ok((await deckRow(D.A1)).field_color === null);
+  ok(bg(await field(D.A1, 'commander')) === 'commander|null');
+  ok(bg(await field(D.A1, 'color', '#aabbcc')) === 'color|#aabbcc');
+  ok(bg(await field(D.A1, 'art', '#aabbcc')) === 'art|#aabbcc', 'Farbe darf bei art mitgemerkt werden');
+  ok(bg(await field(D.A1, 'commander', '#112233')) === 'commander|#112233');
+  ok(bg(await field(D.A1, 'art')) === 'art|null');
+  ok(bg(await deckRow(D.A1)) === 'art|null');
 });
-check('D3 ungültige Farbe ⇒ Fehler', async () => {
+check('D3 ungültige Farbe ⇒ Fehler (in jedem Modus)', async () => {
   await as(U.C);
-  for (const c of ['red', '#12345', '#GGGGGG', '#2D6DB5 ', '']) ok(/Ungültige Farbe/.test(await err(`select * from set_deck_field_color($1, $2)`, [D.A1, c])), c);
-  ok((await deckRow(D.A1)).field_color === null);
+  for (const mode of ['color', 'art', 'commander'])
+    for (const c of ['red', '#12345', '#GGGGGG', '#2D6DB5 ', '']) ok(/Ungültige Farbe/.test(await fieldErr(D.A1, mode, c)), `${mode} ${c}`);
+  ok(bg(await deckRow(D.A1)) === 'art|null');
 });
 check('D4 Fremder B setzt A1 ⇒ Fehler (wie unbekanntes Deck)', async () => {
   await as(U.B);
-  const e1 = await err(`select * from set_deck_field_color($1, '#000000')`, [D.A1]);
-  const e2 = await err(`select * from set_deck_field_color($1, '#000000')`, [NOBODY]);
+  const e1 = await fieldErr(D.A1, 'color', '#000000');
+  const e2 = await fieldErr(NOBODY, 'color', '#000000');
   const e3 = await err(`select * from set_deck_counter_pins($1, array['speed'])`, [D.A1]);
-  ok(e1 && /nicht gefunden/.test(e1) && e1 === e2 && e3 === e1, `${e1} | ${e2} | ${e3}`);
+  const e4 = await fieldErr(D.A1, 'commander');
+  const e5 = await fieldErr(D.A1, 'bild'); // Rechte vor Eingabe: Fehlertext verrät nichts übers Deck
+  ok(e1 && /nicht gefunden/.test(e1) && e1 === e2 && e3 === e1 && e4 === e1 && e5 === e1, `${e1} | ${e2} | ${e3} | ${e4} | ${e5}`);
   const r = await deckRow(D.A1);
-  ok(r.field_color === null && JSON.stringify(r.counter_pins) === '["poison","tax"]');
+  ok(bg(r) === 'art|null' && JSON.stringify(r.counter_pins) === '["poison","tax"]');
 });
 check('D5 Pins: [poison, tax, poison, speed] ⇒ [poison, tax, speed]; leer erlaubt; Platzhalter-Deck ok', async () => {
   await as(U.C);
@@ -380,7 +393,7 @@ check('D5 Pins: [poison, tax, poison, speed] ⇒ [poison, tax, speed]; leer erla
   ok(JSON.stringify((await deckRow(D.A1)).counter_pins) === '["poison","tax","speed"]');
   await as(U.C);
   ok(JSON.stringify((await q(`select * from set_deck_counter_pins($1, '{}'::text[])`, [D.T1]))[0].counter_pins) === '[]');
-  ok(!(await err(`select * from set_deck_field_color($1, '#aabbcc')`, [D.T1])));
+  ok(!(await fieldErr(D.T1, 'color', '#aabbcc')));
 });
 check('D6 Pins ungültig ⇒ Fehler', async () => {
   await as(U.C);
@@ -392,14 +405,61 @@ check('D6 Pins ungültig ⇒ Fehler', async () => {
 check('D7 direktes UPDATE bleibt gesperrt: 0 Zeilen', async () => {
   await as(U.C);
   const upd = await q(`update decks set field_color = '#000000' where id = $1 returning id`, [D.A1]);
-  ok(upd.length === 0 && (await deckRow(D.A1)).field_color === null);
+  const upd2 = await q(`update decks set field_mode = 'commander' where id = $1 returning id`, [D.A1]);
+  ok(upd.length === 0 && upd2.length === 0 && bg(await deckRow(D.A1)) === 'art|null');
+});
+check('D8 ungültiger Modus ⇒ Fehler, Deck unverändert (RPC und direkter Besitzer-Weg)', async () => {
+  await as(U.C);
+  for (const mode of ['bild', 'ART', 'Color', '', ' art', null]) ok(/Ungültiger Modus/.test(await fieldErr(D.A1, mode, '#2D6DB5')), String(mode));
+  ok(/Ungültiger Modus/.test(await err(`select * from set_deck_field_color($1, 'bild')`, [D.A1])), 'ohne Farbe');
+  // Besitzer darf per RLS direkt UPDATE/INSERT: dort greift der Constraint
+  await as(U.A);
+  ok(/decks_field_mode_check/.test(await err(`update decks set field_mode = 'bild' where id = $1`, [D.A1])), 'UPDATE');
+  ok(/decks_field_mode_check/.test(await err(`insert into decks (owner_profile_id, commander_name, short_name, field_mode) values ($1, 'X', 'X', 'bunt')`, [U.A])), 'INSERT');
+  ok(bg(await deckRow(D.A1)) === 'art|null');
+});
+check('D9 color ohne Farbe ⇒ Fehler (RPC und direkter Besitzer-Weg)', async () => {
+  await as(U.C);
+  ok(/Ungültige Farbe/.test(await fieldErr(D.A1, 'color')), 'RPC color/null');
+  ok(/Ungültige Farbe/.test(await err(`select * from set_deck_field_color($1, 'color')`, [D.A1])), 'RPC ohne 3. Argument');
+  ok(bg(await deckRow(D.A1)) === 'art|null');
+  await as(U.A);
+  ok(/decks_field_mode_color_check/.test(await err(`update decks set field_mode = 'color' where id = $1`, [D.A1])), 'UPDATE ohne Farbe');
+  ok(/decks_field_mode_color_check/.test(await err(`insert into decks (owner_profile_id, commander_name, short_name, field_mode) values ($1, 'X', 'X', 'color')`, [U.A])), 'INSERT ohne Farbe');
+  await as(U.C);
+  ok(bg(await field(D.A1, 'color', '#2D6DB5')) === 'color|#2D6DB5');
+  await as(U.A);
+  ok(/decks_field_mode_color_check/.test(await err(`update decks set field_color = null where id = $1`, [D.A1])), 'Farbe löschen bei color');
+  ok(bg(await deckRow(D.A1)) === 'color|#2D6DB5');
+  await as(U.C);
+  ok(bg(await field(D.A1, 'art')) === 'art|null');
+});
+check('D10 Bestand: Decks von vor der Migration bekommen art, Farbe bleibt, Migration läuft durch', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ttg-p4-alt-'));
+  let old;
+  try {
+    for (const f of fs.readdirSync(MIGRATIONS)) if (f.endsWith('.sql') && f !== FILE) fs.copyFileSync(path.join(MIGRATIONS, f), path.join(dir, f));
+    old = await freshDb({ migrations: dir });
+    await old.query(`insert into auth.users (id, email) values ($1, 'a@x.de')`, [U.A]);
+    await old.query(`insert into decks (owner_profile_id, commander_name, short_name, field_color) values ($1, 'Alt1', 'Alt1', '#2D6DB5'), ($1, 'Alt2', 'Alt2', null)`, [U.A]);
+    await old.exec(fs.readFileSync(path.join(MIGRATIONS, FILE), 'utf8'));
+    const rows = (await old.query(`select short_name, field_mode, field_color from decks order by short_name`)).rows;
+    ok(JSON.stringify(rows) === JSON.stringify([
+      { short_name: 'Alt1', field_mode: 'art', field_color: '#2D6DB5' },
+      { short_name: 'Alt2', field_mode: 'art', field_color: null },
+    ]), JSON.stringify(rows));
+  } finally {
+    await old?.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // ---------------------------------------------------------------- X: Rechte, Rückwärts
 const RPCS = [
   ['start_game', `select * from start_game($1, 'seiten', 40, 0, $2::jsonb, '2026-11-11')`, () => [g.id, JSON.stringify([P(mA, D.A1, 0), P(mC, D.C1, 1)])]],
   ['finish_game', `select * from finish_game($1, 'aborted', 1, null)`, () => [gL99.id]],
-  ['set_deck_field_color', `select * from set_deck_field_color($1, '#000000')`, () => [D.G1]],
+  ['set_deck_field_color', `select * from set_deck_field_color($1, 'color', '#000000')`, () => [D.G1]],
+  ['set_deck_field_color(commander)', `select * from set_deck_field_color($1, 'commander')`, () => [D.G1]],
   ['set_deck_counter_pins', `select * from set_deck_counter_pins($1, array['speed'])`, () => [D.G1]],
 ];
 check('X1 anon und anonymes Konto: jede neue RPC ⇒ Fehler (auch auf eigenem Deck)', async () => {
@@ -414,7 +474,7 @@ check('X1 anon und anonymes Konto: jede neue RPC ⇒ Fehler (auch auf eigenem De
   }
   ok(await counts() === before0);
   const r = await deckRow(D.G1);
-  ok(r.field_color === null && JSON.stringify(r.counter_pins) === '["poison","tax"]');
+  ok(bg(r) === 'art|null' && JSON.stringify(r.counter_pins) === '["poison","tax"]');
   ok((await q(`select status from games where id = $1`, [gL99.id]))[0].status === 'live');
   const priv = await q(`select p.proname, has_function_privilege('anon', p.oid, 'execute') a, has_function_privilege('authenticated', p.oid, 'execute') u
                         from pg_proc p where p.pronamespace = 'public'::regnamespace

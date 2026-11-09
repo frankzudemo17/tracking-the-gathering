@@ -11,8 +11,10 @@
 -- 3. start_game(...): Spieleabend finden/anlegen, Spiel und alle Spieler in einer
 --    Transaktion; prüft Mitgliedschaft, 2–6 Spieler, Sitze, Decks, Startleben.
 -- 4. finish_game(...): Spiel werten (finished, Plätze 1..n) oder verwerfen (aborted).
--- 5. set_deck_field_color(...) / set_deck_counter_pins(...): Feldfarbe und Zähler-Pins
---    eines Decks dürfen alle angemeldeten Mitspieler setzen, die das Deck sehen;
+-- 5. decks.field_mode ('art' | 'color' | 'commander', Standard 'art'; 'color' nur
+--    mit field_color). set_deck_field_color(p_deck, p_mode, p_color) /
+--    set_deck_counter_pins(...): Feldhintergrund und Zähler-Pins eines Decks dürfen
+--    alle angemeldeten Mitspieler setzen, die das Deck sehen;
 --    direktes UPDATE auf decks bleibt Besitzer-only.
 -- 6. ev_insert: Quelle/Ziel müssen Spieler DIESES Spiels sein, actor Mitglied der
 --    Spielgruppe (vorher reichte irgendein Mitglied irgendeiner Gruppe).
@@ -208,17 +210,34 @@ end $$;
 -- 5. Feldfarbe und Zähler-Pins eines Decks (HANDOFF 5.4/5.4a: pro Deck gespeichert)
 -- Erlaubt: wer das Deck bearbeiten darf ODER (angemeldet, nicht anonym, und das
 -- Deck sehen darf = teilt eine Gruppe mit dem Besitzer). Anonyme Konten nie
--- (Abnahme X1). Ändert nur die eine Spalte.
+-- (Abnahme X1). Ändert nur die eine Spalte (Feldhintergrund: field_mode + field_color).
+--
+-- Feldhintergrund pro Deck (WELLE E2/F1): 'art' = Commander-Bild (Standard),
+-- 'color' = eigene Farbe (field_color), 'commander' = Commander-Farben getönt.
+-- Konsistenz 'color' ⇒ field_color gesetzt als CHECK auf der Tabelle, nicht nur in
+-- der RPC: auch der Besitzer schreibt per direktem UPDATE/INSERT auf decks, und
+-- nur ein Constraint hält jeden Schreibweg dicht. Bestand verletzt ihn nicht
+-- (alle Decks bekommen 'art').
 -- ---------------------------------------------------------------------------
-create or replace function public.set_deck_field_color(p_deck uuid, p_color text)
+alter table public.decks add column field_mode text not null default 'art'
+  constraint decks_field_mode_check check (field_mode in ('art', 'color', 'commander'));
+alter table public.decks add constraint decks_field_mode_color_check
+  check (field_mode <> 'color' or field_color is not null);
+
+-- Setzt beide Spalten genau wie übergeben. p_color ist bei 'color' Pflicht, bei
+-- 'art'/'commander' optional (der Client darf die zuletzt gewählte Farbe mitgeben,
+-- null löscht sie).
+create or replace function public.set_deck_field_color(p_deck uuid, p_mode text, p_color text default null)
 returns public.decks language plpgsql security definer set search_path = public as $$
 declare d decks;
 begin
   if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
   select * into d from decks where id = p_deck;
   if d.id is null or not (public.can_edit_deck(d) or public.can_see_deck(d)) then raise exception 'Deck nicht gefunden'; end if;
+  if p_mode is null or p_mode not in ('art', 'color', 'commander') then raise exception 'Ungültiger Modus'; end if;
   if p_color is not null and p_color !~ '^#[0-9A-Fa-f]{6}$' then raise exception 'Ungültige Farbe'; end if;
-  update decks set field_color = p_color where id = p_deck returning * into d;
+  if p_mode = 'color' and p_color is null then raise exception 'Ungültige Farbe'; end if;
+  update decks set field_mode = p_mode, field_color = p_color where id = p_deck returning * into d;
   return d;
 end $$;
 
@@ -290,14 +309,14 @@ drop function public.gp_valid(uuid, uuid, uuid);
 revoke execute on function
   public.start_game(uuid, public.table_layout, int, int, jsonb, date),
   public.finish_game(uuid, public.game_status, int, jsonb),
-  public.set_deck_field_color(uuid, text),
+  public.set_deck_field_color(uuid, text, text),
   public.set_deck_counter_pins(uuid, text[])
 from public, anon;
 
 grant execute on function
   public.start_game(uuid, public.table_layout, int, int, jsonb, date),
   public.finish_game(uuid, public.game_status, int, jsonb),
-  public.set_deck_field_color(uuid, text),
+  public.set_deck_field_color(uuid, text, text),
   public.set_deck_counter_pins(uuid, text[])
 to authenticated;
 
@@ -306,7 +325,7 @@ revoke execute on function public.deck_in_group(uuid, uuid) from public, anon, a
 
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen; Zeilen ohne „-- “ ausführen, Reihenfolge einhalten).
--- Datenverlust: nur die Spalte game_events.seq (Inhalt geht verloren).
+-- Datenverlust: die Spalten game_events.seq und decks.field_mode (Inhalt geht verloren).
 -- Der DB-Test X2 führt genau diesen Block aus.
 -- RÜCKWÄRTS-BEGINN
 -- create or replace function public.gp_valid(p_game uuid, p_member uuid, p_elim uuid)
@@ -331,7 +350,9 @@ revoke execute on function public.deck_in_group(uuid, uuid) from public, anon, a
 --   with check (exists (select 1 from games g where g.id = game_id and g.status = 'live' and public.is_group_member(g.playgroup_id)));
 -- drop function public.ev_valid(uuid, uuid, uuid, uuid);
 -- drop function public.set_deck_counter_pins(uuid, text[]);
--- drop function public.set_deck_field_color(uuid, text);
+-- drop function public.set_deck_field_color(uuid, text, text);
+-- alter table public.decks drop constraint decks_field_mode_color_check;
+-- alter table public.decks drop column field_mode;  -- Datenverlust: Feldhintergrund-Modus
 -- drop function public.finish_game(uuid, public.game_status, int, jsonb);
 -- drop function public.start_game(uuid, public.table_layout, int, int, jsonb, date);
 -- drop function public.deck_in_group(uuid, uuid);
