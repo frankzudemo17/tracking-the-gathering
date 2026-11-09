@@ -11,10 +11,10 @@ import { t, fmtDate, getLang } from '../i18n/index.js';
 import { go } from '../router.js';
 import { MEMBER_SELECT } from './groups.js';
 
-// Vorschau je Look: Hintergrund, Fläche, Hauptknopf
-const LOOKS = {
-  nacht: ['#0F1729', '#24325A', '#F3F6FC'], arktis: ['#DCE7F3', '#F7FAFD', '#0E1A2B'], lachs: ['#F2DCD3', '#FFF7F4', '#3B2420'],
-};
+// Decks auf- oder zugeklappt: pro Gerät gemerkt (reine Ansichtssache)
+const DECKS_KEY = 'ttg.decksOpen';
+const decksOpenPref = () => { try { return localStorage.getItem(DECKS_KEY) !== '0'; } catch { return true; } };
+const setDecksOpenPref = (v) => { try { localStorage.setItem(DECKS_KEY, v ? '1' : '0'); } catch { /* egal */ } };
 
 export default async function profile(el, { params, isStale }) {
   const mineId = currentMembership()?.id;
@@ -40,10 +40,14 @@ export default async function profile(el, { params, isStale }) {
   const group = state.memberships.find((x) => x.playgroup_id === m.playgroup_id)?.playgroups || currentGroup();
   const target = isMe ? { kind: 'profile', id: state.profile.id } : { kind: 'member', id: m.id };
   const showBack = !!params.memberId && params.memberId !== mineId;
+  const decksOpen = decksOpenPref();
 
   const av = avatar({ name, url: urls[avPath], size: 72 });
   mount(el, html`
-    ${showBack ? html`<div class="head"><a class="icon-btn" href="#/gruppen" aria-label="${t('common.back')}">${icon('back')}</a></div>` : ''}
+    ${showBack || isMe ? html`<div class="prof-top">
+      ${showBack ? html`<a class="icon-btn" href="#/gruppen" aria-label="${t('common.back')}">${icon('back')}</a>` : html`<span></span>`}
+      ${isMe ? html`<a class="icon-btn" href="#/einstellungen" aria-label="${t('profile.settings')}">${icon('gear', 22)}</a>` : ''}
+    </div>` : ''}
     <div class="prof-head">
       ${canEdit
         ? html`<button type="button" class="avatar-edit" data-act="photo" aria-label="${t('avatar.change', { name })}">${av}<span class="cam">${icon('camera', 14)}</span></button>`
@@ -73,46 +77,37 @@ export default async function profile(el, { params, isStale }) {
     </div>
 
     <div class="section">
-      <div class="section-head"><h3 class="section-title">${t('profile.decks')}</h3></div>
+      <button type="button" class="collapse-head" data-act="toggle-decks" aria-expanded="${decksOpen}" aria-controls="prof-decks">
+        <h3 class="section-title">${t('profile.decks')} <span class="count">${decks.length}</span></h3>
+        ${decks.length ? html`<span class="deck-minis" aria-hidden="true">${decks.slice(0, 5).map((d) => html`<i style="background-image:url('${d.image_url}')"></i>`)}</span>` : ''}
+        <span class="chev">${icon('chevDown', 20)}</span>
+      </button>
+      <div id="prof-decks" class="section" ${decksOpen ? '' : html`hidden`}>
       ${decks.length ? html`<div class="decks">${decks.map((d) => html`
         <a class="deck-card" href="#/deck/${d.id}">
           <span class="arts ${d.partner_image_url ? 'split' : ''}">${[d.image_url, d.partner_image_url].filter(Boolean).map((a) => html`<span style="background-image:url('${a}')"></span>`)}</span>
           <span class="info"><b>${d.short_name}</b><span class="meta">${manaPips(sortColors(d.color_identity), 10)}<span>${t('decks.bracket')} ${d.bracket} · ${bracketName(d.bracket)}</span></span></span>
         </a>`)}</div>` : html`<div class="card">${empty('play', t('decks.none'), isMe || isGuest ? '' : t('decks.noneOther', { name }))}</div>`}
       ${canEdit ? html`<a class="btn soft" href="#/deck-neu/${m.id}">${icon('plus', 20)}${t('decks.add')}</a>` : ''}
+      </div>
     </div>
 
     ${isAdmin() && !isGuest && !isMe ? html`
     <button type="button" class="btn soft" data-act="role">${icon('shield', 18)}${m.role === 'admin' ? t('profile.removeAdmin') : t('profile.makeAdmin')}</button>` : ''}
 
-    ${isMe ? html`
-    <div class="section">
-      <div class="section-head"><h3 class="section-title">${t('profile.settings')}</h3></div>
-      <div class="card">
-        <div class="set-row">
-          <span class="small" style="font-weight:600">${t('profile.language')}</span>
-          <div class="seg">${['de', 'en'].map((l) => html`<button type="button" data-lang="${l}" aria-pressed="${state.profile.locale === l}">${l.toUpperCase()}</button>`)}</div>
-        </div>
-        <div class="field">
-          <span class="small" style="font-weight:600">${t('profile.look')}</span>
-          <div class="looks">${Object.entries(LOOKS).map(([k, [a, b, c]]) => html`
-            <button type="button" class="look" data-look="${k}" aria-pressed="${state.profile.theme === k}">
-              <span class="sw" style="background:${a}"><i style="background:${b}"></i><i style="background:${c}"></i></span>${t(`profile.looks.${k}`)}</button>`)}
-          </div>
-        </div>
-        <a class="set-link" href="#/gruppen">${t('profile.manageGroups')}${icon('chevRight', 18)}</a>
-        <button type="button" class="btn danger" data-act="logout">${icon('logout', 18)}${t('profile.logout')}</button>
-      </div>
-    </div>` : ''}`);
+`);
 
   const rerender = () => go(location.hash.slice(1));
 
   on(el, 'click', '[data-act="photo"]', () => openAvatarSheet({ name, url: urls[avPath], has: !!avPath, target, isMe, onDone: rerender }));
   on(el, 'click', '[data-act="rename"]', () => openRename({ name, isMe, member: m, onDone: rerender }));
   on(el, 'click', '[data-act="claim-link"]', () => copyText(appUrl(`#/code/${m.claim_code}`)));
-  on(el, 'click', '[data-act="logout"]', () => sb.auth.signOut());
-  on(el, 'click', '[data-lang]', async (e, b) => { try { await updateProfile({ locale: b.dataset.lang }); rerender(); } catch (ex) { toast(errText(ex)); } });
-  on(el, 'click', '[data-look]', async (e, b) => { try { await updateProfile({ theme: b.dataset.look }); rerender(); } catch (ex) { toast(errText(ex)); } });
+  on(el, 'click', '[data-act="toggle-decks"]', (e, b) => {
+    const open = b.getAttribute('aria-expanded') !== 'true';
+    b.setAttribute('aria-expanded', String(open));
+    el.querySelector('#prof-decks').hidden = !open;
+    setDecksOpenPref(open);
+  });
   on(el, 'click', '[data-act="role"]', async (e, b) => {
     await busy(b, async () => {
       try {

@@ -270,3 +270,16 @@
 .auth-card .btn[type="submit"] { margin-top: 2px; }
 .auth-switch { text-align: center; color: var(--mu); font-size: 14px; }
 .auth-switch .link { display: inline; min-height: 0; }
+
+/* Profil: Kopfzeile mit Zurück/Zahnrad, ausklappbare Decks */
+.prof-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: -6px; }
+.collapse-head { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 4px 2px; border: 0; background: transparent; color: var(--ink); text-align: left; }
+.collapse-head .section-title { display: inline-flex; align-items: baseline; gap: 8px; }
+.collapse-head .count { font-family: var(--f-body); font-size: 14px; font-weight: 600; color: var(--mu); }
+.collapse-head .chev { margin-left: auto; color: var(--mu); display: grid; transition: transform .18s ease; }
+.collapse-head[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.deck-minis { display: flex; margin-left: 6px; }
+.deck-minis i { width: 30px; height: 30px; border-radius: 50%; background-size: cover; background-position: center 25%; box-shadow: 0 0 0 2px var(--bg); }
+.deck-minis i + i { margin-left: -9px; }
+.collapse-head[aria-expanded="true"] .deck-minis { display: none; }
+.row-ic { color: var(--acc2); display: grid; }

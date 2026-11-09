@@ -325,7 +325,7 @@ Franco gibt keinen Schlüssel in den Chat, sondern meldet sich selbst an. Ablauf
 2. ✅ **Decks** (09.11.2026): Scryfall-Suche inkl. Partner (Partner, Partner with, Friends forever, Background, Doctor/Companion), Bracket, Deck-Link, Deckprofil-Grundgerüst, Spielerfarbe aus dem Commander.
 3. **Spielen:** Setup mit Sitzordnung und Layouts, Feldfarben, Lifecounter komplett (Tippen, Zähler, Pins, Mittelknopf, Verlauf, Rückgängig), Angriff per Ziehen mit Zielfernrohr, Würfeltisch, Ereignisse speichern, K.O.-Screens.
 4. **Spielende und Historie:** Ergebnis, Bewertungen, Deck-Salt, Play of the Game, Foto, Historie nach Abenden, Spieldetail.
-5. **Statistik:** Rangliste (Spieler, Decks, Salt), Profile mit Tempo und Nemesis, Deckprofile, Spieleabend-Karte zum Teilen.
+5. **Statistik:** Rangliste (Spieler, Decks, Salt), Profile mit Tempo und Nemesis, Deckprofile, Spieleabend-Karte zum Teilen. Dazu **Profil-Stats als Highlight-Kacheln** (Franco 09.11.2026): Siegquote/Ø Platz/Punkte im Verlauf, Tempo, Nemesis, Lieblings- und bestes Deck, längste Siegesserie, schnellster Sieg, Salt/Spaß; optional wechselnder Titel unter dem Namen. Keine Abzeichen zum Freischalten.
 6. **Live und Feinschliff:** Realtime auf mehreren Handys, Offline-Warteschlange, Wake Lock, Englisch fertig übersetzen, Barrierefreiheit prüfen, Bestätigungsmail bei Registrierung wieder einschalten (in der Testphase aus).
 
 Nach jeder Etappe kurz mit Franco abstimmen und auf GitHub Pages veröffentlichen.
