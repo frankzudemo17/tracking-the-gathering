@@ -40,7 +40,7 @@ export function bindPwToggles(el) {
     input.type = show ? 'text' : 'password';
     b.setAttribute('aria-pressed', String(show));
     b.setAttribute('aria-label', show ? t('auth.hidePw') : t('auth.showPw'));
-    b.innerHTML = String(icon(show ? 'eyeOff' : 'eye', 20));
+    mount(b, icon(show ? 'eyeOff' : 'eye', 20));
   });
 }
 
