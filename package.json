@@ -1,0 +1,15 @@
+{
+  "name": "tracking-the-gathering",
+  "private": true,
+  "type": "module",
+  "description": "Lokales Test-Gate (kein Build-Schritt): typecheck · lint · test · build",
+  "scripts": {
+    "typecheck": "node tools/gate/syntax.mjs",
+    "lint": "node tools/gate/lint.mjs",
+    "test": "node tools/gate/test.mjs",
+    "build": "node tools/gate/build-check.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.15"
+  }
+}
