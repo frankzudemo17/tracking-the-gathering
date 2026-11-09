@@ -62,7 +62,14 @@ for (const f of gameJs) {
 }
 summary.push(`L3 src/game rein · Suchraum src/game/**/*.{js,mjs} · ${gameJs.length} Dateien${fs.existsSync(GAME) ? '' : ' (Ordner existiert noch nicht)'}`);
 
-// ---- L4: kein JWT mit role=service_role (Payload dekodieren, kein grep auf das Wort)
+// ---- L4: keine Server-Schlüssel im Repo.
+// (a) kein JWT mit role=service_role in src/ + index.html + sw.js (Payload dekodieren, kein grep auf das Wort).
+// (b) Nachtrag Dirigent 2026-11-09: in allen .js/.mjs/.html/.json außerhalb von supabase/migrations
+//     (und Doku *.md, die ohnehin keine dieser Endungen trägt) schlagen zusätzlich an:
+//     Supabase-Secret-Keys sb_secret_… (Rohtext, auch in Kommentaren — ein Schlüssel im Kommentar
+//     ist trotzdem geleakt) und das Wort für die Server-Rolle (reine Kommentarzeilen ausgenommen).
+// Das Wort wird hier aus Teilen gebaut, damit diese Datei sich nicht selbst meldet.
+const SR = ['service', 'role'].join('_');
 const l4files = [...walk(SRC), path.join(ROOT, 'index.html'), path.join(ROOT, 'sw.js')].filter((f) => fs.existsSync(f));
 emptyGuard('L4', l4files, 'src');
 let tokens = 0;
@@ -74,12 +81,28 @@ for (const f of l4files) {
     try { payload = Buffer.from(m[1], 'base64url').toString('utf8'); } catch { /* kein Base64 */ }
     let role = null;
     try { role = JSON.parse(payload).role; } catch { /* kein JSON */ }
-    if (role === 'service_role' || /"role"\s*:\s*"service_role"/.test(payload)) {
-      report(f, lineOf(text, m.index), 'L4', 'JWT mit role=service_role — dieser Schlüssel gehört nie ins Frontend');
+    if (role === SR || new RegExp(`"role"\\s*:\\s*"${SR}"`).test(payload)) {
+      report(f, lineOf(text, m.index), 'L4', 'JWT mit Server-Rolle im Payload — dieser Schlüssel gehört nie ins Frontend');
     }
   }
 }
-summary.push(`L4 kein service_role-JWT · Suchraum src/** + index.html + sw.js · ${l4files.length} Dateien · ${tokens} JWT dekodiert`);
+summary.push(`L4a kein Server-Rollen-JWT · Suchraum src/** + index.html + sw.js · ${l4files.length} Dateien · ${tokens} JWT dekodiert`);
+
+// Einzige Ausnahme für das Wort (nicht für sb_secret_): die Supabase-Attrappe des DB-Harness legt
+// die Rolle per SQL an (Inhalt aus test-entwurf/dbtest.mjs unverändert, Spec P1). Dateigenau,
+// kein Ordner — Folgedateien unter tests/db/ werden voll geprüft.
+const L4_WORD_EXEMPT = new Set(['tests/db/harness.mjs']);
+const MIGR = path.join(ROOT, 'supabase', 'migrations');
+const l4bFiles = walk(ROOT, ['.js', '.mjs', '.html', '.json'])
+  .filter((f) => !f.startsWith(MIGR + path.sep) && !f.endsWith('.md'));
+emptyGuard('L4', l4bFiles, '.');
+const SECRET = /sb_secret_[A-Za-z0-9_-]{10,}/g;
+const WORD = new RegExp(`\\b${SR}\\b`, 'g');
+for (const f of l4bFiles) {
+  scan(f, SECRET, 'L4', () => 'Supabase-Secret-Key (sb_secret_…) gehört nie ins Repo', { strip: false });
+  if (!L4_WORD_EXEMPT.has(rel(f))) scan(f, WORD, 'L4', () => `Wort „${SR}“ außerhalb von Migrationen/Doku (Server-Schlüssel?)`);
+}
+summary.push(`L4b sb_secret_ + Wort ${SR} · Suchraum **/*.{js,mjs,html,json} ohne supabase/migrations, node_modules, .* · ${l4bFiles.length} Dateien · Wort-Ausnahme: ${[...L4_WORD_EXEMPT].join(', ')}`);
 
 // ---- L5: i18n-Parität de.js ↔ en.js (Blattschlüssel)
 const leaves = (obj, pre = '') => Object.entries(obj).flatMap(([k, v]) =>
