@@ -220,7 +220,6 @@
 .deck-card .arts { display: grid; grid-template-columns: 1fr; height: 104px; position: relative; }
 .deck-card .arts.split { grid-template-columns: 1fr 1fr; }
 .deck-card .arts > span { background-size: cover; background-position: center 25%; }
-.deck-card .arts::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--c); }
 .deck-card .info { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .deck-card .info b { font-family: var(--f-display); font-size: 17px; font-weight: 700; letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .deck-card .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--mu); flex-wrap: wrap; }
@@ -237,7 +236,6 @@
 .btn.soft svg, .sheet-opt svg { color: var(--acc2); }
 .sheet-opt.danger svg { color: var(--danger); }
 .result > svg { color: var(--acc2); }
-.avatar.ring { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--c, var(--acc2)); }
 
 /* Kopf der Startseite: Gruppe links, Logo mittig, Profil rechts */
 .top { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }

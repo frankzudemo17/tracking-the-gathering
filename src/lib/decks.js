@@ -14,7 +14,7 @@ const WUBRG = ['W', 'U', 'B', 'R', 'G'];
 /** Farben in WUBRG-Reihenfolge */
 export const sortColors = (cols) => WUBRG.filter((c) => (cols || []).includes(c));
 
-/** Spielerfarbe = erste Commander-Farbe (WUBRG-Reihenfolge), farblos = grau */
+/** Farbe aus erster Commander-Farbe (WUBRG), farblos = grau. Nur für Diagramme gedacht, nicht als Spielerfarbe in der Oberfläche (Franco, 09.11.2026). */
 export function playerColor(deck) {
   const c = sortColors(deck?.color_identity)[0];
   return c ? `var(--p-${c.toLowerCase()})` : 'var(--p-c)';

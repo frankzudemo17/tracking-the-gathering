@@ -2,7 +2,7 @@
 // Strategie: eigene Dateien „Netz zuerst, sonst Cache“ (so kommen Updates sofort an),
 // Google Fonts „Cache zuerst“. Supabase-Anfragen werden nie gecacht.
 // Die Ereignis-Warteschlange für Offline-Spiele folgt in Etappe 5/6.
-const VERSION = 'ttg-v6';
+const VERSION = 'ttg-v7';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './src/styles/tokens.css', './src/styles/base.css', './src/styles/components.css',

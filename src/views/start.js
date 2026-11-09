@@ -8,7 +8,7 @@ import { avatar, empty, memberName, memberAvatarPath } from '../lib/parts.js';
 import { toast } from '../lib/ui.js';
 import { t } from '../i18n/index.js';
 import { MEMBER_SELECT } from './groups.js';
-import { latestDeckByMember, playerColor } from '../lib/decks.js';
+import { latestDeckByMember } from '../lib/decks.js';
 
 export default async function start(el, { isStale }) {
   const g = currentGroup();
@@ -24,7 +24,7 @@ export default async function start(el, { isStale }) {
   // Spielerbild: Foto, sonst Commander-Art des neuesten Decks, sonst Initialen
   const personAv = (m, size) => {
     const d = latest[m.id];
-    return avatar({ name: memberName(m), url: urls[memberAvatarPath(m)] || d?.image_url || null, size, ring: !!d, color: d ? playerColor(d) : '' });
+    return avatar({ name: memberName(m), url: urls[memberAvatarPath(m)] || d?.image_url || null, size });
   };
   // eigenes Profil zuerst, dann alphabetisch
   members.sort((a, b) => (b.profile_id === me?.id) - (a.profile_id === me?.id) || memberName(a).localeCompare(memberName(b), 'de'));

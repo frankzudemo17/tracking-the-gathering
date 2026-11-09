@@ -60,7 +60,7 @@ Im Prototyp sind alle Daten Beispieldaten (Franco, Luka, Marie, Deniz, Tim ohne 
 > **Neu seit 09.11.2026 (Design-Durchgang mit Franco).** Das Mockup gilt weiter für Funktionen und Abläufe, aber nicht mehr für Farben, Schrift und Icons. Verbindlich sind `src/styles/tokens.css` und die Vorschau https://claude.ai/artifact/JJdCH8yS44WcvddJNGHgTK (Version 4).
 
 ### Leitlinie
-Modern und vermarktbar, nicht nerdig, kein Fantasy-Look. **Commander-Bilder groß und ungetönt** (nur ein neutraler dunkler Verlauf für Lesbarkeit, nie ein Farbschleier). **Spielerfarben nur als Akzent:** Streifen, Ring, Punkt, dünne Balken. Kontrast zwischen Flächen statt Ton-in-Ton.
+Modern und vermarktbar, nicht nerdig, kein Fantasy-Look. **Commander-Bilder groß und ungetönt** (nur ein neutraler dunkler Verlauf für Lesbarkeit, nie ein Farbschleier). **Keine Spielerfarben in der Oberfläche** (nur in Diagrammen). Kontrast zwischen Flächen statt Ton-in-Ton.
 
 ### Looks (im Profil wählbar, `profiles.theme`)
 | Look | Hintergrund | Fläche | Hauptknopf | Akzent |
@@ -71,7 +71,8 @@ Modern und vermarktbar, nicht nerdig, kein Fantasy-Look. **Commander-Bilder gro�
 
 Kein Creme-Weiß. Alle Tokens in `src/styles/tokens.css`. Karten heben sich deutlich vom Hintergrund ab (Franco: „nicht einfarbig, mehr Kontrast“). **Zweiter Akzent `--acc2`** für Links, Symbol-Kacheln, Chips, „Neu“-Knöpfe: Nacht Himmelblau `#6EA8FF`, Arktis Koralle `#E2583F`, Burgund Rosé `#FF8FA3`.
 
-### Spielerfarben (aus der ersten Commander-Farbe)
+### Spielerfarben (nur für Diagramme)
+**Keine Spielerfarbe in der Oberfläche** (Franco, 09.11.2026): keine Rahmen, Ringe, Punkte oder Streifen. Spieler erkennt man an Name, Profilbild und Commander-Bild. Im Lifecounter ist nur „am Zug“ farbig (Bernstein). Die folgenden Farben sind nur für Diagramme (z. B. Schadensbilanz) gedacht und werden dort automatisch vergeben:
 W `#D9A93F`, U `#4C7BE0`, B `#8C74D6`, R `#D9614F`, G `#2F9E78`, farblos `#8A94A3`. Mana-Pips bleiben W `#EFE6C4`, U `#2D6DB5`, B `#3A3337`, R `#C4452F`, G `#2E7D50`.
 
 ### Schrift und Icons

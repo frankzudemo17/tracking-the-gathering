@@ -4,7 +4,7 @@ import { state, currentMembership, currentGroup, isAdmin, updateProfile, loadMe 
 import { html, mount, on, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { avatar, backHead, empty, memberName, memberAvatarPath, roleChip, manaPips } from '../lib/parts.js';
-import { decksOf, playerColor, sortColors, bracketName } from '../lib/decks.js';
+import { decksOf, sortColors, bracketName } from '../lib/decks.js';
 import { sheet, toast, errText, copyText } from '../lib/ui.js';
 import { setAvatar, removeAvatar } from '../lib/avatar.js';
 import { t, fmtDate, getLang } from '../i18n/index.js';
@@ -41,7 +41,7 @@ export default async function profile(el, { params, isStale }) {
   const target = isMe ? { kind: 'profile', id: state.profile.id } : { kind: 'member', id: m.id };
   const showBack = !!params.memberId && params.memberId !== mineId;
 
-  const av = avatar({ name, url: urls[avPath], size: 72, ring: decks.length > 0, color: decks[0] ? playerColor(decks[0]) : '' });
+  const av = avatar({ name, url: urls[avPath], size: 72 });
   mount(el, html`
     ${showBack ? html`<div class="head"><a class="icon-btn" href="#/gruppen" aria-label="${t('common.back')}">${icon('back')}</a></div>` : ''}
     <div class="prof-head">
@@ -75,7 +75,7 @@ export default async function profile(el, { params, isStale }) {
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('profile.decks')}</h3></div>
       ${decks.length ? html`<div class="decks">${decks.map((d) => html`
-        <a class="deck-card" href="#/deck/${d.id}" style="--c:${playerColor(d)}">
+        <a class="deck-card" href="#/deck/${d.id}">
           <span class="arts ${d.partner_image_url ? 'split' : ''}">${[d.image_url, d.partner_image_url].filter(Boolean).map((a) => html`<span style="background-image:url('${a}')"></span>`)}</span>
           <span class="info"><b>${d.short_name}</b><span class="meta">${manaPips(sortColors(d.color_identity), 10)}<span>${t('decks.bracket')} ${d.bracket} · ${bracketName(d.bracket)}</span></span></span>
         </a>`)}</div>` : html`<div class="card">${empty('play', t('decks.none'), isMe || isGuest ? '' : t('decks.noneOther', { name }))}</div>`}
