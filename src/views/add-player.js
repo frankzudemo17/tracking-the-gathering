@@ -13,9 +13,9 @@ export default function addPlayer(el) {
     <form class="form" novalidate>
       <div class="field"><label for="ap-name">${t('addPlayer.name')}</label>
         <input id="ap-name" class="input" autocomplete="off" maxlength="40" placeholder="${t('addPlayer.namePh')}" required></div>
-      <div class="card soft">
+      <div class="note">
         <b>${t('addPlayer.noAccount')}</b>
-        <span class="small">${t('addPlayer.noAccountText')}</span>
+        <p class="small muted" style="margin-top:4px">${t('addPlayer.noAccountText')}</p>
       </div>
       <p class="error" role="alert" hidden></p>
       <button class="btn block" type="submit">${t('addPlayer.create')}</button>

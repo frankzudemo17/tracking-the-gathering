@@ -2,7 +2,7 @@
 
 PWA für Magic: The Gathering Commander. Lifecounter am Tisch, Spielhistorie und Gruppenstatistik.
 
-**Lies zuerst `HANDOFF.md`.** Dort stehen alle Entscheidungen, Funktionen, das Design, das Datenmodell, die Supabase-Einrichtung und die Etappen. `mockup/prototyp.html` ist die verbindliche Referenz für Aussehen und Verhalten.
+**Lies zuerst `HANDOFF.md`.** Dort stehen alle Entscheidungen, Funktionen, das Design, das Datenmodell, die Supabase-Einrichtung und die Etappen. `mockup/prototyp.html` ist die verbindliche Referenz für Funktionen und Verhalten. Das Aussehen ist seit dem Design-Durchgang (09.11.2026) neu festgelegt: siehe `HANDOFF.md` Abschnitt 4 und `src/styles/tokens.css`.
 
 ## Arbeitsweise
 - Sprache mit Franco: Deutsch. UI-Texte Deutsch (Englisch über `src/i18n`).

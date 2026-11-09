@@ -3,28 +3,30 @@ import { html, initials } from './dom.js';
 import { icon } from './icons.js';
 import { t } from '../i18n/index.js';
 
-export function avatar({ name, url, size = 44, plain = false }) {
-  const style = `--av:${size}px;${url ? `background-image:url('${String(url).replace(/'/g, '%27')}');` : ''}`;
-  return html`<span class="avatar ${plain ? 'plain' : ''}" style="${style}" aria-hidden="true">${url ? '' : initials(name)}</span>`;
+/** Runder Avatar: Foto, sonst Initialen. ring = Farbring (z. B. Spielerfarbe), color = CSS-Farbe. */
+export function avatar({ name, url, size = 44, ring = false, color = '' }) {
+  const style = `--av:${size}px;${color ? `--c:${color};` : ''}${url ? `background-image:url('${String(url).replace(/'/g, '%27')}');` : ''}`;
+  return html`<span class="avatar ${ring ? 'ring' : ''}" style="${style}" aria-hidden="true">${url ? '' : initials(name)}</span>`;
 }
 
 export function backHead(title, href = '#/start') {
   return html`<div class="head">
-    <a class="icon-btn" href="${href}" aria-label="${t('common.back')}">${icon('back')}</a>
-    <h2>${title}</h2>
+    <a class="icon-btn" href="${href}" aria-label="${t('common.back')}">${icon('back', 20)}</a>
+    ${title ? html`<h2>${title}</h2>` : ''}
   </div>`;
 }
 
-export const manaPips = (colors = ['W', 'U', 'B', 'R', 'G'], size = 14) =>
+export const manaPips = (colors = ['W', 'U', 'B', 'R', 'G'], size = 12) =>
   html`<span class="pips" aria-hidden="true">${colors.map((c) => html`<span class="pip ${c}" style="width:${size}px;height:${size}px"></span>`)}</span>`;
 
 export function empty(iconName, title, sub) {
-  return html`<div class="empty">${icon(iconName, 32, 1.6)}<b>${title}</b><span class="small">${sub}</span></div>`;
+  return html`<div class="empty"><span class="ic">${icon(iconName, 26)}</span><b>${title}</b>${sub ? html`<span>${sub}</span>` : ''}</div>`;
 }
 
 export const roleChip = (m) => {
   if (!m.profile_id) return html`<span class="chip guest">${t('groups.roles.guest')}</span>`;
-  return html`<span class="chip ${m.role === 'admin' ? 'admin' : ''}">${t(`groups.roles.${m.role}`)}</span>`;
+  if (m.role === 'admin') return html`<span class="chip admin">${icon('shield', 13)}${t('groups.roles.admin')}</span>`;
+  return html`<span class="chip">${t('groups.roles.member')}</span>`;
 };
 
 /** Anzeigename eines Mitglieds: bei Konten der Profilname, sonst der Platzhaltername */

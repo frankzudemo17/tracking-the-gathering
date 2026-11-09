@@ -27,15 +27,16 @@ export default {
   },
 
   welcome: {
-    title: 'Willkommen, {name}!', sub: 'Leg deine erste Playgroup an oder tritt einer bei. Den Code bekommst du von jemandem aus der Gruppe.',
+    title: 'Hallo {name}', sub: 'Leg deine erste Playgroup an oder tritt einer bei. Den Code bekommst du von jemandem aus der Gruppe.',
     create: 'Playgroup anlegen', join: 'Code eingeben',
   },
 
   home: {
-    newRound: 'Neue Runde?', newRoundSub: 'Spieler wählen, Decks zuordnen, Startspieler auswürfeln.',
+    newRound: 'Bereit für die nächste Runde?', newRoundSub: 'Spieler wählen, Decks zuordnen, Startspieler auswürfeln.',
+    players: 'Eure Runde', addShort: 'Neu',
     newGame: 'Neues Spiel', joinGame: 'Spiel beitreten', joinSoon: 'Live-Modus kommt in Etappe 6.',
     leaderboard: 'Rangliste', recent: 'Zuletzt gespielt', all: 'Alle ansehen',
-    noGames: 'Noch keine Spiele', noGamesSub: 'Sobald ihr spielt, stehen hier die letzten Partien und die Rangliste.',
+    noGames: 'Noch keine Spiele', noGamesSub: 'Nach eurem ersten Spiel steht hier, wer vorne liegt.',
     switchGroup: 'Playgroup wechseln',
   },
 
@@ -77,7 +78,7 @@ export default {
     logout: 'Abmelden', rename: 'Namen ändern', save: 'Speichern', saved: 'Gespeichert.',
     makeAdmin: 'Zum Admin machen', removeAdmin: 'Admin-Rechte entziehen', roleChanged: 'Rolle geändert.',
     notFound: 'Dieses Profil gibt es nicht oder du siehst es nicht.',
-    looks: { schiefer: 'Schiefer', gletscher: 'Gletscher', obsidian: 'Obsidian' },
+    looks: { nacht: 'Nacht', arktis: 'Arktis', burgund: 'Burgund' },
   },
 
   avatar: {

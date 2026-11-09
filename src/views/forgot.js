@@ -12,7 +12,7 @@ export default function forgot(el) {
       <div class="field"><label for="fg-mail">${t('auth.email')}</label>
         <input id="fg-mail" class="input" type="email" autocomplete="email" inputmode="email" required></div>
       <p class="error" role="alert" hidden></p>
-      <p class="card soft small" data-ok hidden>${t('auth.linkSent')}</p>
+      <p class="note" data-ok hidden>${t('auth.linkSent')}</p>
       <button class="btn block" type="submit">${t('auth.sendLink')}</button>
     </form>`);
 

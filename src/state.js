@@ -16,11 +16,13 @@ function store(k, v) { try { v == null ? localStorage.removeItem(k) : localStora
 function load(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
 export function applyPrefs(p) {
-  const theme = p?.theme || load('ttg.theme') || 'schiefer';
+  const LOOKS = ['nacht', 'arktis', 'burgund'];
+  const saved = load('ttg.theme');
+  const theme = LOOKS.includes(p?.theme) ? p.theme : LOOKS.includes(saved) ? saved : 'nacht';
   document.documentElement.dataset.theme = theme;
   store('ttg.theme', theme);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue('--hero').trim() || '#2F3A46';
+  if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0D1117';
   setLang(p?.locale || load('ttg.lang') || 'de');
   if (p?.locale) store('ttg.lang', p.locale);
 }

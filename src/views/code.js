@@ -19,6 +19,6 @@ export default async function code(el, { params }) {
     toast(r.message);
   } catch (e) {
     pendingCode.clear();
-    mount(el, html`<div class="empty"><b>${errText(e)}</b><a class="btn ghost" href="#/start">OK</a></div>`);
+    mount(el, html`<div class="empty"><b>${errText(e)}</b><a class="btn soft" href="#/start">OK</a></div>`);
   }
 }

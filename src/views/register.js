@@ -2,12 +2,12 @@ import { sb } from '../supabase.js';
 import { html, mount, on, busy } from '../lib/dom.js';
 import { errText } from '../lib/ui.js';
 import { t } from '../i18n/index.js';
-import { authHead, pendingNote } from './login.js';
+import { authArt, brandTitle, pendingNote } from './login.js';
 
 export default function register(el) {
   el.classList.add('auth');
   mount(el, html`
-    ${authHead(t('auth.registerSub'))}
+    ${authArt(brandTitle(), t('auth.registerSub'))}
     <form class="form" novalidate>
       ${pendingNote()}
       <div class="field"><label for="rg-name">${t('auth.name')}</label>
@@ -18,7 +18,7 @@ export default function register(el) {
         <input id="rg-pass" class="input" type="password" autocomplete="new-password" minlength="8" placeholder="••••••••" required aria-describedby="rg-pw-hint">
         <span id="rg-pw-hint" class="hint">${t('auth.pwHint')}</span></div>
       <p class="error" role="alert" hidden></p>
-      <p class="card soft small" data-mail hidden>${t('auth.checkMail')}</p>
+      <p class="note" data-mail hidden>${t('auth.checkMail')}</p>
       <button class="btn block" type="submit">${t('auth.register')}</button>
       <div class="auth-links"><a class="link" href="#/login">${t('auth.haveAccount')}</a></div>
     </form>`);

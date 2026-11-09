@@ -36,36 +36,36 @@ export default async function groups(el, { isStale }) {
       ${state.memberships.map((m) => html`
         <button type="button" class="pick" data-group="${m.playgroup_id}" aria-pressed="${m.playgroup_id === state.groupId}">
           <span class="grow-col"><b>${m.playgroups.name}</b><span class="tiny muted">${sub(m.playgroup_id)}</span></span>
-          ${m.playgroup_id === state.groupId ? html`<span class="accent-text">${icon('check', 20, 2.2)}</span>` : ''}
+          ${m.playgroup_id === state.groupId ? html`<span class="ok">${icon('check', 22)}</span>` : ''}
         </button>`)}
       <div class="two">
-        <button type="button" class="btn dashed" data-act="new">${icon('plus', 18)}${t('groups.newGroup')}</button>
-        <button type="button" class="btn dashed" data-act="code">${icon('key', 18)}${t('groups.enterCode')}</button>
+        <button type="button" class="btn soft" data-act="new">${icon('plus', 18)}${t('groups.newGroup')}</button>
+        <button type="button" class="btn soft" data-act="code">${icon('key', 18)}${t('groups.enterCode')}</button>
       </div>
     </div>
 
     ${g ? html`
     <div class="card">
-      <span class="label">${t('groups.invite')} · ${g.name}</span>
+      <h3 class="section-title">${t('groups.invite')}</h3>
       <div class="code-row">
         <span class="code">${g.invite_code}</span>
-        <button type="button" class="btn ghost small" data-act="copy">${icon('copy', 16)}${t('groups.copy')}</button>
+        <button type="button" class="btn soft small" data-act="copy" style="background:var(--sf2)">${icon('copy', 16)}${t('groups.copy')}</button>
       </div>
-      <button type="button" class="btn ghost small" data-act="share">${icon('share', 16)}${t('groups.copyLink')}</button>
+      <button type="button" class="btn small" data-act="share">${icon('share', 18)}${t('groups.copyLink')}</button>
       <span class="hint">${t('groups.inviteHint')}</span>
     </div>
 
     <div class="section">
-      <span class="label">${t('groups.members')}</span>
+      <div class="section-head"><h3 class="section-title">${t('groups.members')}</h3><span class="tiny muted">${members.length}</span></div>
       <div class="list">
         ${members.map((m) => html`
           <a class="row" href="#/profil/${m.id}">
-            ${avatar({ name: memberName(m), url: urls[memberAvatarPath(m)], size: 36, plain: true })}
+            ${avatar({ name: memberName(m), url: urls[memberAvatarPath(m)], size: 40 })}
             <span class="grow"><span class="title">${memberName(m)}${m.profile_id === state.profile?.id ? html` <span class="muted">·</span> <span class="muted tiny">ich</span>` : ''}</span></span>
             ${roleChip(m)}
           </a>`)}
       </div>
-      <a class="btn dashed" href="#/spieler-neu">${icon('plus', 18)}${t('groups.addPlaceholder')}</a>
+      <a class="btn soft" href="#/spieler-neu">${icon('userPlus', 20)}${t('groups.addPlaceholder')}</a>
       <span class="hint">${t('groups.addPlaceholderHint')}</span>
     </div>` : ''}`);
 

@@ -1,55 +1,55 @@
-/* Design-Tokens · Looks aus Main.dc.html → looks(). Standard: Schiefer. */
+/* Design-Tokens · Looks: Nacht (Standard), Arktis, Burgund.
+   Commander-Bilder bleiben ungetönt; Spielerfarben nur als Akzent (Streifen, Ring, Punkt). */
 :root,
-:root[data-theme="schiefer"] {
-  --bg: #D5D9DD; --surface: #EEF0F2; --raised: #F8F9FA; --ink: #16191D; --muted: #525A63; --line: #BDC3C9;
-  --accent: #2F3A46; --accentInk: #F4EBD6; --accentSoft: #E7DDC4; --accentText: #7A5A18; --gold: #9A7426;
-  --danger: #A3352B; --good: #2E6B46;
-  --hero: #2F3A46; --heroInk: #F4EBD6; --heroLine: rgba(244,235,214,.07); --heroLine2: rgba(244,235,214,.35);
-  --heroBtn: #C9A45C; --heroBtnInk: #1B1710;
-  --turn: #E8A317; --turnGlow: rgba(232,163,23,.55); --table: #CDD2D7;
-  --panelBtn: rgba(255,255,255,.55); --panelLine: rgba(22,25,29,.12); --outVeil: rgba(213,217,221,.88);
-  --mix: #F8F9FA; --mixPct: 24%;
-  --scrim: rgba(10,12,16,.45);
+:root[data-theme="nacht"] {
+  --bg: #0D1117; --sf: #171C24; --sf2: #222936; --ink: #F3F6FA; --mu: #8B95A3; --ln: #262D38;
+  --hero: #171C24; --hero-ink: #F3F6FA; --hero-mu: #A3ADBA;
+  --btn: #F3F6FA; --btn-ink: #0D1117;           /* Hauptknopf */
+  --act: #F3F6FA; --act-ink: #0D1117;           /* aktiver Tab, gewählte Segmente */
+  --hi: #E9C46A;                                /* Hervorhebung: Platz 1, Fokus */
+  --live: #22C55E; --danger: #F0716A; --turn: #F2C14E;
+  --scrim: 8, 11, 16;                           /* RGB für Verläufe über Bildern */
+  --nav-bg: rgba(23, 28, 36, .88);
+  color-scheme: dark;
+}
+:root[data-theme="arktis"] {
+  --bg: #E4EDF6; --sf: #F6F9FC; --sf2: #D8E3EE; --ink: #0E1A2B; --mu: #5A6A7F; --ln: #D2DDE8;
+  --hero: #0E1A2B; --hero-ink: #F6F9FC; --hero-mu: #A9B8CB;
+  --btn: #0E1A2B; --btn-ink: #F6F9FC;
+  --act: #0E1A2B; --act-ink: #F6F9FC;
+  --hi: #2F6FDE;
+  --live: #16A34A; --danger: #C8382E; --turn: #D99A0B;
+  --scrim: 10, 18, 32;
+  --nav-bg: rgba(246, 249, 252, .9);
   color-scheme: light;
 }
-:root[data-theme="gletscher"] {
-  --bg: #EAF0F7; --surface: #FFFFFF; --raised: #F4F7FB; --ink: #0E1A2B; --muted: #4B5B71; --line: #D0DBE8;
-  --accent: #1C4C9C; --accentInk: #FFFFFF; --accentSoft: #DCE6F6; --accentText: #1C4C9C; --gold: #A07722;
-  --danger: #B0352A; --good: #2A6D48;
-  --hero: #14315F; --heroInk: #EEF3FA; --heroLine: rgba(238,243,250,.07); --heroLine2: rgba(238,243,250,.35);
-  --heroBtn: #FFFFFF; --heroBtnInk: #14315F;
-  --turn: #E8A317; --turnGlow: rgba(232,163,23,.5); --table: #E2E9F2;
-  --panelBtn: rgba(255,255,255,.7); --panelLine: rgba(14,26,43,.12); --outVeil: rgba(234,240,247,.9);
-  --mix: #FFFFFF; --mixPct: 18%;
-  color-scheme: light;
-}
-:root[data-theme="obsidian"] {
-  --bg: #2A2E33; --surface: #343940; --raised: #3E444C; --ink: #EFF1F3; --muted: #B0B8C0; --line: #4A525B;
-  --accent: #D6B56C; --accentInk: #1E1A12; --accentSoft: #4A4434; --accentText: #E2C584; --gold: #D6B56C;
-  --danger: #EC8B77; --good: #7FC79D;
-  --hero: #1F2226; --heroInk: #F2E6CB; --heroLine: rgba(242,230,203,.06); --heroLine2: rgba(242,230,203,.3);
-  --heroBtn: #D6B56C; --heroBtnInk: #1E1A12;
-  --turn: #F2C14E; --turnGlow: rgba(242,193,78,.45); --table: #25292D;
-  --panelBtn: rgba(255,255,255,.08); --panelLine: rgba(255,255,255,.12); --outVeil: rgba(37,41,45,.9);
-  --mix: #343940; --mixPct: 30%;
-  --scrim: rgba(0,0,0,.55);
+:root[data-theme="burgund"] {
+  --bg: #3A0A18; --sf: #521226; --sf2: #661B31; --ink: #FFF0F3; --mu: #DDB0BC; --ln: #6A1F35;
+  --hero: #521226; --hero-ink: #FFF0F3; --hero-mu: #E2B9C4;
+  --btn: #F0C46A; --btn-ink: #2B0A15;
+  --act: #F0C46A; --act-ink: #2B0A15;
+  --hi: #F0C46A;
+  --live: #4ADE80; --danger: #FF8A80; --turn: #F2C14E;
+  --scrim: 30, 6, 14;
+  --nav-bg: rgba(82, 18, 38, .9);
   color-scheme: dark;
 }
 
 :root {
-  /* Mana-Farben */
-  --mana-W: #EFE6C4; --mana-W-ink: #3A3326;
-  --mana-U: #2D6DB5; --mana-U-ink: #FFFFFF;
-  --mana-B: #3A3337; --mana-B-ink: #EFE6C4;
-  --mana-R: #C4452F; --mana-R-ink: #FFFFFF;
-  --mana-G: #2E7D50; --mana-G-ink: #FFFFFF;
+  /* Spielerfarben (aus erster Commander-Farbe), gedämpft */
+  --p-w: #D9A93F; --p-u: #4C7BE0; --p-b: #8C74D6; --p-r: #D9614F; --p-g: #2F9E78; --p-c: #8A94A3;
+  /* Mana-Pips (Kartenfarben) */
+  --mana-W: #EFE6C4; --mana-U: #2D6DB5; --mana-B: #3A3337; --mana-R: #C4452F; --mana-G: #2E7D50;
 
-  --f-display: 'Outfit', 'Manrope', system-ui, sans-serif;
-  --f-body: 'Manrope', system-ui, sans-serif;
+  --f-display: 'Bricolage Grotesque', 'Geist', system-ui, sans-serif;
+  --f-body: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-  --r-sm: 12px; --r-md: 14px; --r-lg: 18px; --r-xl: 22px;
+  --r-sm: 12px; --r-md: 16px; --r-lg: 22px; --r-xl: 26px;
   --tap: 44px;
-  --nav-h: 68px;
+  --nav-h: 64px;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
+
+  /* Standardbild für leere Zustände: Command Tower (Art: Arthur Yuan, via Scryfall) */
+  --art-default: url('https://cards.scryfall.io/art_crop/front/a/7/a73297d2-580c-4174-a427-265f6916d09f.jpg?1793021256');
 }

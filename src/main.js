@@ -28,6 +28,7 @@ const NAV = [
   ['start', '#/start', 'home'], ['play', '#/spielen', 'play'], ['history', '#/historie', 'history'],
   ['board', '#/rangliste', 'trophy'], ['me', '#/profil', 'user'],
 ];
+// Aktiver Tab zeigt das gefüllte Icon
 
 const app = $('#app');
 let renderToken = 0;
@@ -36,7 +37,7 @@ const cameFromReset = new URLSearchParams(location.search).has('reset');
 
 function navHtml(active) {
   return html`<nav class="nav" aria-label="Hauptnavigation">${NAV.map(([k, href, ic]) =>
-    html`<a href="${href}" ${active === k ? html`aria-current="page"` : ''}>${icon(ic, 22, 1.8)}${t(`nav.${k}`)}</a>`)}</nav>`;
+    html`<a href="${href}" ${active === k ? html`aria-current="page"` : ''}>${icon(active === k ? ic + 'Fill' : ic, 23)}<span>${t(`nav.${k}`)}</span></a>`)}</nav>`;
 }
 
 export async function render() {

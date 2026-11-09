@@ -10,8 +10,9 @@ import { t, fmtDate, getLang } from '../i18n/index.js';
 import { go } from '../router.js';
 import { MEMBER_SELECT } from './groups.js';
 
+// Vorschau je Look: Hintergrund, Fläche, Hauptknopf
 const LOOKS = {
-  schiefer: ['#D5D9DD', '#2F3A46'], gletscher: ['#EAF0F7', '#14315F'], obsidian: ['#2A2E33', '#1F2226'],
+  nacht: ['#0D1117', '#222936', '#F3F6FA'], arktis: ['#E4EDF6', '#F6F9FC', '#0E1A2B'], burgund: ['#3A0A18', '#661B31', '#F0C46A'],
 };
 
 export default async function profile(el, { params, isStale }) {
@@ -53,9 +54,9 @@ export default async function profile(el, { params, isStale }) {
     </div>
 
     ${isGuest && m.claim_code ? html`
-    <div class="card soft">
+    <div class="guest-card">
       <b>${t('profile.guestTitle', { name })}</b>
-      <span class="small">${t('profile.guestText', { name })}</span>
+      <span class="hint">${t('profile.guestText', { name })}</span>
       <div class="code-row">
         <span class="code">${m.claim_code}</span>
         <button type="button" class="btn small" data-act="claim-link">${icon('copy', 16)}${t('groups.copyLink')}</button>
@@ -70,26 +71,26 @@ export default async function profile(el, { params, isStale }) {
     </div>
 
     <div class="section">
-      <span class="label">${t('profile.decks')}</span>
-      <div class="card"><span class="small muted">${t('profile.decksSoon')}</span></div>
+      <div class="section-head"><h3 class="section-title">${t('profile.decks')}</h3></div>
+      <div class="card">${empty('play', t('profile.decks'), t('profile.decksSoon'))}</div>
     </div>
 
     ${isAdmin() && !isGuest && !isMe ? html`
-    <button type="button" class="btn ghost" data-act="role">${icon('shield', 18)}${m.role === 'admin' ? t('profile.removeAdmin') : t('profile.makeAdmin')}</button>` : ''}
+    <button type="button" class="btn soft" data-act="role">${icon('shield', 18)}${m.role === 'admin' ? t('profile.removeAdmin') : t('profile.makeAdmin')}</button>` : ''}
 
     ${isMe ? html`
     <div class="section">
-      <span class="label">${t('profile.settings')}</span>
+      <div class="section-head"><h3 class="section-title">${t('profile.settings')}</h3></div>
       <div class="card">
         <div class="set-row">
-          <b class="small">${t('profile.language')}</b>
+          <span class="small" style="font-weight:600">${t('profile.language')}</span>
           <div class="seg">${['de', 'en'].map((l) => html`<button type="button" data-lang="${l}" aria-pressed="${state.profile.locale === l}">${l.toUpperCase()}</button>`)}</div>
         </div>
         <div class="field">
-          <b class="small">${t('profile.look')}</b>
-          <div class="looks">${Object.entries(LOOKS).map(([k, [a, b]]) => html`
+          <span class="small" style="font-weight:600">${t('profile.look')}</span>
+          <div class="looks">${Object.entries(LOOKS).map(([k, [a, b, c]]) => html`
             <button type="button" class="look" data-look="${k}" aria-pressed="${state.profile.theme === k}">
-              <span class="sw" style="background:linear-gradient(90deg,${a} 0 50%,${b} 50% 100%)"></span>${t(`profile.looks.${k}`)}</button>`)}
+              <span class="sw" style="background:${a}"><i style="background:${b}"></i><i style="background:${c}"></i></span>${t(`profile.looks.${k}`)}</button>`)}
           </div>
         </div>
         <a class="set-link" href="#/gruppen">${t('profile.manageGroups')}${icon('chevRight', 18)}</a>

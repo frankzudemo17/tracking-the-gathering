@@ -57,36 +57,34 @@ Im Prototyp sind alle Daten Beispieldaten (Franco, Luka, Marie, Deniz, Tim ohne 
 
 ## 4. Design
 
-### Look „Schiefer“ (Standard)
-| Token | Wert | Verwendung |
-|---|---|---|
-| `--bg` | `#D5D9DD` | Seitenhintergrund |
-| `--surface` | `#EEF0F2` | Karten, Navigation |
-| `--raised` | `#F8F9FA` | Eingabefelder, Knöpfe auf Karten |
-| `--ink` | `#16191D` | Text |
-| `--muted` | `#525A63` | Nebentext |
-| `--line` | `#BDC3C9` | Linien, Ränder |
-| `--accent` | `#2F3A46` | Hauptknöpfe |
-| `--accentInk` | `#F4EBD6` | Text auf Hauptknöpfen |
-| `--accentText` | `#7A5A18` | Akzent-Text (Messing/Gold) |
-| `--gold` | `#9A7426` | Krone, Platz 1, Sterne |
-| `--danger` | `#A3352B` | Gefahr, Gift, K.O. |
-| `--good` | `#2E6B46` | Live, positiv |
-| `--hero` | `#2F3A46` | dunkle Hero-Flächen |
-| `--table` | `#CDD2D7` | Hintergrund im Lifecounter |
+> **Neu seit 09.11.2026 (Design-Durchgang mit Franco).** Das Mockup gilt weiter für Funktionen und Abläufe, aber nicht mehr für Farben, Schrift und Icons. Verbindlich sind `src/styles/tokens.css` und die Vorschau https://claude.ai/artifact/JJdCH8yS44WcvddJNGHgTK (Version 4).
 
-Die Alternativen „Gletscher“ (blauweiß) und „Obsidian“ (dunkelgrau) gibt es im Profil unter Erscheinungsbild. Werte stehen in `Main.dc.html` → `looks()`.
+### Leitlinie
+Modern und vermarktbar, nicht nerdig, kein Fantasy-Look. **Commander-Bilder groß und ungetönt** (nur ein neutraler dunkler Verlauf für Lesbarkeit, nie ein Farbschleier). **Spielerfarben nur als Akzent:** Streifen, Ring, Punkt, dünne Balken. Kontrast zwischen Flächen statt Ton-in-Ton.
 
-Mana-Farben für Pips und Feldtönung: W `#EFE6C4`, U `#2D6DB5`, B `#3A3337`, R `#C4452F`, G `#2E7D50`. Spielerfelder im Lifecounter sind mit der ersten Commander-Farbe getönt: `color-mix(in srgb, <farbe> 24%, #F8F9FA)`.
+### Looks (im Profil wählbar, `profiles.theme`)
+| Look | Hintergrund | Fläche | Hauptknopf | Akzent |
+|---|---|---|---|---|
+| **Nacht** (Standard) | `#0D1117` | `#171C24` | `#F3F6FA` (weiß) | Gold `#E9C46A` |
+| **Arktis** | `#E4EDF6` | `#F6F9FC` | Marine `#0E1A2B` | Blau `#2F6FDE` |
+| **Burgund** | `#3A0A18` | `#521226` | Gold `#F0C46A` | Gold `#F0C46A` |
 
-### Schrift
-- **Outfit** für Zahlen, Lebenspunkte und Überschriften. Lebenspunkte groß und dünn (Gewicht 300).
-- **Manrope** für alles andere.
+Kein Creme-Weiß. Alle Tokens in `src/styles/tokens.css`.
+
+### Spielerfarben (aus der ersten Commander-Farbe)
+W `#D9A93F`, U `#4C7BE0`, B `#8C74D6`, R `#D9614F`, G `#2F9E78`, farblos `#8A94A3`. Mana-Pips bleiben W `#EFE6C4`, U `#2D6DB5`, B `#3A3337`, R `#C4452F`, G `#2E7D50`.
+
+### Schrift und Icons
+- **Bricolage Grotesque** für Überschriften und große Zahlen (Lebenspunkte), **Geist** für Text.
 - In den K.O.-Screens zusätzlich Bangers, Cinzel, Press Start 2P und Noto Sans JP.
+- Icons: **Phosphor** (MIT), regular; aktiver Tab als fill. Eingebettet in `src/lib/icons.js`.
+
+### Startseite
+Laufendes Spiel als **kompakte Anzeigetafel** (eine Reihe Sitzfelder mit Commander-Art, Lebenspunkten, Farbstreifen; am Zug = Rahmen, wenig Leben = „kritisch“), ganze Karte antippbar, nicht dominant. Ohne Spiel: Bild-Karte „Bereit für die nächste Runde?“. Untere Leiste **schwebend und beschriftet**, aktiver Bereich als Fläche.
 
 ### Regeln
 - Mobile first, Touch-Ziele mindestens 44 px.
-- Keine Emojis als Icons, sondern schlichte Linien-SVGs (Pfade stehen in `Main.dc.html` → `icons()`).
+- Keine Emojis als Icons, sondern Phosphor-Icons (`src/lib/icons.js`).
 - Ingame so wenig Text wie möglich, alles Weitere hinter „⋯“ und dem Mittelknopf.
 
 ---

@@ -27,15 +27,16 @@ export default {
   },
 
   welcome: {
-    title: 'Welcome, {name}!', sub: 'Create your first playgroup or join one. Someone in the group can give you the code.',
+    title: 'Hi {name}', sub: 'Create your first playgroup or join one. Someone in the group can give you the code.',
     create: 'Create playgroup', join: 'Enter code',
   },
 
   home: {
-    newRound: 'New round?', newRoundSub: 'Pick players, assign decks, roll for who starts.',
+    newRound: 'Ready for the next round?', newRoundSub: 'Pick players, assign decks, roll for who starts.',
+    players: 'Your table', addShort: 'Add',
     newGame: 'New game', joinGame: 'Join game', joinSoon: 'Live mode arrives in stage 6.',
     leaderboard: 'Rankings', recent: 'Recently played', all: 'See all',
-    noGames: 'No games yet', noGamesSub: 'Once you play, your latest games and the rankings show up here.',
+    noGames: 'No games yet', noGamesSub: 'After your first game, this shows who is ahead.',
     switchGroup: 'Switch playgroup',
   },
 
@@ -77,7 +78,7 @@ export default {
     logout: 'Sign out', rename: 'Change name', save: 'Save', saved: 'Saved.',
     makeAdmin: 'Make admin', removeAdmin: 'Remove admin rights', roleChanged: 'Role changed.',
     notFound: 'This profile does not exist or is not visible to you.',
-    looks: { schiefer: 'Slate', gletscher: 'Glacier', obsidian: 'Obsidian' },
+    looks: { nacht: 'Night', arktis: 'Arctic', burgund: 'Burgundy' },
   },
 
   avatar: {
