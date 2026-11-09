@@ -16,7 +16,7 @@ function store(k, v) { try { v == null ? localStorage.removeItem(k) : localStora
 function load(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
 export function applyPrefs(p) {
-  const LOOKS = ['nacht', 'arktis', 'burgund'];
+  const LOOKS = ['nacht', 'arktis', 'lachs'];
   const saved = load('ttg.theme');
   const theme = LOOKS.includes(p?.theme) ? p.theme : LOOKS.includes(saved) ? saved : 'nacht';
   document.documentElement.dataset.theme = theme;

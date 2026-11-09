@@ -13,7 +13,7 @@ import { MEMBER_SELECT } from './groups.js';
 
 // Vorschau je Look: Hintergrund, Fläche, Hauptknopf
 const LOOKS = {
-  nacht: ['#0D1117', '#222936', '#F3F6FA'], arktis: ['#E4EDF6', '#F6F9FC', '#0E1A2B'], burgund: ['#3A0A18', '#661B31', '#F0C46A'],
+  nacht: ['#0F1729', '#24325A', '#F3F6FC'], arktis: ['#DCE7F3', '#F7FAFD', '#0E1A2B'], lachs: ['#F2DCD3', '#FFF7F4', '#3B2420'],
 };
 
 export default async function profile(el, { params, isStale }) {

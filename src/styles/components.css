@@ -246,3 +246,29 @@
 .brand-logo, .auth-logo { display: block; background: var(--logo) center / contain no-repeat; }
 .brand-logo { width: 58px; height: 58px; margin-block: -6px; }
 .auth-logo { width: 92px; height: 92px; margin-left: -8px; filter: drop-shadow(0 4px 14px rgba(0,0,0,.35)); }
+
+/* ================= Login / Registrieren (neu): Bild, Marke mittig, Formular als Karte ================= */
+:root { --f-brand: 'Unbounded', 'Bricolage Grotesque', system-ui, sans-serif; }
+.screen.auth { padding: 0 0 28px; gap: 0; }
+.screen.auth > :not(.auth-art) { margin-inline: 16px; }
+.auth-art { margin: 0; min-height: min(50dvh, 420px); padding: calc(28px + var(--safe-t)) 20px 64px; justify-content: center; align-items: flex-end; text-align: center;
+  background: linear-gradient(180deg, rgba(var(--scrim), .35) 0%, rgba(var(--scrim), .15) 35%, rgba(var(--scrim), .7) 72%, var(--bg) 100%), var(--art, var(--art-default)) center 28% / cover, var(--bg); }
+.auth-art .brand { align-items: center; gap: 10px; width: 100%; }
+.auth-logo { width: 96px; height: 96px; margin: 0 0 2px; }
+:root[data-theme="arktis"] .auth-logo, :root[data-theme="lachs"] .auth-logo { background-image: url("../../assets/icons/logo-light.png"); }
+.auth-title { font-family: var(--f-brand); font-weight: 600; font-size: clamp(25px, 7.4vw, 31px); line-height: 1.08; letter-spacing: -.03em; color: #fff;
+  text-shadow: 0 2px 18px rgba(0,0,0,.45); max-width: 14ch; text-wrap: balance; }
+.auth-title .the { font-family: var(--f-body); font-weight: 500; font-size: .52em; letter-spacing: .04em; text-transform: uppercase; vertical-align: .32em; opacity: .85; }
+.auth-sub { color: rgba(255,255,255,.82); font-size: 15px; max-width: 30ch; text-shadow: 0 1px 10px rgba(0,0,0,.4); }
+.auth-card { position: relative; margin-top: -40px; background: var(--sf); border-radius: 26px; padding: 22px 18px 18px; gap: 14px;
+  box-shadow: 0 24px 50px -28px rgba(0,0,0,.55), 0 0 0 1px var(--ln); }
+.auth-card .input { background: var(--bg); }
+.input-icon { position: relative; display: flex; align-items: center; }
+.input-icon > svg { position: absolute; left: 15px; color: var(--mu); pointer-events: none; }
+.input-icon .input { padding-left: 46px; }
+.input-icon .input[type="password"], .input-icon .input:has(+ .pw-toggle) { padding-right: 50px; }
+.pw-toggle { position: absolute; right: 4px; width: 44px; height: 44px; border: 0; background: transparent; color: var(--mu); display: grid; place-items: center; border-radius: 12px; }
+.forgot { align-self: flex-end; min-height: 32px; font-size: 13px; }
+.auth-card .btn[type="submit"] { margin-top: 2px; }
+.auth-switch { text-align: center; color: var(--mu); font-size: 14px; }
+.auth-switch .link { display: inline; min-height: 0; }

@@ -2,26 +2,25 @@ import { sb } from '../supabase.js';
 import { html, mount, on, busy } from '../lib/dom.js';
 import { errText } from '../lib/ui.js';
 import { t } from '../i18n/index.js';
-import { authArt, brandTitle, pendingNote } from './login.js';
+import { authArt, brandTitle, pendingNote, authField, bindPwToggles } from './login.js';
+import { icon } from '../lib/icons.js';
 
 export default function register(el) {
   el.classList.add('auth');
   mount(el, html`
     ${authArt(brandTitle(), t('auth.registerSub'))}
-    <form class="form" novalidate>
+    <form class="form auth-card" novalidate>
       ${pendingNote()}
-      <div class="field"><label for="rg-name">${t('auth.name')}</label>
-        <input id="rg-name" class="input" autocomplete="nickname" maxlength="40" placeholder="${t('auth.namePh')}" required></div>
-      <div class="field"><label for="rg-mail">${t('auth.email')}</label>
-        <input id="rg-mail" class="input" type="email" autocomplete="email" inputmode="email" placeholder="name@beispiel.de" required></div>
-      <div class="field"><label for="rg-pass">${t('auth.password')}</label>
-        <input id="rg-pass" class="input" type="password" autocomplete="new-password" minlength="8" placeholder="••••••••" required aria-describedby="rg-pw-hint">
-        <span id="rg-pw-hint" class="hint">${t('auth.pwHint')}</span></div>
+      ${authField({ id: 'rg-name', label: t('auth.name'), iconName: 'person', autocomplete: 'nickname', placeholder: t('auth.namePh'), extra: 'maxlength="40"' })}
+      ${authField({ id: 'rg-mail', label: t('auth.email'), type: 'email', iconName: 'mail', autocomplete: 'email', placeholder: 'name@beispiel.de', extra: 'inputmode="email"' })}
+      ${authField({ id: 'rg-pass', label: t('auth.password'), type: 'password', iconName: 'lock', autocomplete: 'new-password', placeholder: '••••••••',
+        extra: 'minlength="8" aria-describedby="rg-pw-hint"', hint: html`<span id="rg-pw-hint" class="hint">${t('auth.pwHint')}</span>` })}
       <p class="error" role="alert" hidden></p>
       <p class="note" data-mail hidden>${t('auth.checkMail')}</p>
-      <button class="btn block" type="submit">${t('auth.register')}</button>
-      <div class="auth-links"><a class="link" href="#/login">${t('auth.haveAccount')}</a></div>
+      <button class="btn block" type="submit">${t('auth.register')}${icon('arrowRight', 18)}</button>
+      <p class="auth-switch">${t('auth.haveAccountQ')} <a class="link" href="#/login">${t('auth.login')}</a></p>
     </form>`);
+  bindPwToggles(el);
 
   on(el, 'submit', 'form', async (e) => {
     e.preventDefault();

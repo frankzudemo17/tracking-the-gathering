@@ -1,16 +1,17 @@
-/* Design-Tokens · Looks: Nacht (Standard), Arktis, Burgund.
+/* Design-Tokens · Looks: Nacht (Standard), Arktis, Lachs.
    Commander-Bilder bleiben ungetönt; Spielerfarben nur als Akzent (Streifen, Ring, Punkt). */
 :root,
 :root[data-theme="nacht"] {
-  --bg: #0B0F15; --sf: #1A212C; --sf2: #263040; --ink: #F3F6FA; --mu: #8F9AAA; --ln: #2A3342;
-  --acc2: #6EA8FF;                              /* zweiter Akzent: Links, Symbol-Kacheln */
-  --hero: #1A212C; --hero-ink: #F3F6FA; --hero-mu: #A3ADBA;
-  --btn: #F3F6FA; --btn-ink: #0D1117;           /* Hauptknopf */
-  --act: #F3F6FA; --act-ink: #0D1117;           /* aktiver Tab, gewählte Segmente */
+  /* Mitternachtsblau statt Fast-Schwarz (Franco: „schönere dunkle Farbe“) */
+  --bg: #0F1729; --sf: #1A2540; --sf2: #24325A; --ink: #F3F6FC; --mu: #94A3C2; --ln: #2A3860;
+  --acc2: #7DB2FF;                              /* zweiter Akzent: Links, Symbol-Kacheln */
+  --hero: #1A2540; --hero-ink: #F3F6FC; --hero-mu: #A8B6D2;
+  --btn: #F3F6FC; --btn-ink: #0F1729;           /* Hauptknopf */
+  --act: #F3F6FC; --act-ink: #0F1729;           /* aktiver Tab, gewählte Segmente */
   --hi: #E9C46A;                                /* Hervorhebung: Platz 1, Fokus */
   --live: #22C55E; --danger: #F0716A; --turn: #F2C14E;
-  --scrim: 8, 11, 16;                           /* RGB für Verläufe über Bildern */
-  --nav-bg: rgba(26, 33, 44, .9);
+  --scrim: 12, 19, 36;                          /* RGB für Verläufe über Bildern */
+  --nav-bg: rgba(26, 37, 64, .9);
   --logo: url("../../assets/icons/logo-light.png");
   color-scheme: dark;
 }
@@ -27,18 +28,19 @@
   --logo: url("../../assets/icons/logo-dark.png");
   color-scheme: light;
 }
-:root[data-theme="burgund"] {
-  --bg: #26060F; --sf: #561429; --sf2: #6D1E38; --ink: #FFF0F3; --mu: #E0B3BF; --ln: #742441;
-  --acc2: #FF8FA3;
-  --hero: #561429; --hero-ink: #FFF0F3; --hero-mu: #E2B9C4;
-  --btn: #F0C46A; --btn-ink: #2B0A15;
-  --act: #F0C46A; --act-ink: #2B0A15;
-  --hi: #F0C46A;
-  --live: #4ADE80; --danger: #FF8A80; --turn: #F2C14E;
-  --scrim: 30, 6, 14;
-  --nav-bg: rgba(86, 20, 41, .92);
-  --logo: url("../../assets/icons/logo-light.png");
-  color-scheme: dark;
+:root[data-theme="lachs"] {
+  /* weiches Lachs statt Burgund (Franco: „nicht so farbintensiv“), Espresso als Kontrast */
+  --bg: #F2DCD3; --sf: #FFF7F4; --sf2: #F8E7E0; --ink: #2E1A17; --mu: #7A5D56; --ln: #EBCFC6;
+  --acc2: #D9634B;
+  --hero: #3B2420; --hero-ink: #FFF3EE; --hero-mu: #D9BCB1;
+  --btn: #3B2420; --btn-ink: #FFF3EE;
+  --act: #3B2420; --act-ink: #FFF3EE;
+  --hi: #B97A2A;
+  --live: #2E8B57; --danger: #C2412D; --turn: #D99A0B;
+  --scrim: 40, 22, 18;
+  --nav-bg: rgba(255, 247, 244, .9);
+  --logo: url("../../assets/icons/logo-dark.png");
+  color-scheme: light;
 }
 
 :root {

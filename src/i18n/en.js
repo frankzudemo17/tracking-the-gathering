@@ -7,6 +7,7 @@ export default {
   auth: {
     email: 'Email', password: 'Password', name: 'Display name', namePh: 'How your group sees you',
     login: 'Sign in', register: 'Create account', forgot: 'Forgot password', haveAccount: 'I already have an account',
+    noAccount: 'No account yet?', haveAccountQ: 'Already have an account?', showPw: 'Show password', hidePw: 'Hide password',
     pwHint: 'At least 8 characters.',
     registerTitle: 'Create account', registerSub: 'Afterwards you create a playgroup or join one with a code.',
     forgotTitle: 'Forgot password', forgotSub: 'We will send you a link to set a new password.',
@@ -78,7 +79,7 @@ export default {
     logout: 'Sign out', rename: 'Change name', save: 'Save', saved: 'Saved.',
     makeAdmin: 'Make admin', removeAdmin: 'Remove admin rights', roleChanged: 'Role changed.',
     notFound: 'This profile does not exist or is not visible to you.',
-    looks: { nacht: 'Night', arktis: 'Arctic', burgund: 'Burgundy' },
+    looks: { nacht: 'Night', arktis: 'Arctic', lachs: 'Salmon' },
   },
 
   avatar: {
