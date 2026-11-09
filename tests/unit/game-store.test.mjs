@@ -350,6 +350,28 @@ test('G7 Reload: push 1..5, nur 1..3 bestätigt ⇒ neue Instanz: state = replay
   assert.equal(storage.getItem(`ttg.queue.${GAME}`), null, 'Warteschlange leer ⇒ Schlüssel weg');
 });
 
+test('G7b Laden während laufendem Schreibvorgang: bestätigt zwischen Server-Lesen und Queue-Abzug ⇒ nichts fällt heraus', async () => {
+  const { sb, t, store } = await setup({ db: serverDb(), upserts: [{ hang: true }] });
+  const { events, state: before } = play(lifeTaps(3));
+  const rec = store.recorder(GAME);
+  rec.push(events);
+  await t.advance(300);
+  assert.equal(sb.upserts().length, 1, 'upsert hängt');
+  // Server-Lesen der Ereignisse liefert den Stand VOR dem Commit; direkt danach kommt die Bestätigung an.
+  const orig = sb.from;
+  sb.from = (table) => {
+    const b = orig(table);
+    if (table !== 'game_events') return b;
+    const then = b.then;
+    b.then = (ok, ko) => then((res) => { sb.release(); return settle().then(() => res); }).then(ok, ko);
+    return b;
+  };
+  const loaded = await store.loadGame(GAME);
+  assert.equal(rec.status.pending, 0, 'Schreibvorgang während des Ladens bestätigt');
+  assert.deepEqual(loaded.state.events.map((e) => e.seq), [1, 2, 3]);
+  assert.deepEqual(loaded.state, before);
+});
+
 test('G8 Dubletten beim Laden: Server 1..3, lokal 2..5 ⇒ replay 1..5 je einmal', async () => {
   const { events, state: before } = play(lifeTaps(5));
   const storage = memStorage();

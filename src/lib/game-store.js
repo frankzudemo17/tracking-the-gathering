@@ -267,6 +267,10 @@ export function createStore(sb, {
     const rows = gp.data || [];
     const memberIds = rows.map((r) => r.member_id);
     const deckIds = [...new Set(rows.map((r) => r.deck_id).filter(Boolean))];
+    // Warteschlange VOR dem Server-Lesen festhalten: bestätigt ein laufender Schreibvorgang
+    // zwischen Lesen und Abzug, wäre die seq sonst weder im Server- noch im Queue-Stand.
+    const rec = recorder(gameId);
+    const pendingBefore = rec.pendingEvents();
     const [mres, dres, server] = await Promise.all([
       memberIds.length ? sb.from('members').select('id, display_name, avatar_path, profile_id').in('id', memberIds) : { data: [] },
       deckIds.length ? sb.from('decks').select(DECK_COLS).in('id', deckIds) : { data: [] },
@@ -281,7 +285,7 @@ export function createStore(sb, {
     // Server + lokale Warteschlange, nach seq vereinigt (Server gewinnt bei Dublette)
     const bySeq = new Map();
     for (const r of server) bySeq.set(r.seq, toEvent(r));
-    for (const e of recorder(gameId).pendingEvents()) if (!bySeq.has(e.seq)) bySeq.set(e.seq, e);
+    for (const e of [...pendingBefore, ...rec.pendingEvents()]) if (!bySeq.has(e.seq)) bySeq.set(e.seq, e);
     const evs = [...bySeq.values()].sort((a, b) => a.seq - b.seq);
 
     const init = createGame({
