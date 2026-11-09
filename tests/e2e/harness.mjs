@@ -203,6 +203,8 @@ export function deleteHint(run = RUN) {
     `Testkonten dieses Laufs bleiben bestehen (E1 = A). Löschen nur nach Francos Freigabe,`,
     `im Supabase-Dashboard (SQL-Editor, Projekt ${new URL(TARGET.url).hostname.split('.')[0]}):`,
     `  delete from auth.users where email like 'ttg.test.%.${run}@gmail.com';`,
+    `Rest im Storage (per RLS für niemanden löschbar): Profilbild übernommener Platzhalter`,
+    `unter avatars/members/<id>/avatar.jpg — bei Bedarf im Dashboard (Storage → avatars) entfernen.`,
   ].join('\n');
 }
 

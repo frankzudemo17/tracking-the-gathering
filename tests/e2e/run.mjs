@@ -55,7 +55,9 @@ async function main() {
         h.counts.fail++;
         const at = where(e);
         broken.push(`${f}: ${at}`);
-        console.log(`  ✗ ABBRUCH in ${at}: ${String(e.message).split('\n')[0]}`);
+        const msg = String(e.message).split('\n');
+        const waiting = msg.find((l) => /waiting for/.test(l))?.trim();
+        console.log(`  ✗ ABBRUCH in ${at}: ${msg[0]}${waiting ? ` (${waiting})` : ''}`);
         for (const [n, p] of h.opened) await p.screenshot({ path: path.join(h.OUT, `FEHLER-${h.RUN}-${n}.png`) }).catch(() => {});
         if (h.env.rateLimited) throw new h.Abort('Rate-Limit', 'Supabase-Auth meldet 429 (zu viele Registrierungen/Anmeldungen) — später erneut');
         if (h.env.scryfallDown) throw new h.Abort('übersprungen (Scryfall)', 'Scryfall nicht erreichbar — Deck-Fälle nicht geprüft');
