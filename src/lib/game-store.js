@@ -113,7 +113,7 @@ export function createStore(sb, {
 
     /** Ein Schreibvorgang über alle ausstehenden Zeilen. Wirft bei Fehlschlag. */
     async function send() {
-      if (inflight) { await inflight.catch(() => {}); }
+      while (inflight) await inflight.catch(() => {});
       if (!queue.length) { setStatus('saved'); return; }
       if (online() === false) { setStatus('offline'); throw new Error('Offline'); }
       clearTimer();
