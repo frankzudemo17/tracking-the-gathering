@@ -69,7 +69,7 @@ Modern und vermarktbar, nicht nerdig, kein Fantasy-Look. **Commander-Bilder gro�
 | **Arktis** | `#E4EDF6` | `#F6F9FC` | Marine `#0E1A2B` | Blau `#2F6FDE` |
 | **Burgund** | `#3A0A18` | `#521226` | Gold `#F0C46A` | Gold `#F0C46A` |
 
-Kein Creme-Weiß. Alle Tokens in `src/styles/tokens.css`.
+Kein Creme-Weiß. Alle Tokens in `src/styles/tokens.css`. Karten heben sich deutlich vom Hintergrund ab (Franco: „nicht einfarbig, mehr Kontrast“). **Zweiter Akzent `--acc2`** für Links, Symbol-Kacheln, Chips, „Neu“-Knöpfe: Nacht Himmelblau `#6EA8FF`, Arktis Koralle `#E2583F`, Burgund Rosé `#FF8FA3`.
 
 ### Spielerfarben (aus der ersten Commander-Farbe)
 W `#D9A93F`, U `#4C7BE0`, B `#8C74D6`, R `#D9614F`, G `#2F9E78`, farblos `#8A94A3`. Mana-Pips bleiben W `#EFE6C4`, U `#2D6DB5`, B `#3A3337`, R `#C4452F`, G `#2E7D50`.

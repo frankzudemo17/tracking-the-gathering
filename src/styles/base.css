@@ -13,6 +13,8 @@ a { color: inherit; }
 img { display: block; max-width: 100%; }
 h1, h2, h3 { margin: 0; font-family: var(--f-display); font-weight: 700; line-height: 1.05; letter-spacing: -.025em; text-wrap: balance; }
 p { margin: 0; }
+/* hidden gewinnt immer, auch gegen display aus Komponenten-Klassen (Toast, Formulare) */
+[hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .num { font-variant-numeric: tabular-nums; }
 

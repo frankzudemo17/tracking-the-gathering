@@ -2,18 +2,20 @@
    Commander-Bilder bleiben ungetönt; Spielerfarben nur als Akzent (Streifen, Ring, Punkt). */
 :root,
 :root[data-theme="nacht"] {
-  --bg: #0D1117; --sf: #171C24; --sf2: #222936; --ink: #F3F6FA; --mu: #8B95A3; --ln: #262D38;
-  --hero: #171C24; --hero-ink: #F3F6FA; --hero-mu: #A3ADBA;
+  --bg: #0B0F15; --sf: #1A212C; --sf2: #263040; --ink: #F3F6FA; --mu: #8F9AAA; --ln: #2A3342;
+  --acc2: #6EA8FF;                              /* zweiter Akzent: Links, Symbol-Kacheln */
+  --hero: #1A212C; --hero-ink: #F3F6FA; --hero-mu: #A3ADBA;
   --btn: #F3F6FA; --btn-ink: #0D1117;           /* Hauptknopf */
   --act: #F3F6FA; --act-ink: #0D1117;           /* aktiver Tab, gewählte Segmente */
   --hi: #E9C46A;                                /* Hervorhebung: Platz 1, Fokus */
   --live: #22C55E; --danger: #F0716A; --turn: #F2C14E;
   --scrim: 8, 11, 16;                           /* RGB für Verläufe über Bildern */
-  --nav-bg: rgba(23, 28, 36, .88);
+  --nav-bg: rgba(26, 33, 44, .9);
   color-scheme: dark;
 }
 :root[data-theme="arktis"] {
-  --bg: #E4EDF6; --sf: #F6F9FC; --sf2: #D8E3EE; --ink: #0E1A2B; --mu: #5A6A7F; --ln: #D2DDE8;
+  --bg: #DCE7F3; --sf: #F7FAFD; --sf2: #E3ECF5; --ink: #0E1A2B; --mu: #55667C; --ln: #CBD8E6;
+  --acc2: #E2583F;
   --hero: #0E1A2B; --hero-ink: #F6F9FC; --hero-mu: #A9B8CB;
   --btn: #0E1A2B; --btn-ink: #F6F9FC;
   --act: #0E1A2B; --act-ink: #F6F9FC;
@@ -24,14 +26,15 @@
   color-scheme: light;
 }
 :root[data-theme="burgund"] {
-  --bg: #3A0A18; --sf: #521226; --sf2: #661B31; --ink: #FFF0F3; --mu: #DDB0BC; --ln: #6A1F35;
-  --hero: #521226; --hero-ink: #FFF0F3; --hero-mu: #E2B9C4;
+  --bg: #26060F; --sf: #561429; --sf2: #6D1E38; --ink: #FFF0F3; --mu: #E0B3BF; --ln: #742441;
+  --acc2: #FF8FA3;
+  --hero: #561429; --hero-ink: #FFF0F3; --hero-mu: #E2B9C4;
   --btn: #F0C46A; --btn-ink: #2B0A15;
   --act: #F0C46A; --act-ink: #2B0A15;
   --hi: #F0C46A;
   --live: #4ADE80; --danger: #FF8A80; --turn: #F2C14E;
   --scrim: 30, 6, 14;
-  --nav-bg: rgba(82, 18, 38, .9);
+  --nav-bg: rgba(86, 20, 41, .92);
   color-scheme: dark;
 }
 
