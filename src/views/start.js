@@ -32,11 +32,12 @@ export default async function start(el, { isStale }) {
   mount(el, html`
     <div class="top">
       <a class="group-switch" href="#/gruppen" aria-label="${t('home.switchGroup')}: ${g?.name}"><span>${g?.name}</span>${icon('chevDown', 18)}</a>
+      <span class="brand-logo" role="img" aria-label="Tracking the Gathering"></span>
       <a href="#/profil" aria-label="${t('nav.me')}" class="avatar-link">${mine ? personAv(mine, 42) : avatar({ name: me?.display_name, url: urls[me?.avatar_path], size: 42 })}</a>
     </div>
 
     <div class="art-hero" ${myDeck?.image_url ? html`style="--art:url('${myDeck.image_url}')"` : ''}>
-      ${myDeck?.image_url ? '' : html`<span class="art-credit">Command Tower · Arthur Yuan</span>`}
+      ${myDeck?.image_url ? '' : html`<span class="art-credit">Diabolic Tutor · Brain Dead</span>`}
       <h2>${t('home.newRound')}</h2>
       <p>${t('home.newRoundSub')}</p>
       <div class="btns">

@@ -11,6 +11,7 @@
   --live: #22C55E; --danger: #F0716A; --turn: #F2C14E;
   --scrim: 8, 11, 16;                           /* RGB für Verläufe über Bildern */
   --nav-bg: rgba(26, 33, 44, .9);
+  --logo: url("../../assets/icons/logo-light.png");
   color-scheme: dark;
 }
 :root[data-theme="arktis"] {
@@ -23,6 +24,7 @@
   --live: #16A34A; --danger: #C8382E; --turn: #D99A0B;
   --scrim: 10, 18, 32;
   --nav-bg: rgba(246, 249, 252, .9);
+  --logo: url("../../assets/icons/logo-dark.png");
   color-scheme: light;
 }
 :root[data-theme="burgund"] {
@@ -35,6 +37,7 @@
   --live: #4ADE80; --danger: #FF8A80; --turn: #F2C14E;
   --scrim: 30, 6, 14;
   --nav-bg: rgba(86, 20, 41, .92);
+  --logo: url("../../assets/icons/logo-light.png");
   color-scheme: dark;
 }
 
@@ -53,6 +56,6 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
 
-  /* Standardbild für leere Zustände: Command Tower (Art: Arthur Yuan, via Scryfall) */
-  --art-default: url('https://cards.scryfall.io/art_crop/front/a/7/a73297d2-580c-4174-a427-265f6916d09f.jpg?1793021256');
+  /* Standardbild (Login, leere Zustände): Diabolic Tutor, Secret Lair (Art: Brain Dead, via Scryfall) */
+  --art-default: url('https://cards.scryfall.io/art_crop/front/8/c/8c6150f2-cc6c-405d-9812-bbbc524ce450.jpg?1783921608');
 }

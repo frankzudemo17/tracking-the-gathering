@@ -8,6 +8,7 @@ import { t } from '../i18n/index.js';
 export function authArt(title, sub) {
   return html`<div class="auth-art">
     <div class="brand">
+      <span class="auth-logo" aria-hidden="true"></span>
       <h1 class="auth-title">${title}</h1>
       ${sub ? html`<p class="auth-sub">${sub}</p>` : ''}
     </div>

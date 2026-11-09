@@ -2,14 +2,14 @@
 // Strategie: eigene Dateien „Netz zuerst, sonst Cache“ (so kommen Updates sofort an),
 // Google Fonts „Cache zuerst“. Supabase-Anfragen werden nie gecacht.
 // Die Ereignis-Warteschlange für Offline-Spiele folgt in Etappe 5/6.
-const VERSION = 'ttg-v4';
+const VERSION = 'ttg-v5';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './src/styles/tokens.css', './src/styles/base.css', './src/styles/components.css',
   './src/main.js', './src/router.js', './src/state.js', './src/supabase.js', './src/config.js',
   './src/i18n/index.js', './src/i18n/de.js', './src/i18n/en.js',
   './src/lib/dom.js', './src/lib/icons.js', './src/lib/ui.js', './src/lib/parts.js', './src/lib/avatar.js', './src/lib/group-actions.js', './src/lib/scryfall.js', './src/lib/decks.js',
-  './assets/icons/icon.svg', './assets/icons/icon-192.png',
+  './assets/icons/logo-light.png', './assets/icons/logo-dark.png', './assets/icons/favicon.png', './assets/icons/icon-192.png',
 ];
 
 self.addEventListener('install', (e) => {

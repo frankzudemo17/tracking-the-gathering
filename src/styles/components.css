@@ -238,3 +238,11 @@
 .sheet-opt.danger svg { color: var(--danger); }
 .result > svg { color: var(--acc2); }
 .avatar.ring { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--c, var(--acc2)); }
+
+/* Kopf der Startseite: Gruppe links, Logo mittig, Profil rechts */
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+.top .avatar-link { justify-self: end; }
+/* Logo freigestellt, je Look helle oder dunkle Linien (--logo in tokens.css) */
+.brand-logo, .auth-logo { display: block; background: var(--logo) center / contain no-repeat; }
+.brand-logo { width: 58px; height: 58px; margin-block: -6px; }
+.auth-logo { width: 92px; height: 92px; margin-left: -8px; filter: drop-shadow(0 4px 14px rgba(0,0,0,.35)); }
