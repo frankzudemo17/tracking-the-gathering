@@ -56,7 +56,7 @@ async function main() {
         const at = where(e);
         broken.push(`${f}: ${at}`);
         const msg = String(e.message).split('\n');
-        const waiting = msg.find((l) => /waiting for/.test(l))?.trim();
+        const waiting = msg.find((l) => /waiting for/.test(l))?.replace(/\x1b\[[0-9;]*m/g, '').trim();
         console.log(`  ✗ ABBRUCH in ${at}: ${msg[0]}${waiting ? ` (${waiting})` : ''}`);
         for (const [n, p] of h.opened) await p.screenshot({ path: path.join(h.OUT, `FEHLER-${h.RUN}-${n}.png`) }).catch(() => {});
         if (h.env.rateLimited) throw new h.Abort('Rate-Limit', 'Supabase-Auth meldet 429 (zu viele Registrierungen/Anmeldungen) — später erneut');

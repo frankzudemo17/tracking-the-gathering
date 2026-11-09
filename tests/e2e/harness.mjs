@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { randomBytes } from 'node:crypto';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const OUT = path.join(ROOT, 'tests', 'e2e', 'out');
@@ -22,7 +23,8 @@ export class Abort extends Error {
 }
 
 // ---------------------------------------------------------------- Lauf, Konten, Prüfzähler
-export let RUN = Date.now().toString(36);
+// Zeit + Zufall: zwei parallel gestartete Läufe (zwei Worktrees) bekommen nie dieselbe Kennung.
+export let RUN = Date.now().toString(36) + randomBytes(3).toString('hex');
 export const accounts = [];
 export const runFile = (run = RUN) => path.join(OUT, `${run}.json`);
 const MAIL_RE = /^ttg\.test\.([a-z0-9]+)\.([a-z0-9]+)@gmail\.com$/;
@@ -74,7 +76,8 @@ export async function ctx(browser, name) {
     if (/api\.scryfall\.com/.test(u) && (r.status() === 429 || r.status() >= 500)) env.scryfallDown = true;
     if (r.status() >= 400) p.bad.push(r.status() + ' ' + u.split('?')[0] + (u.includes('grant_type=password') ? '?grant_type=password' : ''));
   });
-  p.on('requestfailed', (r) => { if (/api\.scryfall\.com/.test(r.url())) env.scryfallDown = true; });
+  // ERR_ABORTED = Suche beim Weitertippen/Seitenwechsel abgebrochen, kein Ausfall
+  p.on('requestfailed', (r) => { if (/api\.scryfall\.com/.test(r.url()) && !/ERR_ABORTED/.test(r.failure()?.errorText ?? '')) env.scryfallDown = true; });
   p.shot = (n) => shot(p, `${name}-${n}`);
   opened.push([name, p]);
   return p;
