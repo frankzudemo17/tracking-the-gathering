@@ -233,7 +233,8 @@ declare d decks;
 begin
   if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
   select * into d from decks where id = p_deck;
-  if d.id is null or not (public.can_edit_deck(d) or public.can_see_deck(d)) then raise exception 'Deck nicht gefunden'; end if;
+  -- „is not true“: bei Platzhalter-Decks (owner_profile_id NULL) liefern beide Hilfen NULL statt false
+  if d.id is null or (public.can_edit_deck(d) or public.can_see_deck(d)) is not true then raise exception 'Deck nicht gefunden'; end if;
   if p_mode is null or p_mode not in ('art', 'color', 'commander') then raise exception 'Ungültiger Modus'; end if;
   if p_color is not null and p_color !~ '^#[0-9A-Fa-f]{6}$' then raise exception 'Ungültige Farbe'; end if;
   if p_mode = 'color' and p_color is null then raise exception 'Ungültige Farbe'; end if;
@@ -247,7 +248,7 @@ declare d decks; clean text[];
 begin
   if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
   select * into d from decks where id = p_deck;
-  if d.id is null or not (public.can_edit_deck(d) or public.can_see_deck(d)) then raise exception 'Deck nicht gefunden'; end if;
+  if d.id is null or (public.can_edit_deck(d) or public.can_see_deck(d)) is not true then raise exception 'Deck nicht gefunden'; end if;
   if p_pins is null then raise exception 'Ungültiger Zähler'; end if;
   -- positiv geprüft: NULL-Einträge gelten als ungültig
   if exists (select 1 from unnest(p_pins) p
@@ -322,6 +323,17 @@ to authenticated;
 
 -- Hilfe ohne eigene Mitgliedsprüfung: für keine Client-Rolle ausführbar
 revoke execute on function public.deck_in_group(uuid, uuid) from public, anon, authenticated;
+
+-- Policy-Hilfen: nur authenticated (Policies rufen sie im Kontext der Rolle auf;
+-- anon schreibt nie Spiele, ein Aufruf scheitert dort ohnehin)
+revoke execute on function
+  public.ev_valid(uuid, uuid, uuid, uuid),
+  public.gp_valid(uuid, uuid, uuid, uuid)
+from public, anon;
+grant execute on function
+  public.ev_valid(uuid, uuid, uuid, uuid),
+  public.gp_valid(uuid, uuid, uuid, uuid)
+to authenticated;
 
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen; Zeilen ohne „-- “ ausführen, Reihenfolge einhalten).

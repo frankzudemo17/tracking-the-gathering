@@ -385,6 +385,13 @@ check('D4 Fremder B setzt A1 ⇒ Fehler (wie unbekanntes Deck)', async () => {
   ok(e1 && /nicht gefunden/.test(e1) && e1 === e2 && e3 === e1 && e4 === e1 && e5 === e1, `${e1} | ${e2} | ${e3} | ${e4} | ${e5}`);
   const r = await deckRow(D.A1);
   ok(bg(r) === 'art|null' && JSON.stringify(r.counter_pins) === '["poison","tax"]');
+  // Platzhalter-Deck aus G (owner_profile_id NULL ⇒ Rechte-Hilfen liefern NULL, nicht false)
+  await as(U.B);
+  const e6 = await fieldErr(D.T1, 'commander');
+  const e7 = await err(`select * from set_deck_counter_pins($1, array['speed'])`, [D.T1]);
+  ok(e6 === e1 && e7 === e1, `Platzhalter-Deck: ${e6} | ${e7}`);
+  const t = await deckRow(D.T1);
+  ok(bg(t) === 'art|null' && JSON.stringify(t.counter_pins) === '["poison","tax"]', `${bg(t)} ${JSON.stringify(t.counter_pins)}`);
 });
 check('D5 Pins: [poison, tax, poison, speed] ⇒ [poison, tax, speed]; leer erlaubt; Platzhalter-Deck ok', async () => {
   await as(U.C);
@@ -478,8 +485,8 @@ check('X1 anon und anonymes Konto: jede neue RPC ⇒ Fehler (auch auf eigenem De
   ok((await q(`select status from games where id = $1`, [gL99.id]))[0].status === 'live');
   const priv = await q(`select p.proname, has_function_privilege('anon', p.oid, 'execute') a, has_function_privilege('authenticated', p.oid, 'execute') u
                         from pg_proc p where p.pronamespace = 'public'::regnamespace
-                          and p.proname in ('start_game','finish_game','set_deck_field_color','set_deck_counter_pins','deck_in_group') order by 1`);
-  ok(priv.length === 5 && priv.every((p) => !p.a && p.u === (p.proname !== 'deck_in_group')), JSON.stringify(priv));
+                          and p.proname in ('start_game','finish_game','set_deck_field_color','set_deck_counter_pins','deck_in_group','ev_valid','gp_valid') order by 1`);
+  ok(priv.length === 7 && priv.every((p) => !p.a && p.u === (p.proname !== 'deck_in_group')), JSON.stringify(priv));
   await as(U.C);
   ok(/permission denied/.test(await err(`select deck_in_group($1, $2)`, [D.B1, h.id])), 'Hilfe nicht per RPC');
 });
