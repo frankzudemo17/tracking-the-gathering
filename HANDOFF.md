@@ -321,7 +321,7 @@ Franco gibt keinen Schlüssel in den Chat, sondern meldet sich selbst an. Ablauf
 ## 9. Etappen
 
 1. ✅ **Fundament** (09.11.2026): Repo, PWA-Grundgerüst, Design-Tokens, Supabase verbunden, Login/Registrierung, Profil mit Profilbild, Playgroups (anlegen, beitreten, Einladungscode), Spieler ohne Konto anlegen und per Code übernehmen. Dazu Sicherheits-Migration und Design-Durchgang (Abschnitt 4).
-2. ✅ **Decks** (10.11.2026): Scryfall-Suche inkl. Partner (Partner, Partner with, Friends forever, Background, Doctor/Companion), Bracket, Deck-Link, Deckprofil-Grundgerüst, Spielerfarbe aus dem Commander.
+2. ✅ **Decks** (09.11.2026): Scryfall-Suche inkl. Partner (Partner, Partner with, Friends forever, Background, Doctor/Companion), Bracket, Deck-Link, Deckprofil-Grundgerüst, Spielerfarbe aus dem Commander.
 3. **Spielen:** Setup mit Sitzordnung und Layouts, Feldfarben, Lifecounter komplett (Tippen, Zähler, Pins, Mittelknopf, Verlauf, Rückgängig), Angriff per Ziehen mit Zielfernrohr, Würfeltisch, Ereignisse speichern, K.O.-Screens.
 4. **Spielende und Historie:** Ergebnis, Bewertungen, Deck-Salt, Play of the Game, Foto, Historie nach Abenden, Spieldetail.
 5. **Statistik:** Rangliste (Spieler, Decks, Salt), Profile mit Tempo und Nemesis, Deckprofile, Spieleabend-Karte zum Teilen.
