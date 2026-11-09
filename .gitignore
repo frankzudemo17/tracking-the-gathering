@@ -1,0 +1,12 @@
+# Lokal / Werkzeuge
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+.claude/settings.local.json
+# Supabase CLI (lokale Artefakte, keine Schlüssel ins Repo)
+supabase/.branches/
+supabase/.temp/
+supabase/.env

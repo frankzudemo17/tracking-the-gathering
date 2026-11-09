@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="de" data-theme="schiefer">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tracking the Gathering</title>
+  <meta name="description" content="Lifecounter, Spielhistorie und Statistik für eure Commander-Runden.">
+  <meta name="theme-color" content="#2F3A46">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="TTG">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="src/styles/tokens.css">
+  <link rel="stylesheet" href="src/styles/base.css">
+  <link rel="stylesheet" href="src/styles/components.css">
+  <script>
+    // Look vor dem ersten Zeichnen setzen (kein Aufblitzen)
+    try { var th = localStorage.getItem('ttg.theme'); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
+  </script>
+  <script type="module" src="src/main.js"></script>
+</head>
+<body>
+  <div id="app"><div class="loading"><span class="spinner"></span></div></div>
+  <noscript>Tracking the Gathering braucht JavaScript.</noscript>
+</body>
+</html>

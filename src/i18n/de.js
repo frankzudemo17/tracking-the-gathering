@@ -1,0 +1,91 @@
+export default {
+  app: 'Tracking the Gathering',
+  tagline: 'Eure Commander-Runden. Jedes Spiel, jeder Salt-Moment, jede Revanche.',
+
+  nav: { start: 'Start', play: 'Spielen', history: 'Historie', board: 'Rangliste', me: 'Profil' },
+
+  auth: {
+    email: 'E-Mail', password: 'Passwort', name: 'Anzeigename', namePh: 'So sieht dich deine Gruppe',
+    login: 'Anmelden', register: 'Konto erstellen', forgot: 'Passwort vergessen', haveAccount: 'Ich habe schon ein Konto',
+    pwHint: 'Mindestens 8 Zeichen.',
+    registerTitle: 'Konto erstellen', registerSub: 'Danach legst du eine Playgroup an oder trittst mit einem Code bei.',
+    forgotTitle: 'Passwort vergessen', forgotSub: 'Wir schicken dir einen Link, mit dem du ein neues Passwort setzt.',
+    sendLink: 'Link schicken', linkSent: 'Falls es ein Konto mit dieser Adresse gibt, ist der Link unterwegs.',
+    newPwTitle: 'Neues Passwort', newPwSave: 'Passwort speichern', newPwDone: 'Passwort geändert.',
+    checkMail: 'Fast geschafft: Bitte bestätige deine E-Mail-Adresse über den Link in der Mail.',
+    pendingCode: 'Nach der Anmeldung wird der Code {code} eingelöst.',
+    errors: {
+      'Invalid login credentials': 'E-Mail oder Passwort stimmt nicht.',
+      'User already registered': 'Mit dieser E-Mail gibt es schon ein Konto.',
+      'Email not confirmed': 'Bitte bestätige zuerst deine E-Mail-Adresse.',
+      weak: 'Das Passwort braucht mindestens 8 Zeichen.',
+      name: 'Bitte gib einen Namen mit 1 bis 40 Zeichen ein.',
+      rate: 'Zu viele Versuche. Bitte warte kurz.',
+      generic: 'Das hat nicht geklappt. Bitte versuch es nochmal.',
+      offline: 'Keine Verbindung. Bitte prüfe dein Internet.',
+    },
+  },
+
+  welcome: {
+    title: 'Willkommen, {name}!', sub: 'Leg deine erste Playgroup an oder tritt einer bei. Den Code bekommst du von jemandem aus der Gruppe.',
+    create: 'Playgroup anlegen', join: 'Code eingeben',
+  },
+
+  home: {
+    newRound: 'Neue Runde?', newRoundSub: 'Spieler wählen, Decks zuordnen, Startspieler auswürfeln.',
+    newGame: 'Neues Spiel', joinGame: 'Spiel beitreten', joinSoon: 'Live-Modus kommt in Etappe 6.',
+    leaderboard: 'Rangliste', recent: 'Zuletzt gespielt', all: 'Alle ansehen',
+    noGames: 'Noch keine Spiele', noGamesSub: 'Sobald ihr spielt, stehen hier die letzten Partien und die Rangliste.',
+    switchGroup: 'Playgroup wechseln',
+  },
+
+  soon: {
+    play: { title: 'Lifecounter kommt bald', sub: 'Setup, Sitzordnung, Lifecounter mit Angriff per Ziehen und Würfeltisch kommen in Etappe 3.' },
+    history: { title: 'Historie kommt bald', sub: 'Gespeicherte Spiele nach Spieleabenden gibt es ab Etappe 4.' },
+    board: { title: 'Rangliste kommt bald', sub: 'Punkte, Decks und Salt-Rangliste kommen in Etappe 5.' },
+  },
+
+  groups: {
+    title: 'Playgroups', newGroup: 'Neue Playgroup', groupName: 'Name der Playgroup', groupNamePh: 'z. B. Küchentisch',
+    create: 'Anlegen', created: 'Playgroup angelegt.',
+    enterCode: 'Code eingeben', codeLabel: 'Einladungs- oder Spielercode', codePh: 'TTG-XXXXXX', redeem: 'Einlösen',
+    codeHint: 'Einladungscodes beginnen mit TTG-. Hast du einen persönlichen Code (z. B. TIM-…), übernimmst du damit dein Profil samt Historie.',
+    invite: 'Einladen', copy: 'Kopieren', copyLink: 'Link kopieren', copied: 'Kopiert.', shareText: 'Komm in unsere Playgroup „{name}“ bei Tracking the Gathering:',
+    inviteHint: 'Code oder Link teilen. Wer ihn einlöst, wird Mitglied dieser Playgroup.',
+    members: 'Mitglieder', addPlaceholder: 'Spieler ohne Konto anlegen',
+    addPlaceholderHint: 'Für Leute, die sich nicht registrieren wollen. Sie können ihr Profil später mit einem Code übernehmen.',
+    roles: { admin: 'Admin', member: 'Mitglied', guest: 'Ohne Konto' },
+    membersCount: '{n} Mitglieder', membersCountOne: '1 Mitglied', membersCountGuests: '{n} Mitglieder · {g} ohne Konto',
+    joined: 'Willkommen in „{name}“.', claimed: 'Profil übernommen. Deine Spiele sind jetzt bei dir.',
+    codeWrong: 'Diesen Code kennen wir nicht. Bitte prüf ihn nochmal.',
+  },
+
+  addPlayer: {
+    title: 'Spieler anlegen', name: 'Name', namePh: 'z. B. Max', create: 'Spieler anlegen',
+    noAccount: 'Kein Konto nötig',
+    noAccountText: 'Der Spieler bekommt ein eigenes Profil mit Statistiken und Decks. Will er sich später registrieren, gibst du ihm seinen Code aus dem Profil. Damit übernimmt er alles, inklusive der kompletten Historie.',
+    created: '{name} ist angelegt.',
+  },
+
+  profile: {
+    since: '{group} · dabei seit {date}',
+    stats: { games: 'Spiele', wins: 'Siege', points: 'Punkte', place: 'Ø Platz' },
+    guestTitle: '{name} hat noch kein Konto',
+    guestText: 'Alle Spiele werden trotzdem hier gesammelt. Sobald sich {name} registriert und diesen Code eingibt, gehören Profil und Historie ihm.',
+    decks: 'Decks', decksSoon: 'Decks mit Commander-Suche kommen in Etappe 2.',
+    settings: 'Einstellungen', language: 'Sprache', look: 'Erscheinungsbild', manageGroups: 'Playgroups verwalten',
+    logout: 'Abmelden', rename: 'Namen ändern', save: 'Speichern', saved: 'Gespeichert.',
+    makeAdmin: 'Zum Admin machen', removeAdmin: 'Admin-Rechte entziehen', roleChanged: 'Rolle geändert.',
+    notFound: 'Dieses Profil gibt es nicht oder du siehst es nicht.',
+    looks: { schiefer: 'Schiefer', gletscher: 'Gletscher', obsidian: 'Obsidian' },
+  },
+
+  avatar: {
+    title: 'Profilbild', take: 'Foto aufnehmen', gallery: 'Aus Galerie wählen', remove: 'Bild entfernen',
+    hint: 'Das Bild wird quadratisch zugeschnitten und klein gespeichert. Ohne Bild stehen die Initialen da.',
+    forWhom: 'für {name}', change: 'Profilbild von {name} ändern', saved: 'Profilbild gespeichert.', removed: 'Profilbild entfernt.',
+    tooBig: 'Das Bild ließ sich nicht lesen.',
+  },
+
+  common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.' },
+};
