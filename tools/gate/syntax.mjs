@@ -10,8 +10,8 @@ const files = [
   path.join(ROOT, 'sw.js'),
 ].filter((f) => fs.existsSync(f));
 
-if (files.length === 0) {
-  console.error('typecheck: 0 Dateien gefunden — falscher Pfad? (rot)');
+if (files.length === 0 || !files.some((f) => rel(f).startsWith('src/'))) {
+  console.error('typecheck: keine Dateien unter src/ gefunden — falscher Pfad? (rot)');
   process.exit(1);
 }
 
