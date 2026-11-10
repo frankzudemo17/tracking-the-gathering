@@ -11,6 +11,8 @@ import { inviteCode } from '../zugang/invite.js';
 import { shareInvite, openInviteQr, openRenew } from '../zugang/invite-ui.js';
 import { t } from '../i18n/index.js';
 import { go } from '../router.js';
+import { rpcOrUnavailable } from './member-remove.js';
+import { groupData } from '../lib/data.js';
 
 export const MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path)';
 
@@ -77,19 +79,57 @@ function openDeleteGroup(g, { games, members, guests }) {
   });
 }
 
+// ---------------------------------------------------------------- Gruppe verlassen (Spec P10 F/H, Block K2/K7)
+
+function openLeave(g, { onlyAdmin }) {
+  const sa = isSuperadmin();
+  sheet(t('memberRemove.leaveTitle', { name: g.name }), html`
+    <h2 class="sheet-title">${t('memberRemove.leaveTitle', { name: g.name })}</h2>
+    <p class="sheet-text">${t(sa ? 'memberRemove.leaveText' : 'memberRemove.leaveTextMember', { name: g.name })}</p>
+    ${sa && onlyAdmin ? html`<p class="note warn" role="status" data-no-admin>${icon('warn', 16)}<span>${t('memberRemove.leaveNoAdmin')}</span></p>` : ''}
+    <p class="error" role="alert" hidden></p>
+    <button type="button" class="btn block danger-fill" data-act="leave-yes">${icon('logout', 18)}${t('memberRemove.leaveYes')}</button>
+    <button type="button" class="btn block soft" data-act="cancel">${t('common.cancel')}</button>`, (sh, close) => {
+    const box = sh.querySelector('.error');
+    on(sh, 'click', '[data-act="cancel"]', () => close());
+    on(sh, 'click', '[data-act="leave-yes"]', async (e, b) => {
+      box.hidden = true;
+      await busy(b, async () => {
+        try {
+          const r = await rpcOrUnavailable(sb, 'leave_playgroup', { p_group: g.id });
+          if (r.unavailable) throw new Error('unavailable');
+          must(r);
+          groupData.invalidate(g.id);
+          await loadMe();
+          setGroup(state.groupId);
+          close();
+          toast(t('memberRemove.left', { name: g.name }));
+          // Superadmin ohne Gruppe ⇒ Verwaltung (dort „Alle Gruppen“, Krit. 18)
+          go(state.groupId ? '/start' : isSuperadmin() ? '/einstellungen/verwaltung' : '/willkommen', { replace: true });
+        } catch (ex) { box.textContent = errText(ex); box.hidden = false; }
+      });
+    });
+  });
+}
+
 export default async function groups(el, { isStale }) {
   const ids = state.memberships.map((m) => m.playgroup_id);
-  const [counts, members] = await Promise.all([
-    ids.length ? sb.from('members').select('playgroup_id, profile_id').in('playgroup_id', ids).then(must) : [],
+  const [counts, all] = await Promise.all([
+    // '*' statt Spaltenliste: removed_at kommt mit, wenn es sie gibt (Übergangsregel P10 H)
+    ids.length ? sb.from('members').select('*').in('playgroup_id', ids).then(must) : [],
     state.groupId ? sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', state.groupId).order('created_at').then(must) : [],
   ]);
+  // P10: aktive Liste und Zählungen ohne Entfernte (Filter im Client); Entfernte nur im eigenen Abschnitt
+  const members = all.filter((m) => !m.removed_at);
+  const gone = all.filter((m) => m.removed_at).sort((a, b) => memberName(a).localeCompare(memberName(b), 'de'));
+  const manage = isAdmin() || isSuperadmin();
   const urls = await avatarUrls(members.map(memberAvatarPath));
   // Einladungscode nur für Admins der Gruppe und den Superadmin (Mitglieder fragen gar nicht erst)
   const code = currentGroup() && (isAdmin() || isSuperadmin()) ? await inviteCode(sb, currentGroup()) : null;
   if (isStale()) return;
 
   const sub = (gid) => {
-    const rows = counts.filter((c) => c.playgroup_id === gid);
+    const rows = counts.filter((c) => c.playgroup_id === gid && !c.removed_at);
     const guests = rows.filter((r) => !r.profile_id).length;
     return guests ? t('groups.membersCountGuests', { n: rows.length, g: guests }) : rows.length === 1 ? t('groups.membersCountOne') : t('groups.membersCount', { n: rows.length });
   };
@@ -143,6 +183,26 @@ export default async function groups(el, { isStale }) {
       <span class="hint">${t('groups.addPlaceholderHint')}</span>
     </div>
 
+    ${manage && gone.length ? html`
+    <div class="section" data-removed>
+      <button type="button" class="collapse-head" data-act="toggle-removed" aria-expanded="false" aria-controls="grp-removed">
+        <h3 class="section-title">${t('memberRemove.removedTitle')} <span class="count">${gone.length}</span></h3>
+        <span class="chev">${icon('chevDown', 20)}</span>
+      </button>
+      <div id="grp-removed" class="list" hidden>
+        ${gone.map((m) => html`
+          <div class="row" data-removed-row="${m.id}">
+            <a class="grow" href="#/profil/${m.id}"><span class="title">${memberName(m)}</span>${m.former_profile_id ? html`<span class="tiny muted">${t('memberRemove.viaInvite')}</span>` : ''}</a>
+            ${m.former_profile_id ? '' : html`<button type="button" class="btn small soft" data-act="restore" data-id="${m.id}">${icon('arrowCounterClockwise', 16)}${t('memberRemove.restore')}</button>`}
+          </div>`)}
+      </div>
+    </div>` : ''}
+
+    <div class="card danger-zone" data-leave>
+      <div class="grow-col"><h3 class="section-title">${t('memberRemove.leave')}</h3><span class="hint">${t('memberRemove.leaveSub')}</span></div>
+      <button type="button" class="btn danger" data-act="leave">${icon('logout', 18)}${t('memberRemove.leave')}</button>
+    </div>
+
     ${isAdmin() ? html`
     <div class="card danger-zone">
       <div class="grow-col"><h3 class="section-title">${t('groups.dangerTitle')}</h3><span class="hint">${t('groups.dangerSub')}</span></div>
@@ -156,14 +216,39 @@ export default async function groups(el, { isStale }) {
   on(el, 'click', '[data-act="share"]', () => shareInvite(g, code));
   on(el, 'click', '[data-act="qr"]', () => openInviteQr(g, code));
   on(el, 'click', '[data-act="renew"]', () => openRenew(g));
+  on(el, 'click', '[data-act="toggle-removed"]', (e, b) => {
+    const open = b.getAttribute('aria-expanded') !== 'true';
+    b.setAttribute('aria-expanded', String(open));
+    el.querySelector('#grp-removed').hidden = !open;
+  });
+  on(el, 'click', '[data-act="restore"]', async (e, b) => {
+    const m = gone.find((x) => x.id === b.dataset.id);
+    if (!m) return;
+    await busy(b, async () => {
+      try {
+        const r = await rpcOrUnavailable(sb, 'restore_member', { p_member: m.id });
+        if (r.unavailable) { toast(t('auth.errors.unavailable')); return; }
+        must(r);
+        groupData.invalidate(g.id);
+        toast(t('memberRemove.restored', { name: memberName(m) }));
+        go('/gruppen');
+      } catch (ex) { toast(errText(ex)); }
+    });
+  });
+  on(el, 'click', '[data-act="leave"]', () => {
+    const me = members.find((m) => m.profile_id === state.profile?.id);
+    const admins = members.filter((m) => m.profile_id && m.role === 'admin').length;
+    openLeave(g, { onlyAdmin: me?.role === 'admin' && admins === 1 });
+  });
   on(el, 'click', '[data-act="delete-group"]', async (e, b) => {
     if (!isAdmin()) return;
     await busy(b, async () => {
       try {
         const { count, error } = await sb.from('games').select('id', { count: 'exact', head: true }).eq('playgroup_id', g.id);
         if (error) throw error;
-        const guests = members.filter((m) => !m.profile_id).length;
-        openDeleteGroup(g, { games: count ?? 0, members: members.length - guests, guests });
+        // Löschen nimmt auch entfernte Zeilen mit ⇒ hier alle zählen
+        const guests = all.filter((m) => !m.profile_id).length;
+        openDeleteGroup(g, { games: count ?? 0, members: all.length - guests, guests });
       } catch (ex) { toast(errText(ex)); }
     });
   });

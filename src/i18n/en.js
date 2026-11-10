@@ -51,6 +51,16 @@ export default {
       signup_code_invalid: 'We don’t know this code (anymore). Please ask your group for a new one.',
       signup_full: 'All places are taken at the moment.',
       signup_anonymous_disabled: 'This app needs an account. Please sign up with an invite code.',
+      // Keywords from P10 (members)
+      member_removed: 'This player was removed from the group and can no longer play.',
+      member_has_account: 'Members with an account come back via the invite link.',
+      member_state_changed: 'Something changed in the meantime. Please check again.',
+      member_files_pending: 'The profile picture could not be deleted. Please try again.',
+      group_not_found: 'This group does not exist (anymore).',
+      member_is_admin: 'Admins cannot be removed. Revoke their admin rights first.',
+      member_is_self: 'To remove yourself, use “Leave group”.',
+      last_admin: 'You are the only admin. Make someone else an admin first.',
+      unavailable: 'Not available yet. Please try again later.',
     },
   },
 
@@ -104,6 +114,29 @@ export default {
     renew: 'Renew link', renewTitle: 'Renew link?', renewText: 'The current link and QR code will stop working.',
     renewYes: 'Create new link', renewed: 'New link is active.',
     inviteAdminsOnly: 'The admins of this group can invite people.',
+  },
+
+  // P10: remove players, restore, leave group
+  memberRemove: {
+    button: 'Remove from group', title: 'Remove {name}?', chip: 'Removed',
+    deleteText: '{name} has not played a game yet and will be deleted completely.',
+    deleteDecks: '{n} decks will be deleted as well.', deleteDecksOne: '1 deck will be deleted as well.',
+    markGames: '{name} is part of {n} games.', markGamesOne: '{name} is part of one game.',
+    markGamesNone: '{name} appears in the history.',
+    markRest: 'The games stay. {name} disappears from the member list, game setup and leaderboard. Undo under Group → Removed players.',
+    markRestAccount: 'The games stay. {name} will no longer see the group and disappears from the member list, game setup and leaderboard.',
+    accountBack: 'Removing is not a ban: with the invite link {name} can come back. To keep {name} out, renew the link afterwards.',
+    live: 'A running game with {name} continues.',
+    again: 'Something changed in the meantime. Please check again.',
+    yesDelete: 'Delete for good', yesMark: 'Remove',
+    deleted: '{name} was deleted.', marked: '{name} was removed.', already: '{name} is already removed.',
+    removedTitle: 'Removed players', restore: 'Restore', restored: '{name} is back.',
+    viaInvite: 'comes back via the invite link',
+    leave: 'Leave group', leaveSub: 'Your games stay in the history.', leaveTitle: 'Leave “{name}”?',
+    leaveText: 'You are leaving “{name}”. Your games stay in the history; you will no longer see the group. You can enter it again under Admin → All groups.',
+    leaveTextMember: 'You are leaving “{name}”. Your games stay in the history; you will no longer see the group. You can come back with an invite link.',
+    leaveNoAdmin: 'The group will then have no admin: nobody but you can invite people or remove players. Make someone an admin first.',
+    leaveYes: 'Leave', left: 'You left “{name}”.',
   },
 
   addPlayer: {
@@ -167,6 +200,7 @@ export default {
     capLabel: 'Maximum number of accounts', capHint: '1 to 1000. Existing accounts stay.',
     capSave: 'Save', capSaved: 'Cap saved.',
     groupsTitle: 'Groups', createGroup: 'Create group', groupsHint: 'Invite links are on each group’s page.',
+    allGroups: 'All groups', noAdmin: 'no admin', enter: 'Enter', entered: 'You are now in “{name}”.', allNone: 'No groups yet.',
   },
 
   account: {

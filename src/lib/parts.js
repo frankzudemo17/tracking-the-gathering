@@ -24,6 +24,7 @@ export function empty(iconName, title, sub) {
 }
 
 export const roleChip = (m) => {
+  if (m.removed_at) return html`<span class="chip guest removed">${t('memberRemove.chip')}</span>`; // P10
   if (!m.profile_id) return html`<span class="chip guest">${t('groups.roles.guest')}</span>`;
   if (m.role === 'admin') return html`<span class="chip admin">${icon('shield', 13)}${t('groups.roles.admin')}</span>`;
   return html`<span class="chip">${t('groups.roles.member')}</span>`;
