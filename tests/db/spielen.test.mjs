@@ -528,9 +528,9 @@ check('X2 Rückwärts-Block: neue Objekte weg, Schema gleich dem Stand ohne die 
     ref = await freshDb({ migrations: dir });
     const want = (await ref.query(CATALOG)).rows[0].j;
     await su();
+    for (const b of later) await db.exec(b);
     const pre = (await q(CATALOG))[0].j;
     ok(pre !== want, 'vor dem Rückwärts-Block unterscheiden sich die Schemata');
-    for (const b of later) await db.exec(b);
     await db.exec(back);
     const got = (await q(CATALOG))[0].j;
     if (got !== want) {
