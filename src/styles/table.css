@@ -8,6 +8,7 @@
 .tb-stack { flex-wrap: wrap; row-gap: 10px; }
 .tb-stack .grow { flex: 1 1 calc(100% - 44px); }
 .tb-seg { display: flex; width: 100%; }
+.tb-seg2 { display: grid; grid-template-columns: repeat(2, 1fr); } /* Tischlayout: 4 längere Namen ⇒ 2 × 2 */
 .tb-seg button { flex: 1 1 0; min-width: 0; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Schalter (role="switch") */

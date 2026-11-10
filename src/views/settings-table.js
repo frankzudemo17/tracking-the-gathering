@@ -25,7 +25,7 @@ function segRow(key, ic, title, sub, options, value, label, extra = '') {
   return html`<div class="row static tb-row tb-stack">
     <span class="row-ic">${icon(ic, 20)}</span>
     <span class="grow"><span class="title" id="${id}">${title}</span>${sub ? html`<span class="sub" data-sub="${key}">${sub}</span>` : ''}</span>
-    <div class="seg tb-seg" role="group" aria-labelledby="${id}">${options.map((o) => html`<button type="button" data-pref="${key}" data-v="${String(o)}" aria-pressed="${String(o === value)}">${label(o)}</button>`)}</div>
+    <div class="seg tb-seg${options.length > 3 && key === 'layout' ? ' tb-seg2' : ''}" role="group" aria-labelledby="${id}">${options.map((o) => html`<button type="button" data-pref="${key}" data-v="${String(o)}" aria-pressed="${String(o === value)}">${label(o)}</button>`)}</div>
     ${extra}
   </div>`;
 }
