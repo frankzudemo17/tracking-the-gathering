@@ -32,8 +32,8 @@ test('K1 Router-Regel: Muster-Regex in src/router.js wie hier nachgebaut', () =>
 test('K1 Naht-Block: fünf Routen mit Muster, View und Optionen wie in der Spec', () => {
   const list = routes();
   const want = [
-    ['/historie', 'history', "{ nav: 'history', group: true, arg: 'history' }"],
-    ['/rangliste', 'board', "{ nav: 'board', group: true, arg: 'board' }"],
+    ['/historie', 'history', "{ nav: 'history', group: true, arg: 'history', swap: true }"],
+    ['/rangliste', 'board', "{ nav: 'board', group: true, arg: 'board', swap: true }"],
     ['/partie/:id', 'game-detail', "{ nav: 'history', group: true, arg: 'history' }"],
     ['/abend/:id', 'recap', "{ nav: 'history', group: true, arg: 'history' }"],
     ['/spiel/:id/ende', 'result', "{ group: true, arg: 'history' }"],

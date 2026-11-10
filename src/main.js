@@ -7,31 +7,32 @@ import { icon } from './lib/icons.js';
 import { loading } from './lib/parts.js';
 import { t } from './i18n/index.js';
 import { applyDevicePrefs, onPrefs, keepAwake } from './lib/prefs.js';
+import { setupSwUpdate } from './lib/sw-update.js';
 
 // ---------- Routen ----------
 const v = (name) => () => import(`./views/${name}.js`);
-route('/login', v('login'), { public: true });
+route('/login', v('login'), { public: true, swap: true });
 route('/registrieren', v('register'), { public: true });
 route('/passwort-vergessen', v('forgot'), { public: true });
 route('/passwort-neu', v('newpass'));
 route('/code/:code', v('code'), { public: true });
 route('/willkommen', v('welcome'));
 // Spielende, Historie, Statistik (Etappe 4/5, Naht P13).
-route('/historie', v('history'), { nav: 'history', group: true, arg: 'history' });
-route('/rangliste', v('board'), { nav: 'board', group: true, arg: 'board' });
+route('/historie', v('history'), { nav: 'history', group: true, arg: 'history', swap: true });
+route('/rangliste', v('board'), { nav: 'board', group: true, arg: 'board', swap: true });
 route('/partie/:id', v('game-detail'), { nav: 'history', group: true, arg: 'history' });
 route('/abend/:id', v('recap'), { nav: 'history', group: true, arg: 'history' });
 route('/spiel/:id/ende', v('result'), { group: true, arg: 'history' });
-route('/start', v('start'), { nav: 'start', group: true });
+route('/start', v('start'), { nav: 'start', group: true, swap: true });
 route('/spielen', v('setup'), { nav: 'play', group: true });
-route('/profil', v('profile'), { nav: 'me', group: true });
-route('/profil/:memberId', v('profile'), { nav: 'me', group: true });
-route('/gruppen', v('groups'));
-route('/einstellungen', v('settings'), { nav: 'me' });
+route('/profil', v('profile'), { nav: 'me', group: true, swap: true });
+route('/profil/:memberId', v('profile'), { nav: 'me', group: true, swap: true });
+route('/gruppen', v('groups'), { swap: true });
+route('/einstellungen', v('settings'), { nav: 'me', swap: true });
 route('/einstellungen/konto', v('settings-account'), { nav: 'me' });
 // Rechtliches und Datenschutz auch ohne Anmeldung lesbar (ohne Navigationsleiste)
-route('/einstellungen/rechtliches', v('legal'), { public: true });
-route('/datenschutz', v('legal'), { public: true, arg: 'privacy' });
+route('/einstellungen/rechtliches', v('legal'), { public: true, swap: true });
+route('/datenschutz', v('legal'), { public: true, arg: 'privacy', swap: true });
 route('/spieler-neu', v('add-player'), { group: true });
 route('/deck-neu/:memberId', v('add-deck'), { group: true });
 route('/deck/:id', v('deck'), { nav: 'me', group: true });
@@ -82,6 +83,7 @@ export async function render() {
   mount(app, html`<main id="view" class="screen ${r.opts.nav ? 'with-nav' : ''}">${loading()}</main>${r.opts.nav ? navHtml(r.opts.nav) : ''}`);
   try {
     let mod;
+    const sw = swNext(r.opts.swap === true); if (sw !== 'go' && (await sw) === 'reload') return; // P11: neue Version nur an ruhiger Stelle
     try { mod = await r.load(); } catch (e) { if (reloadOnce()) return; throw e; }
     if (token !== renderToken) return;
     const view = $('#view');
@@ -140,6 +142,9 @@ async function boot() {
 
 boot();
 
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW', e));
-}
+// Service Worker (P11 Tempo, src/lib/sw-update.js): registrieren (https; lokal nur mit localStorage['ttg.sw'] = 'on'),
+// neue Version nur zwischen ruhigen Routen übernehmen. Steht nach boot(): render() läuft erst nach dessen erstem await.
+const swNext = setupSwUpdate({
+  container: navigator.serviceWorker, location, document,
+  storage: () => sessionStorage, flag: () => localStorage.getItem('ttg.sw'),
+});
