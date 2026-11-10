@@ -109,8 +109,8 @@ export default async function koE2e({ browser, base: BASE }) {
   await P.shot('p11-03-live-C');
   await P.click('.ko [data-ko="ask"]');
   await P.waitForSelector('.sheet-wrap [data-sheet="ko"] [data-ko="by"]');
-  ok('K3 „Wer war es?“ ⇒ Auswahl mit Spitzenreiter (A) und „Aufgegeben“',
-    (await P.locator(`.sheet-wrap [data-ko="by"][data-by="${A}"].top`).count()) === 1 && (await P.locator('.sheet-wrap [data-ko="gaveup"]').count()) === 1);
+  ok('K3 „Wer war es?“ ⇒ Auswahl mit A, C und „Aufgegeben“',
+    (await P.locator(`.sheet-wrap [data-ko="by"][data-by="${A}"]`).count()) === 1 && (await P.locator(`.sheet-wrap [data-ko="by"][data-by="${C}"]`).count()) === 1 && (await P.locator('.sheet-wrap [data-ko="gaveup"]').count()) === 1);
   await P.shot('p11-04-wer-war-es');
   await P.click(`.sheet-wrap [data-ko="by"][data-by="${A}"]`);
   await P.waitForFunction(() => !document.querySelector('.ko') && !document.querySelector('.sheet-wrap'));
@@ -234,6 +234,8 @@ export default async function koE2e({ browser, base: BASE }) {
   await V.clock.install();
   await V.goto(BASE + '#/login');
   await V.waitForSelector('#app');
+  // Uhr anhalten: Timer laufen nur über runFor, CSS-Übergänge in Echtzeit
+  await V.clock.pauseAt(await V.evaluate(() => Date.now() + 1000));
   const tymna = { short_name: 'Tymna', commander_name: 'Tymna the Weaver', partner_name: 'Thrasios, Triton Hero', color_identity: ['W', 'U', 'B', 'G'], image_url: null };
   const ref = { A: 'ko-a-anime', B: 'ko-b-reich-der-schatten', C: 'ko-c-arcade' };
   for (const v of ['A', 'B', 'C']) {
