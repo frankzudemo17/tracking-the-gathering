@@ -553,7 +553,8 @@ check('Gegenprobe Migration: ohne 20261112000000_konto.sql gibt es delete_my_acc
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ttg-p12-ohne-'));
   let old;
   try {
-    for (const f of fs.readdirSync(MIGRATIONS)) if (f.endsWith('.sql') && f !== FILE) fs.copyFileSync(path.join(MIGRATIONS, f), path.join(dir, f));
+    // P10 K5: 20261117000000_mitglieder.sql schreibt delete_my_account fort ⇒ Stand VOR dieser Migration, nicht „alle außer“
+    for (const f of fs.readdirSync(MIGRATIONS)) if (f.endsWith('.sql') && f < FILE) fs.copyFileSync(path.join(MIGRATIONS, f), path.join(dir, f));
     old = await freshDb({ migrations: dir });
     const e = await old.query(DEL).then(() => null, (x) => x.message);
     ok(/does not exist/.test(e || ''), e);
