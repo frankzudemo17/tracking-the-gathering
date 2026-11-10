@@ -143,7 +143,7 @@ export default async function lifeE2e({ browser, base: BASE }) {
 
   // ---------------------------------------------------------------- Kriterium 7: Anzeigetafel
   const ls = await poll("const r = await sb.from('games').select('live_state').eq('id', a).single(); return r.data?.live_state;", g1,
-    (v) => v?.players?.find((p) => p.id === a)?.life === 18, 12000).catch(() => null);
+    (v) => v?.players?.find((p) => p.id === C)?.life === 18, 12000);
   await menu();
   await P.click('[data-sheet="menu"] [data-m="home"]');
   await waitHash(P, '#/start');
