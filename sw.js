@@ -3,7 +3,7 @@
 // esm.sh (supabase-js) „Cache zuerst“. Supabase-Anfragen werden nie gecacht.
 // Schriften liegen selbst gehostet unter assets/fonts/ und stehen in der SHELL (offline da).
 // Die Ereignis-Warteschlange für Offline-Spiele folgt in Etappe 5/6.
-const VERSION = 'ttg-v13';
+const VERSION = 'ttg-v14';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './src/styles/fonts.css', './src/styles/tokens.css', './src/styles/base.css', './src/styles/components.css',
@@ -15,6 +15,7 @@ const SHELL = [
   './src/lib/dom.js', './src/lib/icons.js', './src/lib/ui.js', './src/lib/parts.js', './src/lib/avatar.js', './src/lib/group-actions.js', './src/lib/scryfall.js', './src/lib/decks.js', './src/lib/game-store.js', './src/lib/field-color.js', './src/lib/rand.js',
   './src/game/engine.js', './src/game/layouts.js', './src/game/rng.js', './src/game/ko.js',
   './assets/icons/logo-light.png', './assets/icons/logo-dark.png', './assets/icons/favicon.png', './assets/icons/icon-192.png',
+  './src/styles/result.css', './src/styles/history.css', './src/styles/board.css', './src/styles/recap.css', './src/styles/stats.css', './src/i18n/de-result.js', './src/i18n/en-result.js', './src/i18n/de-history.js', './src/i18n/en-history.js', './src/i18n/de-board.js', './src/i18n/en-board.js', './src/i18n/de-recap.js', './src/i18n/en-recap.js', './src/i18n/de-stats.js', './src/i18n/en-stats.js', './src/lib/stats.js', './src/lib/history-data.js', './src/lib/data.js', './src/lib/format.js',
 ];
 
 self.addEventListener('install', (e) => {

@@ -397,6 +397,14 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Vermittler zu Commander Spellbook (P2, Welle ttg-live-feinschliff-decks). Nur angemeldete Nutzer:
+# das Gateway prüft das JWT; core.js lehnt zusätzlich anonyme Konten ab. Kein geheimer Schlüssel.
+# entrypoint: „path must be relative to config.toml“ (Supabase-Doku, Function configuration).
+[functions.spellbook]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/spellbook/index.js"
+
 [analytics]
 enabled = true
 port = 54327
