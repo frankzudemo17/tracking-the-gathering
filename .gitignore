@@ -10,3 +10,6 @@ Thumbs.db
 supabase/.branches/
 supabase/.temp/
 supabase/.env
+# E2E (Screenshots, Lauf-Konten; Testziel-Zugang falls je eingeführt)
+tests/e2e/out/
+tests/e2e/target.local.json
