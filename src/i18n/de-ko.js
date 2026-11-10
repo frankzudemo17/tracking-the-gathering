@@ -13,6 +13,7 @@ export default {
   poison: '{n} Gift',
   gaveUp: 'Aufgegeben',
   back: 'Zurück',
+  by: 'durch {name}',
   quotes: [
     'Du wurdest ins Reich der Schatten verbannt.',
     'Das Herz der Karten hat dich wohl verlassen.',

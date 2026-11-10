@@ -12,6 +12,7 @@ export default {
   poison: '{n} poison',
   gaveUp: 'Conceded',
   back: 'Back',
+  by: 'by {name}',
   quotes: [
     'You have been banished to the realm of shadows.',
     'The heart of the cards seems to have left you.',

@@ -94,3 +94,49 @@ export function logText(en, L, name = (id) => String(id), counter = (k) => k) {
     default: return en.type;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Anzeige-Schwellen (keine Spielregeln: „tödlich“ entscheidet allein engine.isLethal)
+
+/** Rote Zahl im Feld (WELLE E2 F6 a): wenig Leben, solange nicht ausgeschieden. */
+export const LOW_LIFE = 10;
+export const lowLife = (p) => !!p && !p.out && Number(p.life) <= LOW_LIFE;
+
+/** „kritisch“ auf der Anzeigetafel (HANDOFF 4 Startseite): Leben ≤ 10, Gift ≥ 7 oder Commander-Schaden ≥ 15. */
+export const CRIT = { life: 10, poison: 7, cmd: 15 };
+export function critical(sp) {
+  if (!sp || sp.out) return false;
+  return Number(sp.life) <= CRIT.life || Number(sp.poison) >= CRIT.poison || Number(sp.cmdMax) >= CRIT.cmd;
+}
+
+/** Commander-Name ohne Beinamen nach dem Komma („Thrasios, Triton Hero“ ⇒ „Thrasios“). */
+export const shortCmd = (name) => String(name ?? '').split(',')[0].trim();
+
+/** Zeile unter dem Spielernamen: Commander, bei Partner beide. */
+export function cmdLine(deck) {
+  if (!deck) return '';
+  const a = shortCmd(deck.commander_name || deck.short_name);
+  return deck.partner_name ? `${a} & ${shortCmd(deck.partner_name)}` : a;
+}
+
+/** Ergebnis-Zeilen (engine.results) nach Platz sortiert. */
+export const byPlace = (rows) => (rows || []).slice().sort((a, b) => (a.place ?? 99) - (b.place ?? 99));
+
+/**
+ * Flacker-Werte des Randomizers (rein optisch, kein Zufall nötig): Schritt i ⇒ Anzeige.
+ * Würfel laufen durch die Augenzahlen, Münze wechselt (0 Kopf, 1 Zahl), Spieler = Index.
+ */
+export function flickerValue(kind, i, n = 2) {
+  const k = Math.abs(Math.floor(Number(i) || 0));
+  switch (kind) {
+    case 'w6': return String(1 + ((k * 5 + 2) % 6));
+    case 'w6x2': return String(2 + ((k * 7 + 3) % 11));
+    case 'w20': return String(1 + ((k * 13 + 6) % 20));
+    case 'coin': return k % 2;
+    case 'player': return k % Math.max(1, n);
+    default: return '';
+  }
+}
+
+/** Ganze Sekunden von `fromMs` bis `nowMs`, nie negativ (Uhrabweichung zum Server). */
+export const secondsSince = (fromMs, nowMs) => Math.max(0, Math.floor((Number(nowMs) - Number(fromMs)) / 1000) || 0);

@@ -1,2 +1,200 @@
 /* life.css · Besitzer: P8 (Lifecounter, Spielmenü, Randomizer, Anzeigetafel).
-   Naht aus P7: nur dieses Paket schreibt hier. Tokens aus tokens.css, keine neuen Farbwerte. */
+   Naht aus P7: nur dieses Paket schreibt hier. Tokens aus tokens.css, keine neuen Farbwerte.
+   Felder neutral gerahmt (WELLE F1 a: keine Spielerfarben), nur „am Zug“ farbig (--turn). */
+
+/* ---------- Brett */
+.screen.lc-screen { padding: 0; gap: 0; }
+.lc { height: 100dvh; display: flex; background: #0A0E16; }
+.lc-board { position: relative; flex: 1; display: grid; gap: 8px; padding: calc(8px + var(--safe-t)) 8px calc(8px + var(--safe-b)); min-height: 0; }
+
+.lc-field { position: relative; container-type: size; min-width: 0; min-height: 0; border-radius: 24px; overflow: hidden;
+  background: var(--hero); color: var(--hero-ink); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.lc-field::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 8;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--hero-ink) 14%, transparent); transition: box-shadow .2s; }
+.lc-field.turn::after { box-shadow: inset 0 0 0 4px var(--turn), 0 0 0 1px var(--turn); }
+.lc-inner { overflow: hidden; }
+.lc-art { position: absolute; inset: 0; display: flex; }
+.lc-art i { flex: 1; background: var(--img) center 28% / cover; }
+.lc-art i + i { box-shadow: -1px 0 0 rgba(0,0,0,.5); }
+.lc-tint { position: absolute; inset: 0; background: var(--field-bg, none); }
+.lc-scrim { position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 62% 48% at 50% 54%, rgba(var(--scrim), .66) 0%, rgba(var(--scrim), .40) 55%, rgba(var(--scrim), 0) 100%),
+    linear-gradient(180deg, rgba(var(--scrim), .72) 0%, rgba(var(--scrim), 0) 34%, rgba(var(--scrim), 0) 64%, rgba(var(--scrim), .7) 100%); }
+.lc-field.out .lc-art, .lc-field.out .lc-tint { filter: grayscale(1) brightness(.55); }
+
+/* Kopfzeile: Name + Commander, Abzeichen, „⋯“ */
+.lc-top { position: absolute; top: 0; left: 0; right: 0; z-index: 5; display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 6px; padding: 10px 8px 0 14px; pointer-events: none; }
+.lc-top .who { min-width: 0; display: flex; flex-direction: column; gap: 1px; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.lc-top .who b { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lc-top .who span { font-size: 12px; color: var(--hero-mu); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lc-top.narrow .who b { font-size: 13px; }
+.lc-top.narrow .who span { display: none; }
+.lc-stat { display: flex; align-items: center; gap: 2px; flex-shrink: 0; pointer-events: auto; }
+.lc-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 46cqw; }
+.lc-badge { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 7px; border-radius: 12px; font-size: 12px; font-weight: 700;
+  background: rgba(var(--scrim), .62); color: var(--hero-ink); font-variant-numeric: tabular-nums; }
+.lc-badge.monarch, .lc-badge.init, .lc-badge.city { color: var(--hi); padding: 0 5px; }
+.lc-more { width: 40px; height: 40px; border: 0; border-radius: 20px; background: transparent; color: var(--hero-ink); display: grid; place-items: center; cursor: pointer; }
+.lc-more:active { background: rgba(var(--scrim), .5); }
+.lc-field.out .lc-more { opacity: .6; }
+
+/* Mitte: Tippzonen + große Zahl */
+.lc-mid { position: absolute; inset: 0; z-index: 3; }
+.lc-tap { position: absolute; top: 0; bottom: 0; width: 50%; border: 0; background: transparent; color: var(--hero-ink); cursor: pointer;
+  display: flex; align-items: center; padding: 0 6%; opacity: .55; -webkit-tap-highlight-color: transparent; }
+.lc-tap.minus { left: 0; justify-content: flex-start; }
+.lc-tap.plus { right: 0; justify-content: flex-end; }
+.lc-tap:active { background: rgba(255,255,255,.06); opacity: 1; }
+.lc-tap:focus-visible { outline: 2px solid var(--hi); outline-offset: -4px; }
+.lc-field.out .lc-tap, .lc-field.lethal .lc-tap { display: none; }
+.lc-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; gap: 2px; }
+.lc-big { font-family: var(--f-display); font-weight: 700; font-size: clamp(42px, 34cqmin, 132px); line-height: .9; letter-spacing: -.045em;
+  font-variant-numeric: tabular-nums; text-shadow: 0 2px 14px rgba(0,0,0,.35); }
+.lc-big.low { color: var(--danger); }
+.lc-field.out .lc-big { opacity: .35; }
+.lc-delta { position: absolute; top: calc(50% - clamp(42px, 34cqmin, 132px) * .5 - 26px); font-size: 18px; font-weight: 800; padding: 1px 10px; border-radius: 12px;
+  background: rgba(var(--scrim), .7); font-variant-numeric: tabular-nums; }
+.lc-delta.neg { color: var(--danger); }
+.lc-delta.pos { color: var(--live); }
+.lc-turnchip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--turn); padding: 3px 10px; border-radius: 12px;
+  background: rgba(var(--scrim), .66); }
+.lc-turnchip i { width: 7px; height: 7px; border-radius: 50%; background: var(--turn); }
+
+/* Unten: „Zug beenden →“ bzw. „Ausgeschieden?“ */
+.lc-bot { position: absolute; left: 0; right: 0; bottom: 10px; z-index: 6; display: flex; justify-content: center; pointer-events: none; }
+.lc-bot > * { pointer-events: auto; }
+.lc-endturn, .lc-outq { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px; border-radius: 20px; border: 0;
+  font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.lc-endturn { background: var(--turn); color: #1A1406; }
+.lc-outq { background: var(--danger); color: #fff; }
+
+/* Platz-Plakette (ausgeschieden) und Sieger */
+.lc-plaque { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; pointer-events: none; }
+.lc-plaque:empty { display: none; }
+.lc-plaque > div { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 18px; border-radius: 18px; background: rgba(var(--scrim), .8);
+  color: var(--hero-ink); text-align: center; max-width: 86%; }
+.lc-plaque b { font-family: var(--f-display); font-size: 22px; letter-spacing: -.02em; }
+.lc-plaque span { font-size: 12px; color: var(--hero-mu); }
+.lc-plaque .win { color: var(--hi); }
+.lc-plaque .win b { color: var(--hi); }
+
+/* Mittelknopf (F4 a: rund, zeigt die Runde) */
+.lc-hub { position: absolute; left: 50%; transform: translate(-50%, -50%); z-index: 9; width: 68px; height: 68px; border-radius: 50%;
+  border: 3px solid #0A0E16; background: var(--sf); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 6px 22px rgba(0,0,0,.4); }
+.lc-hub small { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mu); }
+.lc-hub b { font-family: var(--f-display); font-size: 24px; line-height: 1; }
+
+/* ---------- Spielmenü */
+.lc-menu .lc-tabs { display: flex; width: 100%; }
+.lc-menu .lc-tabs button { flex: 1; }
+.lc-mbody { display: flex; flex-direction: column; gap: 14px; min-height: 280px; }
+.lc-stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lc-stats3 > div { background: var(--sf2); border-radius: 16px; padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.lc-stats3 b { font-family: var(--f-display); font-size: 24px; }
+.lc-stats3 small { font-size: 12px; color: var(--mu); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.lc-next { font-weight: 800; margin-left: 2px; }
+.lc-mrow { display: flex; align-items: center; gap: 12px; }
+.lc-mrow .grow, .lc-live .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lc-mrow small { font-size: 12px; color: var(--mu); }
+.lc-dn button { min-width: 0; padding: 0 10px; display: inline-flex; align-items: center; gap: 4px; }
+.lc-stepper { display: flex; align-items: center; gap: 4px; background: var(--sf2); border-radius: 14px; padding: 3px; flex-shrink: 0; }
+.lc-stepper button { width: 40px; height: 40px; border: 0; border-radius: 11px; background: var(--sf); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.lc-val { min-width: 46px; text-align: center; font-family: var(--f-display); font-weight: 700; font-size: 20px; }
+.lc-val small { font-size: 12px; color: var(--mu); font-family: var(--f-body); }
+.lc-val.hot { color: var(--ink); }
+.lc-val.dead { color: var(--danger); }
+.lc-kinds { display: flex; width: 100%; }
+.lc-kinds button { flex: 1; min-width: 0; padding: 0 4px; }
+.lc-rollbox { min-height: 150px; border-radius: 20px; border: 0; background: var(--hero); color: var(--hero-ink); font: inherit; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 14px; }
+.lc-rollbox .r { font-family: var(--f-display); font-weight: 700; font-size: 56px; line-height: 1; letter-spacing: -.03em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lc-rollbox .r.lbl { font-size: 22px; }
+.lc-rollbox .r.flicker { opacity: .8; }
+.lc-rollbox .s { font-size: 14px; color: var(--hi); min-height: 18px; }
+.lc-rollbox .a { font-size: 12px; color: var(--hero-mu); }
+.lc-msec { display: flex; flex-direction: column; gap: 8px; }
+.lc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.lc-pill { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 20px; border: 0; background: var(--sf2); color: var(--ink);
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.lc-pill[aria-pressed="true"] { background: var(--act); color: var(--act-ink); }
+.lc-pill.top { box-shadow: inset 0 0 0 2px var(--hi); }
+.lc-pill.dash { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ln); color: var(--mu); }
+.lc-pill small { color: var(--mu); font-weight: 600; }
+.lc-hint { font-size: 12px; color: var(--mu); }
+.lc-live { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border-radius: 16px; border: 0; background: var(--sf2); color: var(--ink);
+  font: inherit; text-align: left; cursor: pointer; }
+.lc-live[data-state="saved"] svg { color: var(--live); }
+.lc-live[data-state="offline"] svg, .lc-live[data-state="error"] svg { color: var(--danger); }
+.lc-live small { font-size: 12px; color: var(--mu); }
+.lc-retry { font-size: 13px; font-weight: 700; color: var(--danger); }
+.lc-log { display: flex; flex-direction: column; max-height: 46dvh; overflow-y: auto; }
+.lc-logrow { display: flex; gap: 10px; align-items: baseline; padding: 9px 2px; border-bottom: 1px solid var(--ln); font-size: 14px; }
+.lc-logrow small { flex-shrink: 0; width: 28px; color: var(--mu); font-size: 11px; font-weight: 700; }
+.lc-foot { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--ln); padding-top: 10px; }
+.lc-foot button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; border: 0; background: transparent; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.lc-foot .danger { color: var(--danger); }
+
+/* ---------- Zähler-Sheet */
+.lc-ctrs { display: flex; flex-direction: column; gap: 6px; }
+.lc-ctr { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 2px; border-radius: 14px; background: var(--sf2); }
+.lc-pin { width: 36px; height: 40px; border: 0; background: transparent; color: var(--mu); display: grid; place-items: center; cursor: pointer; flex-shrink: 0; }
+.lc-pin[aria-pressed="true"] { color: var(--ink); }
+.lc-ctr .lab { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.lc-ctr .lab > span { display: flex; flex-direction: column; min-width: 0; }
+.lc-ctr .lab b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lc-ctr .lab small { font-size: 11px; color: var(--mu); }
+.lc-ctr .lc-stepper { background: transparent; }
+.lc-morebtn { display: flex; align-items: center; justify-content: space-between; min-height: 44px; border: 0; background: transparent; color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; padding: 0 4px; }
+.lc-morebtn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.lc-optrow { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 12px; border-radius: 16px; border: 0; background: var(--sf2); color: var(--ink);
+  font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.lc-optrow .grow { flex: 1; }
+.lc-optrow small { color: var(--mu); font-weight: 500; }
+.lc-optrow.danger { color: var(--danger); background: transparent; box-shadow: inset 0 0 0 1.5px var(--ln); }
+.lc-sw { width: 34px; height: 24px; border-radius: 7px; flex-shrink: 0; }
+
+/* ---------- Spiel beenden */
+.lc-endopt { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 18px; background: var(--sf2); }
+.lc-endopt > span { font-size: 13px; color: var(--mu); }
+.lc-rank { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.lc-rank .num { color: var(--mu); }
+.lc-danger { color: var(--danger) !important; box-shadow: inset 0 0 0 1.5px var(--danger) !important; }
+
+/* ---------- K.O. (einfache Fassung, P11 ersetzt) */
+.lc-ko { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 24px 16px 18px; border-radius: 22px; overflow: hidden;
+  background: var(--hero); color: var(--hero-ink); text-align: center; }
+.lc-ko-art { position: absolute; inset: 0; display: flex; filter: grayscale(1) brightness(.4); }
+.lc-ko-art i { flex: 1; background: var(--img) center 28% / cover; }
+.lc-ko > :not(.lc-ko-art) { position: relative; }
+.lc-ko-ic { color: var(--danger); }
+.lc-ko h3 { margin: 0; font-family: var(--f-display); font-size: 30px; letter-spacing: -.03em; }
+.lc-ko b { font-size: 18px; }
+.lc-ko p { margin: 6px 0 0; font-size: 14px; color: var(--hero-mu); font-style: italic; }
+.lc-ko-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lc-ko-by { text-align: center; color: var(--mu); font-size: 13px; }
+.lc-opps { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------- Anzeigetafel (Startseite) */
+.lc-board-card { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: var(--r-lg); background: var(--sf); color: var(--ink); text-decoration: none; }
+.lc-board-card .hd { display: flex; align-items: center; gap: 8px; }
+.lc-board-card .hd b { flex: 1; font-size: 15px; }
+.lc-board-card .hd small { color: var(--mu); font-size: 12px; }
+.lc-livedot { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--live); }
+.lc-livedot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
+.lc-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.lc-tile { position: relative; height: 96px; border-radius: 16px; overflow: hidden; background: var(--hero) var(--img, none) center 28% / cover; color: var(--hero-ink); }
+.lc-tile::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(var(--scrim), .1) 0%, rgba(var(--scrim), .78) 100%); }
+.lc-tile.turn { box-shadow: inset 0 0 0 3px var(--turn); }
+.lc-tile.out { filter: grayscale(1); opacity: .6; }
+.lc-tile > * { position: relative; }
+.lc-tile .n { position: absolute; left: 10px; bottom: 26px; font-family: var(--f-display); font-weight: 700; font-size: 30px; line-height: 1; letter-spacing: -.03em; }
+.lc-tile .nm { position: absolute; left: 10px; right: 8px; bottom: 8px; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lc-tile .crit { position: absolute; top: 6px; right: 6px; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 8px; background: var(--danger); color: #fff; }
+.lc-tile.crit-on .n { color: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-field::after { transition: none; }
+}
