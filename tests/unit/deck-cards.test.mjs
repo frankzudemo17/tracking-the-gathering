@@ -110,6 +110,21 @@ test('C3 nicht auffindbar (auch per Name) ⇒ in notFound mit Abschnitt; ohne Se
   assert.equal(r.cards.length, 1);
 });
 
+test('C3b Positions-Rückfall: andere Schreibweise wird zugeordnet; umsortierte Antwort ordnet nie eine fremde Karte zu', async () => {
+  const { resolveCards } = await cards();
+  const sol = card(1, 'Sol Ring', 'c21', '263');
+  const lim = card(2, "Lim-Dûl's Vault", 'all', '1');
+  const fixed = (data) => ({ fetch: async () => ({ ok: true, status: 200, json: async () => ({ object: 'list', not_found: [], data }) }), wait: waiter().wait });
+  // Reihenfolge wie angefragt ⇒ „Lim-Dul's Vault“ über die Position erkannt
+  const a = await resolveCards([{ qty: 1, name: 'Sol Ring' }, { qty: 1, name: "Lim-Dul's Vault" }], fixed([sol, lim]));
+  assert.deepEqual(a.cards.map((c) => [c.qty, c.scryfall_id]), [[1, uid(1)], [1, uid(2)]]);
+  assert.deepEqual(a.notFound, []);
+  // umsortiert ⇒ Position 0 wäre Sol Ring (gehört schon per Name der 2. Kennung) ⇒ notFound statt falscher Karte
+  const b = await resolveCards([{ qty: 1, name: "Lim-Dul's Vault" }, { qty: 1, name: 'Sol Ring' }], fixed([sol, lim]));
+  assert.deepEqual(b.cards.map((c) => [c.qty, c.scryfall_id]), [[1, uid(1)]]);
+  assert.deepEqual(b.notFound.map((e) => e.name), ["Lim-Dul's Vault"]);
+});
+
 test('C4 Doppelt: Sol Ring DRC 56 + C21 263 ⇒ zwei Zeilen (verschiedene scryfall_id), Σ qty 2', async () => {
   const { resolveCards } = await cards();
   const s = scryfall([card(1, 'Sol Ring', 'drc', '56'), card(2, 'Sol Ring', 'c21', '263')]);

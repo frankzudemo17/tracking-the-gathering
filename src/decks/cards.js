@@ -56,10 +56,16 @@ function matcher(idents, json) {
   }
   const found = idents.filter((i) => !nf.has(keyOf(i)));
   const positional = found.length === data.length;
+  // Karten, die schon per Schlüssel einer Kennung gehören, nie per Position einer anderen geben
+  // (sonst ordnet eine umsortierte Antwort still die falsche Karte zu).
+  const claimed = new Set(found.map((i) => byKey.get(keyOf(i))).filter(Boolean));
   return (k) => {
     const idf = idents[k];
     if (nf.has(keyOf(idf))) return null;
-    return byKey.get(keyOf(idf)) || (positional ? data[found.indexOf(idf)] : null) || null;
+    const hit = byKey.get(keyOf(idf));
+    if (hit) return hit;
+    const c = positional ? data[found.indexOf(idf)] : null;
+    return c && !claimed.has(c) ? c : null;
   };
 }
 
