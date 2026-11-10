@@ -1,11 +1,12 @@
-// i18n-Namensraum „ko“ (de) · Besitzer: P11 (K.O.-Screens; einfacher Ausscheide-Ablauf zuerst von P8).
+// i18n-Namensraum „ko“ (de) · Besitzer: P11 (K.O.-Screens A/B/C; einfacher Ausscheide-Ablauf zuerst von P8).
 // Naht aus P7: eingebunden in de.js unter `ko`; nur dieses Paket schreibt hier. Schlüssel in de/en gleich halten (lint L5).
-// P8: nur die Texte des einfachen Ablaufs; Sprüche wörtlich aus HANDOFF 5.5 (Index 0–7).
+// Sprüche wörtlich aus HANDOFF 5.5 (Index 0–7 in der dortigen Reihenfolge). Arcade-Texte (C) bleiben englisch wie im Mockup.
 export default {
   title: 'K.O.',
-  label: 'Ausscheiden: {name}',
+  label: 'K.O.: {name}',
   cancel: 'Doch nicht',
   out: 'Ausscheiden',
+  banish: 'Verbannen',
   who: 'Wer war es?',
   whoTitle: 'Wer hat {name} rausgenommen?',
   whoSub: 'Sortiert nach Schaden in diesem Spiel',
@@ -14,6 +15,19 @@ export default {
   gaveUp: 'Aufgegeben',
   back: 'Zurück',
   by: 'durch {name}',
+  noCause: 'Ohne Fremdeinwirkung',
+  place: 'Platz {n}',
+  bBanished: 'Verbannt',
+  bTitle: '{name} wurde ins Reich der Schatten geschickt',
+  bBy: 'Durch {name}',
+  bRole: 'Spieler — Verbannt',
+  bMotto: 'Die Schatten vergessen nie.',
+  bDamage: '{n} Schaden von {name}.',
+  cWins: '{name} WINS',
+  cSystem: 'SYSTEM',
+  cVs: 'VS',
+  cContinue: 'CONTINUE?',
+  cCoin: 'INSERT COIN',
   quotes: [
     'Du wurdest ins Reich der Schatten verbannt.',
     'Das Herz der Karten hat dich wohl verlassen.',

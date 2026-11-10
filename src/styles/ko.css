@@ -1,2 +1,146 @@
-/* ko.css · Besitzer: P11 (K.O.-Screens; einfacher Ausscheide-Ablauf zuerst von P8).
-   Naht aus P7: nur dieses Paket schreibt hier. Tokens aus tokens.css, keine neuen Farbwerte. */
+/* ko.css · Besitzer: P11 (K.O.-Screens A/B/C, HANDOFF 5.5). Naht aus P7: nur dieses Paket schreibt hier.
+   Ausnahme von „nur Tokens“: Die K.O.-Varianten behalten ihren eigenen Stil (Spec P11 „Eigener Stil, nicht V4“),
+   Farben und Maße wörtlich aus mockup/ko-varianten/ko-{a,b,c}-*.html und Main.dc.html:1345–1503.
+   Bühne 390 × 844 wie im Mockup, per --ks auf den Bildschirm eingepasst; Text und Knöpfe unten in echten px.
+   Animiert werden nur transform und opacity; Stufen über .ko-s1…ko-s9 (kumulativ) und --st, Wackeln über --sx/--sy. */
+
+.ko {
+  --ko-bangers: 'Bangers', Impact, 'Haettenschweiler', 'Arial Narrow Bold', 'Franklin Gothic Heavy', var(--f-display);
+  --ko-jp: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', 'Noto Sans CJK JP', sans-serif;
+  --ko-cinzel: 'Cinzel', 'Trajan Pro', 'Cormorant Garamond', 'Book Antiqua', Georgia, serif;
+  --ko-pixel: 'Press Start 2P', ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace;
+  --ko-body: var(--f-body);
+  --ko-heavy: var(--f-display);
+  --ks: 1; --st: 0; --sx: 0px; --sy: 0px;
+  position: fixed; inset: 0; z-index: 25; overflow: hidden; outline: none;
+  background: transparent; transition: background .15s;
+  font-family: var(--ko-body); -webkit-tap-highlight-color: transparent; user-select: none;
+}
+.ko.ko-s1:not(.ko-s2) { background: #FFFFFF; } /* weißer Blitz, Stufe 1 */
+.ko-layer { position: absolute; inset: 0; overflow: hidden; }
+.ko-fade { opacity: 0; transition: opacity .25s; }
+.ko-s2 .ko-fade { opacity: 1; }
+.ko-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ko-stage { position: absolute; left: 50%; top: var(--safe-t); width: 390px; height: 844px; margin-left: -195px;
+  transform: scale(var(--ks)); transform-origin: 50% 0; pointer-events: none; }
+.ko-stage > div, .ko-stage > span { position: absolute; }
+.ko-stage > .ko-lines, .ko-stage > .ko-box, .ko-stage > .ko-shards { inset: 0; }
+.ko-stage svg { overflow: visible; display: block; }
+
+/* Text/Knöpfe: erst ab Stufe 9 sichtbar und bedienbar */
+.ko-sub { visibility: hidden; opacity: 0; transform: translateY(14px); transition: opacity .3s, transform .3s, visibility 0s .3s; }
+.ko-s9 .ko-sub { visibility: visible; opacity: 1; transform: none; transition: opacity .3s, transform .3s, visibility 0s; }
+.ko-btns { display: flex; gap: 12px; width: 100%; }
+.ko-btn { min-height: 52px; min-width: 0; cursor: pointer; padding: 0 10px; line-height: 1.1; overflow-wrap: anywhere; }
+.ko-btn:focus-visible { outline: 3px solid #FFD23F; outline-offset: 2px; }
+.ko-no { flex: 1; }
+.ko-go { flex: 1.3; }
+
+/* Bühnen-Animation (Main.dc.html:2582–2591) */
+.ko-lines { opacity: 0; transition: opacity .25s, transform .9s ease-out; }
+.ko-box { opacity: 0; }
+.ko-sfx1, .ko-sfx2 { display: inline-block; opacity: 0; transition: opacity .15s, transform .2s; }
+.ko-sfx1 { transform: rotate(-14deg) scale(2); }
+.ko-sfx2 { transform: rotate(10deg) scale(2); }
+.ko-s3 .ko-sfx1 { opacity: 1; transform: rotate(-14deg) scale(1); }
+.ko-s5 .ko-sfx2 { opacity: 1; transform: rotate(10deg) scale(1); }
+
+/* ============ A · Anime ============ */
+.ko-a { background: #FBF7EE; color: #16191D; }
+.ko-a .ko-dots { position: absolute; inset: 0; background-image: radial-gradient(#16191D 1.3px, transparent 1.8px); background-size: 8px 8px; opacity: .22;
+  -webkit-mask-image: radial-gradient(circle at 50% 38%, transparent 35%, #000 80%); mask-image: radial-gradient(circle at 50% 38%, transparent 35%, #000 80%); }
+.ko-a .ko-lines, .ko-a .ko-box { transform-origin: 195px 318px; }
+.ko-a .ko-lines { transform: rotate(calc(var(--st) * 1.5deg)) scale(1.4); }
+.ko-s2 .ko-a .ko-lines { opacity: .9; transform: rotate(calc(var(--st) * 1.5deg)) scale(1); }
+.ko-a .ko-box, .ko-c .ko-box { transform: translate(var(--sx), var(--sy)) scale(.2) rotate(-14deg); transition: transform .16s cubic-bezier(.2, 1.6, .4, 1), opacity .12s; }
+.ko-s2 .ko-a .ko-box, .ko-s2 .ko-c .ko-box { opacity: 1; transform: translate(var(--sx), var(--sy)) scale(1.18) rotate(0deg); }
+.ko-s3 .ko-a .ko-box, .ko-s3 .ko-c .ko-box { transform: translate(var(--sx), var(--sy)) scale(1) rotate(0deg); }
+.ko-burst text { font-family: var(--ko-bangers) !important; }
+.ko-don { left: 18px; top: 58px; font-family: var(--ko-jp); font-weight: 900; font-size: 56px; line-height: 1.45; color: #16191D; -webkit-text-stroke: 6px #FBF7EE; paint-order: stroke fill; white-space: nowrap; }
+.ko-gogo { right: 22px; top: 500px; font-family: var(--ko-jp); font-weight: 900; font-size: 34px; line-height: 1.45; color: #E23A2C; -webkit-text-stroke: 5px #16191D; paint-order: stroke fill; white-space: nowrap; }
+.ko-a-sub { position: absolute; left: 0; right: 0; bottom: calc(22px + var(--safe-b)); max-width: 420px; margin: 0 auto; padding: 0 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; }
+.ko-a .ko-panel { position: relative; background: #FFFFFF; border: 4px solid #16191D; padding: 16px 18px 18px; transform: rotate(-1.5deg); box-shadow: 8px 8px 0 #16191D; }
+.ko-a .ko-tag { position: absolute; top: -16px; left: 16px; background: #16191D; color: #FFD23F; font-family: var(--ko-bangers); font-size: 18px; letter-spacing: 2px; padding: 2px 10px; line-height: 1.35; }
+.ko-a .ko-name { display: block; font-family: var(--ko-bangers); font-size: clamp(26px, calc(560px / var(--nl)), 48px); letter-spacing: 1px; line-height: 1; text-transform: uppercase;
+  overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; padding-top: 2px; }
+.ko-a .ko-line { display: block; font-size: 13px; font-weight: 800; color: #E23A2C; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ko-a .ko-bubble { position: relative; margin-top: 14px; background: #FBF7EE; border: 3px solid #16191D; border-radius: 22px; padding: 12px 14px; font-size: 15px; font-weight: 800; line-height: 1.35; }
+.ko-a .ko-btn { border: 3px solid #16191D; font-family: var(--ko-bangers); font-size: 20px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 4px 4px 0 #16191D; }
+.ko-a .ko-no { background: #FFFFFF; color: #16191D; }
+.ko-a .ko-go { background: #E23A2C; color: #FFFFFF; }
+
+/* ============ B · Reich der Schatten ============ */
+.ko-b { background: #07040D; color: #EDE6FF; }
+.ko-b .ko-lines { transform-origin: 195px 292px; transform: rotate(calc(var(--st) * 4deg - 36deg)) scale(.55); transition: opacity .4s, transform 1.2s ease-out; }
+.ko-s2 .ko-b .ko-lines { opacity: 1; transform: rotate(calc(var(--st) * 4deg - 36deg)) scale(1); }
+.ko-b .ko-box { transform-origin: 195px 275px; transform: translate(calc(var(--sx) / 3), calc(var(--sy) / 3)) scale(.5); transition: transform .35s cubic-bezier(.2, 1.4, .4, 1), opacity .25s; }
+.ko-s2 .ko-b .ko-box { opacity: 1; transform: translate(calc(var(--sx) / 3), calc(var(--sy) / 3)) scale(1.06); }
+.ko-s3 .ko-b .ko-box { transform: translate(calc(var(--sx) / 3), calc(var(--sy) / 3)) scale(1); }
+.ko-b .ko-cracks { opacity: 0; transition: opacity .3s; }
+.ko-s4 .ko-b .ko-cracks { opacity: 1; }
+.ko-b .ko-shards { transform-origin: 280px 400px; opacity: 0; transform: none; }
+.ko-s5 .ko-b .ko-shards { opacity: 1; transform: translate(18px, 30px) rotate(22deg) scale(.8); transition: transform 1.4s ease-out, opacity .3s; }
+.ko-b .ko-cz { font-family: var(--ko-cinzel); }
+.ko-b .ko-body { font-family: var(--ko-body); }
+.ko-b-sub { position: absolute; left: 0; right: 0; bottom: 0; max-width: 440px; margin: 0 auto; box-sizing: border-box; padding: 0 22px calc(30px + var(--safe-b));
+  display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.ko-b .ko-rule { display: flex; align-items: center; gap: 12px; width: 100%; }
+.ko-b .ko-rule span { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #C9A45C); }
+.ko-b .ko-rule span:last-child { background: linear-gradient(90deg, #C9A45C, transparent); }
+.ko-b .ko-rule b { font-family: var(--ko-cinzel); font-size: 12px; font-weight: 700; letter-spacing: .4em; color: #E9D29A; text-transform: uppercase; }
+.ko-b-title { margin: 0; font-family: var(--ko-cinzel); font-size: clamp(20px, calc(1300px / var(--tl)), 26px); font-weight: 700; line-height: 1.22; letter-spacing: 0; color: #F6EBCB;
+  text-shadow: 0 0 22px rgba(183, 156, 255, .65), 0 2px 0 #2A1650; text-wrap: balance; overflow-wrap: anywhere; }
+.ko-b-line { font-size: 12px; font-weight: 700; letter-spacing: .08em; color: #A99BC9; text-transform: uppercase; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ko-b-quote { position: relative; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 14px 18px; border: 1px solid rgba(233, 210, 154, .45); background: rgba(26, 14, 48, .65); border-radius: 4px;
+  font-family: var(--ko-cinzel); font-size: 15px; font-style: italic; color: #E8DDFF; line-height: 1.5; }
+.ko-b-quote i { position: absolute; top: -5px; left: 50%; width: 9px; height: 9px; background: #E9D29A; transform: translateX(-50%) rotate(45deg); }
+.ko-b .ko-btns { gap: 10px; margin-top: 8px; }
+.ko-b .ko-btn { border-radius: 6px; font-family: var(--ko-cinzel); font-size: 14px; font-weight: 700; letter-spacing: .06em; }
+.ko-b .ko-no { border: 1px solid rgba(233, 210, 154, .55); background: transparent; color: #E9D29A; }
+.ko-b .ko-go { flex: 1.4; border: 1px solid #E9D29A; background: linear-gradient(135deg, #5B3FA8, #8C6DD8 55%, #B79CFF); color: #FFFFFF; box-shadow: 0 0 26px rgba(140, 109, 216, .55); }
+
+/* ============ C · Arcade ============ */
+.ko-c { background: #0A0716; color: #FFFFFF; }
+.ko-c .ko-scan { position: absolute; inset: 0; background-image: repeating-linear-gradient(0deg, rgba(0, 0, 0, .28) 0 2px, transparent 2px 4px); pointer-events: none; }
+.ko-c .ko-vig { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .7) 100%); pointer-events: none; }
+.ko-c .ko-hud { left: 14px; right: 14px; top: 22px; display: flex; flex-direction: column; gap: 8px; font-family: var(--ko-pixel); }
+.ko-c .ko-score { display: flex; justify-content: space-between; font-size: 8px; color: #FF8AD0; }
+.ko-c .ko-bars { display: grid; grid-template-columns: 40px minmax(0, 1fr) 44px minmax(0, 1fr) 40px; gap: 6px; align-items: center; }
+.ko-c .ko-face { box-sizing: border-box; border: 2px solid #FFFFFF; background: #2A1650; }
+.ko-c .ko-face.out { border-color: #FF5A4E; background: #1A1A1A; }
+.ko-c .ko-seg { display: flex; gap: 2px; height: 16px; padding: 2px; border: 2px solid #FFFFFF; background: #000000; }
+.ko-c .ko-seg i { flex: 1; background: #3A0C0C; box-shadow: inset 0 -4px 0 #2A0808; }
+.ko-c .ko-seg i.on { background: #FFD23F; box-shadow: inset 0 -4px 0 #E39A12; }
+.ko-c .ko-vs { height: 36px; display: grid; place-items: center; border: 2px solid #FFFFFF; background: #14142A; font-size: 10px; color: #FFD23F; }
+.ko-c .ko-names { display: flex; justify-content: space-between; gap: 12px; font-size: 9px; }
+.ko-c .ko-names span { max-width: 48%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+.ko-c .ko-names .l { color: #FFD23F; }
+.ko-c .ko-names .r { color: #FF5A4E; text-align: right; }
+.ko-c .ko-c-mid { left: 14px; right: 14px; top: 168px; display: flex; flex-direction: column; align-items: center; }
+.ko-c .ko-box { position: relative; transform-origin: center; }
+.ko-c .ko-3d { display: block; font-family: var(--ko-heavy); font-size: 148px; font-weight: 800; font-style: italic; line-height: .9; letter-spacing: -.05em; color: #FFE45C; white-space: nowrap;
+  transform: rotate(-7deg) skewX(-8deg);
+  text-shadow: 0 2px 0 #FFB020, 0 4px 0 #FF8A1F, 0 6px 0 #FF5A2E, 0 8px 0 #E8322E, 0 10px 0 #B5162A, 0 14px 0 #000000, -4px 0 0 #000000, 4px 0 0 #000000, 0 -4px 0 #000000, 0 0 40px rgba(255, 62, 165, .6); }
+.ko-c .ko-wins { margin-top: 30px; max-width: 100%; text-align: center; font-family: var(--ko-pixel); font-size: clamp(10px, calc(330px / var(--wl)), 16px); line-height: 1.5; color: #FFFFFF;
+  text-shadow: 0 0 10px #FF3EA5, 3px 3px 0 #FF3EA5; text-transform: uppercase; overflow-wrap: anywhere; }
+.ko-c .ko-sfx1 { transform: rotate(0deg) scale(2); }
+.ko-s3 .ko-c .ko-sfx1 { transform: rotate(0deg) scale(1); }
+.ko-c-dialog { position: absolute; left: 0; right: 0; bottom: calc(136px + var(--safe-b)); max-width: 420px; margin: 0 auto; width: calc(100% - 28px); box-sizing: border-box;
+  display: flex; gap: 10px; padding: 10px; border: 3px double #FFFFFF; background: rgba(10, 7, 22, .9); }
+.ko-c-dialog .ko-face { flex-shrink: 0; border-color: #FFD23F; }
+.ko-c-text { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 15px; font-weight: 800; line-height: 1.35; }
+.ko-c-who { font-family: var(--ko-pixel); font-size: 8px; font-weight: 400; line-height: 1.2; color: #FFD23F; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ko-c-sub { position: absolute; left: 0; right: 0; bottom: 0; max-width: 420px; margin: 0 auto; box-sizing: border-box; padding: 0 14px calc(26px + var(--safe-b));
+  display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.ko-continue { display: flex; align-items: center; gap: 14px; font-family: var(--ko-pixel); }
+.ko-continue span { font-size: 11px; color: #FF5A4E; }
+.ko-continue b { font-size: 26px; font-weight: 400; color: #FFFFFF; text-shadow: 3px 3px 0 #E8322E; }
+.ko-continue small { font-size: 8px; color: #8C86A8; }
+.ko-c .ko-btn { font-family: var(--ko-pixel); font-size: 10px; text-transform: uppercase; }
+.ko-c .ko-no { border: 3px solid #FFFFFF; background: #0A0716; color: #FFFFFF; box-shadow: 4px 4px 0 #3A3A55; }
+.ko-c .ko-go { border: 3px solid #000000; background: #FFD23F; color: #000000; box-shadow: 4px 4px 0 #E8322E; }
+
+/* Bewegung reduziert: Stufe 9 sofort (ko.js), keine Übergänge */
+@media (prefers-reduced-motion: reduce) {
+  .ko, .ko * { transition: none !important; animation: none !important; }
+}

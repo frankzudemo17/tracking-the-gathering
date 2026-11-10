@@ -1,10 +1,11 @@
-// i18n namespace "ko" (en) · owner: P11 (knockout screens; simple flow first by P8).
+// i18n namespace "ko" (en) · owner: P11 (knockout screens A/B/C; simple flow first by P8).
 // Seam from P7: included in en.js under `ko`; keep keys equal to de-ko.js (lint L5).
 export default {
   title: 'K.O.',
-  label: 'Knock out: {name}',
+  label: 'K.O.: {name}',
   cancel: 'Not yet',
   out: 'Knock out',
+  banish: 'Banish',
   who: 'Who did it?',
   whoTitle: 'Who took out {name}?',
   whoSub: 'Sorted by damage in this game',
@@ -13,6 +14,19 @@ export default {
   gaveUp: 'Conceded',
   back: 'Back',
   by: 'by {name}',
+  noCause: 'No outside help',
+  place: 'Place {n}',
+  bBanished: 'Banished',
+  bTitle: '{name} was sent to the Shadow Realm',
+  bBy: 'By {name}',
+  bRole: 'Player — Banished',
+  bMotto: 'The shadows never forget.',
+  bDamage: '{n} damage from {name}.',
+  cWins: '{name} WINS',
+  cSystem: 'SYSTEM',
+  cVs: 'VS',
+  cContinue: 'CONTINUE?',
+  cCoin: 'INSERT COIN',
   quotes: [
     'You have been banished to the realm of shadows.',
     'The heart of the cards seems to have left you.',
