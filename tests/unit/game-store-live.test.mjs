@@ -465,6 +465,29 @@ test('B1 zwei Geräte mit Konflikt (gleiche seq + act), Y schreibt zuerst, X umn
   assert.deepEqual(view(y.state), view(serverReplay(server)));
 });
 
+test('B1 Reihenfolge der Review-Probe: X schreibt zuerst, Y umnummeriert; Undo auf X (Undo gilt für den Tisch) ⇒ genau Ys −7 (höchste act) zurück, Xs −5 bleibt, beide Geräte gleich', async () => {
+  const server = seeded(4);
+  const t = clock();
+  const x = await device(server, t);
+  const y = await device(server, t, { actor: 'B' });
+  x.subscribe(); y.subscribe();
+  await t.advance(0);
+  const [ex] = x.act({ type: 'life', target: 'A', d: -5 });
+  const [ey] = y.act({ type: 'life', target: 'B', d: -7 });
+  assert.deepEqual([ex.payload.act, ey.payload.act, ex.seq, ey.seq], [5, 5, 5, 5], 'Ausgangslage: gleiche seq und act');
+  await t.advance(5000);
+  const rows = server.events();
+  assert.deepEqual(rows.slice(4).map((r) => [r.seq, r.payload.act, r.payload.cid, r.target, r.amount]),
+    [[5, 5, ex.payload.cid, 'A', -5], [6, 6, ey.payload.cid, 'B', -7]], 'X steht auf 5, Y umnummeriert auf 6 mit neuer act 6');
+  const u = x.act({ type: 'undo' });
+  assert.deepEqual(u.map((e) => e.payload.seq), [6], 'genau eine Aktion zurück: die mit der höchsten act (Ys Zeile)');
+  await t.advance(5000);
+  assert.deepEqual(serverReplay(server).players.map((p) => p.life), [33, 38], 'Xs −5 bleibt wirksam, Ys −7 zurückgenommen');
+  assert.deepEqual(view(x.state), view(serverReplay(server)));
+  assert.deepEqual(view(y.state), view(serverReplay(server)));
+  assert.deepEqual(view(x.state), view(y.state), 'beide Geräte zeigen denselben Zustand');
+});
+
 test('B1 Y schreibt 3 Aktionen, X (2 Aktionen) dahinter umnummeriert ⇒ Xs Undo trifft das neueste Ereignis, act je Aktion gemeinsam', async () => {
   const server = seeded(4);
   const t = clock();
