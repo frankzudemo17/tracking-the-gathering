@@ -497,7 +497,7 @@ check('Wunsch 3: Erbe nach Beitritt (coalesce(claimed_at, created_at)) ⇒ B vor
 check('B1 (ii) B löscht danach (letztes Konto in G1) ⇒ G1 weg ohne FK-Fehler, G2 unverändert, C sieht weiter', async () => {
   const g2 = await msnap(M.G2.id);
   await m2.as(U.B);
-  const e = (await m2.err(CHECK)) ?? (await m2.err(DEL));
+  const e = await m2.err(DEL);
   ok(e === null, e);
   await m2.su();
   ok(await mn(`select count(*)::int n from playgroups where id = $1`, [M.G1.id]) === 0, 'G1');
