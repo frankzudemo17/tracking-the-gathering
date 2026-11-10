@@ -2,13 +2,13 @@
 // Strategie: eigene Dateien „Netz zuerst, sonst Cache“ (so kommen Updates sofort an),
 // Google Fonts „Cache zuerst“. Supabase-Anfragen werden nie gecacht.
 // Die Ereignis-Warteschlange für Offline-Spiele folgt in Etappe 5/6.
-const VERSION = 'ttg-v9';
+const VERSION = 'ttg-v10';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './src/styles/tokens.css', './src/styles/base.css', './src/styles/components.css',
   './src/main.js', './src/router.js', './src/state.js', './src/supabase.js', './src/config.js',
   './src/i18n/index.js', './src/i18n/de.js', './src/i18n/en.js',
-  './src/lib/dom.js', './src/lib/icons.js', './src/lib/ui.js', './src/lib/parts.js', './src/lib/avatar.js', './src/lib/group-actions.js', './src/lib/scryfall.js', './src/lib/decks.js',
+  './src/lib/dom.js', './src/lib/icons.js', './src/lib/ui.js', './src/lib/parts.js', './src/lib/avatar.js', './src/lib/group-actions.js', './src/lib/scryfall.js', './src/lib/decks.js', './src/lib/game-store.js',
   './src/game/engine.js', './src/game/layouts.js', './src/game/rng.js', './src/game/ko.js',
   './assets/icons/logo-light.png', './assets/icons/logo-dark.png', './assets/icons/favicon.png', './assets/icons/icon-192.png',
 ];
