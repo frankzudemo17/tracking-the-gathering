@@ -7,9 +7,13 @@ import { toast, errText } from '../lib/ui.js';
 import { t } from '../i18n/index.js';
 import { go } from '../router.js';
 
+// Rückweg ins Setup (Spec P7): #/…?zurueck=setup — der Router ignoriert den Query-Teil.
+const fromSetup = () => new URLSearchParams(location.hash.split('?')[1] || '').get('zurueck') === 'setup';
+
 export default function addPlayer(el) {
+  const back = fromSetup();
   mount(el, html`
-    ${backHead(t('addPlayer.title'), '#/gruppen')}
+    ${backHead(t('addPlayer.title'), back ? '#/spiel-neu' : '#/gruppen')}
     <form class="form" novalidate>
       <div class="field"><label for="ap-name">${t('addPlayer.name')}</label>
         <input id="ap-name" class="input" autocomplete="off" maxlength="40" placeholder="${t('addPlayer.namePh')}" required></div>
@@ -30,7 +34,7 @@ export default function addPlayer(el) {
       try {
         const m = must(await sb.rpc('create_placeholder', { p_group: state.groupId, p_name: name }));
         toast(t('addPlayer.created', { name: m.display_name }));
-        go(`/profil/${m.id}`, { replace: true });
+        go(back ? `/spiel-neu?spieler=${m.id}` : `/profil/${m.id}`, { replace: true });
       } catch (ex) { err.textContent = errText(ex); err.hidden = false; }
     });
   });

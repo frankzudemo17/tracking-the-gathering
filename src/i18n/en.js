@@ -1,3 +1,10 @@
+// Namespaces of the game packages (seam from P7): one file per package, only imported here.
+import setup from './en-setup.js';
+import life from './en-life.js';
+import dice from './en-dice.js';
+import attack from './en-attack.js';
+import ko from './en-ko.js';
+
 export default {
   app: 'Tracking the Gathering',
   tagline: 'Your Commander nights. Every game, every salty moment, every rematch.',
@@ -105,4 +112,6 @@ export default {
   },
 
   common: { back: 'Back', close: 'Close', cancel: 'Cancel', loading: 'Loading …', error: 'Something went wrong.' },
+
+  setup, life, dice, attack, ko,
 };
