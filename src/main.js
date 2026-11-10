@@ -23,7 +23,7 @@ route('/partie/:id', v('game-detail'), { nav: 'history', group: true, arg: 'hist
 route('/abend/:id', v('recap'), { nav: 'history', group: true, arg: 'history' });
 route('/spiel/:id/ende', v('result'), { group: true, arg: 'history' });
 route('/start', v('start'), { nav: 'start', group: true });
-route('/spielen', v('soon'), { nav: 'play', group: true, arg: 'play' });
+route('/spielen', v('setup'), { nav: 'play', group: true });
 route('/historie', v('soon'), { nav: 'history', group: true, arg: 'history' });
 route('/rangliste', v('soon'), { nav: 'board', group: true, arg: 'board' });
 route('/profil', v('profile'), { nav: 'me', group: true });
@@ -37,8 +37,7 @@ route('/datenschutz', v('legal'), { public: true, arg: 'privacy' });
 route('/spieler-neu', v('add-player'), { group: true });
 route('/deck-neu/:memberId', v('add-deck'), { group: true });
 route('/deck/:id', v('deck'), { nav: 'me', group: true });
-// Spielen (Etappe 3): /spielen bleibt bis P8 auf „Bald verfügbar“ (jeder Merge ist live, ohne
-// Lifecounter darf die Startseite nicht in ein unspielbares Spiel führen).
+// Spielen (Etappe 3, P8 schaltet frei): /spielen (Nav) und /spiel-neu zeigen das Setup, /spiel/:id den Lifecounter.
 route('/spiel-neu', v('setup'), { group: true });
 route('/spiel/:id', v('life'), { group: true });
 

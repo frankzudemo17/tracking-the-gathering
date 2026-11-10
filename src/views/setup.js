@@ -243,52 +243,63 @@ export default async function setup(el, { isStale }) {
     }
   }
 
-  // ---------- Feldfarbe-Sheet (HANDOFF 5.4a, WELLE E2 F1: Commander-Bild · Commander-Farben · eigene Farbe)
+  // ---------- Feldfarbe-Sheet (gemeinsam mit dem Lifecounter, siehe openFieldColor unten)
   function openColor(mid) {
     const d = decks.get(s.deck[mid]);
     if (!d) return;
-    let chain = Promise.resolve();
-    const look = document.documentElement.dataset.theme || 'nacht';
-    const body = () => {
-      const mode = fieldMode(d);
-      const own = mode === 'color' ? d.field_color : null;
-      const st = fieldStyle(mode === 'color' ? fieldColors(d) : commanderColors(d), look, mode);
-      const cmdCols = commanderColors(d);
-      const manaNames = (d.color_identity?.length ? d.color_identity : ['C']).map((c) => t(`setup.mana.${c}`)).join(', ');
-      return html`<div class="su-sh-head"><span class="t"><h3>${t('setup.field.title')}</h3><small>${t('setup.field.sub', { name: name(mid), deck: d.short_name || d.commander_name })}</small></span>
-          <button type="button" class="btn small" data-act="done">${t('setup.field.done')}</button></div>
-        <div class="su-preview" style="${styleText(st)}">${artLayers(d)}<div class="su-tint"></div><div class="su-scrim"></div>
-          <div class="pv"><b>${name(mid)}</b><span class="n num">${s.life}</span></div></div>
-        <button type="button" class="su-opt" data-mode="art" aria-pressed="${String(mode === 'art')}"><span class="sw art" style="${d.image_url ? `--img:${cssUrl(d.image_url)}` : ''}"></span>
-          <span class="grow"><b>${t('setup.field.art')}</b><small>${t('setup.field.artSub')}</small></span>${mode === 'art' ? icon('check', 20) : ''}</button>
-        <button type="button" class="su-opt" data-mode="commander" aria-pressed="${String(mode === 'commander')}"><span class="sw" style="background:${fieldBg(cmdCols, 100)}"></span>
-          <span class="grow"><b>${t('setup.field.commander')}</b><small>${manaNames}</small></span>${mode === 'commander' ? icon('check', 20) : ''}</button>
-        <span class="su-eyebrow">${t('setup.field.own')}</span>
-        <div class="su-palette">${PALETTE.map((c, i) => html`<button type="button" data-mode="color" data-c="${c}" aria-pressed="${String(own === c)}" aria-label="${t(`setup.colors.${PALETTE_KEYS[i]}`)}">
-          <i style="background:${c}">${own === c ? icon('check', 20) : ''}</i>${t(`setup.colors.${PALETTE_KEYS[i]}`)}</button>`)}</div>`;
-    };
-    sheet(t('setup.field.title'), html`<div class="su-sheet">${body()}</div>`, (sh, close) => {
-      const box = $('.su-sheet', sh);
-      const paint = () => { mount(box, body()); render(); };
-      sh.addEventListener('click', (e) => {
-        if (e.target.closest('[data-act="done"]')) { close(); return; }
-        const b = e.target.closest('[data-mode]');
-        if (!b) return;
-        const mode = b.dataset.mode; const color = mode === 'color' ? b.dataset.c : null;
-        if (fieldMode(d) === mode && (mode !== 'color' || d.field_color === color)) return;
-        const before = { field_mode: d.field_mode, field_color: d.field_color };
-        Object.assign(d, { field_mode: mode, field_color: color });
-        paint(); // sofort sichtbar
-        chain = chain.then(() => store.setFieldColor(d.id, mode, color)).catch((ex) => {
-          Object.assign(d, before);
-          if (box.isConnected) paint(); else render();
-          toast(`${t('setup.field.saveFailed')} ${errText(ex)}`);
-        });
-      });
-    });
+    openFieldColor(d, render, { name: name(mid), life: s.life, store });
   }
 
   render();
+}
+
+/**
+ * Feldfarbe-Sheet (HANDOFF 5.4a, WELLE E2 F1: Commander-Bild · Commander-Farben · eigene Farbe).
+ * Setup und Lifecounter (P8) teilen es. `deck` wird sofort angepasst (optimistisch) und per
+ * store.setFieldColor gespeichert; scheitert das, wird zurückgedreht. `onChange()` nach jeder
+ * Änderung (auch beim Zurückdrehen). opts: name/life für Untertitel und Vorschau.
+ */
+export function openFieldColor(d, onChange, { name = '', life = 40, store = createStore(sb) } = {}) {
+  if (!d) return;
+  let chain = Promise.resolve();
+  const look = document.documentElement.dataset.theme || 'nacht';
+  const body = () => {
+    const mode = fieldMode(d);
+    const own = mode === 'color' ? d.field_color : null;
+    const st = fieldStyle(mode === 'color' ? fieldColors(d) : commanderColors(d), look, mode);
+    const cmdCols = commanderColors(d);
+    const manaNames = (d.color_identity?.length ? d.color_identity : ['C']).map((c) => t(`setup.mana.${c}`)).join(', ');
+    return html`<div class="su-sh-head"><span class="t"><h3>${t('setup.field.title')}</h3><small>${t('setup.field.sub', { name, deck: d.short_name || d.commander_name })}</small></span>
+        <button type="button" class="btn small" data-act="done">${t('setup.field.done')}</button></div>
+      <div class="su-preview" style="${styleText(st)}">${artLayers(d)}<div class="su-tint"></div><div class="su-scrim"></div>
+        <div class="pv"><b>${name}</b><span class="n num">${life}</span></div></div>
+      <button type="button" class="su-opt" data-mode="art" aria-pressed="${String(mode === 'art')}"><span class="sw art" style="${d.image_url ? `--img:${cssUrl(d.image_url)}` : ''}"></span>
+        <span class="grow"><b>${t('setup.field.art')}</b><small>${t('setup.field.artSub')}</small></span>${mode === 'art' ? icon('check', 20) : ''}</button>
+      <button type="button" class="su-opt" data-mode="commander" aria-pressed="${String(mode === 'commander')}"><span class="sw" style="background:${fieldBg(cmdCols, 100)}"></span>
+        <span class="grow"><b>${t('setup.field.commander')}</b><small>${manaNames}</small></span>${mode === 'commander' ? icon('check', 20) : ''}</button>
+      <span class="su-eyebrow">${t('setup.field.own')}</span>
+      <div class="su-palette">${PALETTE.map((c, i) => html`<button type="button" data-mode="color" data-c="${c}" aria-pressed="${String(own === c)}" aria-label="${t(`setup.colors.${PALETTE_KEYS[i]}`)}">
+        <i style="background:${c}">${own === c ? icon('check', 20) : ''}</i>${t(`setup.colors.${PALETTE_KEYS[i]}`)}</button>`)}</div>`;
+  };
+  sheet(t('setup.field.title'), html`<div class="su-sheet">${body()}</div>`, (sh, close) => {
+    const box = $('.su-sheet', sh);
+    const paint = () => { mount(box, body()); onChange(); };
+    sh.addEventListener('click', (e) => {
+      if (e.target.closest('[data-act="done"]')) { close(); return; }
+      const b = e.target.closest('[data-mode]');
+      if (!b) return;
+      const mode = b.dataset.mode; const color = mode === 'color' ? b.dataset.c : null;
+      if (fieldMode(d) === mode && (mode !== 'color' || d.field_color === color)) return;
+      const before = { field_mode: d.field_mode, field_color: d.field_color };
+      Object.assign(d, { field_mode: mode, field_color: color });
+      paint(); // sofort sichtbar
+      chain = chain.then(() => store.setFieldColor(d.id, mode, color)).catch((ex) => {
+        Object.assign(d, before);
+        if (box.isConnected) paint(); else onChange();
+        toast(`${t('setup.field.saveFailed')} ${errText(ex)}`);
+      });
+    });
+  });
 }
 
 /** Mitglieder (inkl. Profilnamen) und alle nicht archivierten Decks der Gruppe. */

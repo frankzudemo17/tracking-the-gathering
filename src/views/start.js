@@ -1,5 +1,5 @@
 // Startseite: Gruppe, Einladung zur nächsten Runde, eure Runde, Rangliste
-// (Live-Anzeigetafel und letzte Spiele kommen mit Etappe 3/4.)
+// Live-Anzeigetafel laufender Spiele (P8); letzte Spiele kommen mit Etappe 4.
 import { sb, must, avatarUrls } from '../supabase.js';
 import { state, currentGroup } from '../state.js';
 import { html, mount, on } from '../lib/dom.js';
@@ -9,14 +9,18 @@ import { toast } from '../lib/ui.js';
 import { t } from '../i18n/index.js';
 import { MEMBER_SELECT } from './groups.js';
 import { latestDeckByMember } from '../lib/decks.js';
+import { createStore } from '../lib/game-store.js';
+import { critical } from './life-ui.js';
 
 export default async function start(el, { isStale }) {
   const g = currentGroup();
   const me = state.profile;
   const members = await sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', state.groupId).order('created_at').then(must);
-  const [urls, latest] = await Promise.all([
+  const [urls, latest, live] = await Promise.all([
     avatarUrls([me?.avatar_path, ...members.map(memberAvatarPath)]),
     latestDeckByMember(members),
+    // Anzeigetafel: ein Fehler hier lässt die Startseite unverändert
+    createStore(sb).liveGames(state.groupId).catch((e) => { console.warn('Laufende Spiele', e); return []; }),
   ]);
   if (isStale()) return;
   const mine = members.find((m) => m.profile_id === me?.id);
@@ -26,6 +30,25 @@ export default async function start(el, { isStale }) {
     const d = latest[m.id];
     return avatar({ name: memberName(m), url: urls[memberAvatarPath(m)] || d?.image_url || null, size });
   };
+  const nameOf = new Map(members.map((m) => [m.id, memberName(m)]));
+  // Anzeigetafel je laufendem Spiel (HANDOFF 4 Startseite): Kacheln aus games.live_state
+  const boardCard = (gm) => {
+    const ls = gm.live_state && Array.isArray(gm.live_state.players) ? gm.live_state : null;
+    const snap = new Map((ls?.players || []).map((p) => [p.id, p]));
+    const round = ls?.round ?? gm.round ?? 1;
+    const min = Math.max(0, Math.floor((Date.now() - (Date.parse(gm.started_at) || Date.now())) / 60000));
+    return html`<a class="lc-board-card" href="#/spiel/${gm.id}" data-live-game="${gm.id}" aria-label="${t('life.board.open')}">
+      <div class="hd"><span class="lc-livedot">${t('life.board.live')}</span><b>${t('life.board.title')}</b><small>${t('life.board.meta', { r: round, min })}</small></div>
+      <div class="lc-tiles">${gm.players.map((p) => {
+        const sp = snap.get(p.member_id);
+        const turn = !!(ls && sp && !sp.out && !ls.finished && sp.seat === ls.turn);
+        const crit = critical(sp);
+        return html`<div class="lc-tile ${turn ? 'turn' : ''} ${sp?.out ? 'out' : ''} ${crit ? 'crit-on' : ''}" data-tile="${p.member_id}" ${p.deck?.image_url ? html`style="--img:url('${p.deck.image_url}')"` : ''}>
+          ${crit ? html`<span class="crit">${t('life.board.crit')}</span>` : ''}
+          <span class="n num" data-life>${sp ? sp.life : '–'}</span><span class="nm">${nameOf.get(p.member_id) || p.name}</span></div>`;
+      })}</div></a>`;
+  };
+
   // eigenes Profil zuerst, dann alphabetisch
   members.sort((a, b) => (b.profile_id === me?.id) - (a.profile_id === me?.id) || memberName(a).localeCompare(memberName(b), 'de'));
 
@@ -45,6 +68,8 @@ export default async function start(el, { isStale }) {
         <button class="btn outline" type="button" data-act="live">${icon('live', 20)}${t('home.joinGame')}</button>
       </div>
     </div>
+
+    ${live.map(boardCard)}
 
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('home.players')}</h3><a href="#/gruppen">${t('home.all')}</a></div>
