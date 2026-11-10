@@ -157,6 +157,10 @@ check('K3e Ausführungsrechte: nur authenticated; anonym ohne Konto ⇒ Rechte-F
   const p = (role) => q(`select has_function_privilege($1, 'public.replace_deck_cards(uuid, jsonb)', 'execute') x`, [role]).then((r) => r[0].x);
   assert.equal(await p('authenticated'), true);
   assert.equal(await p('anon'), false);
+  // Prüfhilfe nur intern: für keine Client-Rolle ausführbar
+  for (const role of ['anon', 'authenticated']) {
+    assert.equal((await q(`select has_function_privilege($1, 'public.deck_card_invalid(jsonb)', 'execute') x`, [role]))[0].x, false, role);
+  }
   await as(null);
   await fails(REPLACE, [D.A, JSON.stringify([row(9)])], /permission denied/);
   await as(U.G, { anonymous: true });
