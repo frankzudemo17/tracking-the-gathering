@@ -97,8 +97,8 @@ check('Aufbau: Gruppen G/H/S/X, Konto F, Spiele, Ereignisse, Bewertungen, Speich
   await ev(g1.id, 'cmd_damage', mB, mB, tim.id, 21, 2);
   await ev(g1.id, 'life', mA, null, mA, -3, 3);
   await finish(g1.id, [R(mA, 1), R(mB, 2, mA), R(tim.id, 3, mB)]);
-  await q(`insert into player_ratings (game_id, member_id, salt, fun) values ($1, $2, 2, 5), ($1, $3, 4, 3)`, [g1.id, mA, mB]);
-  await q(`insert into deck_salt_ratings (game_id, rater_id, deck_id, salt) values ($1, $2, $3, 5)`, [g1.id, mB, D.A1]);
+  await su(); await q(`insert into player_ratings (game_id, member_id, salt, fun) values ($1, $2, 2, 5), ($1, $3, 4, 3)`, [g1.id, mA, mB]);
+  await q(`insert into deck_salt_ratings (game_id, rater_id, deck_id, salt) values ($1, $2, $3, 5)`, [g1.id, mB, D.A1]); await as(U.A);
   g2 = await start(g.id, [P(mA, D.A1, 0), P(mB, D.B1, 1), P(tim.id, D.T1, 2)]);
   await ev(g2.id, 'poison', tim.id, tim.id, mA, 10, 1);
   await finish(g2.id, [R(tim.id, 1), R(mA, 2, tim.id), R(mB, 3, tim.id)]);
@@ -135,7 +135,7 @@ check('Aufbau: Gruppen G/H/S/X, Konto F, Spiele, Ereignisse, Bewertungen, Speich
   s1 = await start(s.id, [P(mAS, D.A4, 0), P(tom.id, D.O1, 1)]);
   await ev(s1.id, 'damage', tom.id, tom.id, mAS, 40, 1);
   await finish(s1.id, [R(tom.id, 1), R(mAS, 2, tom.id)]);
-  await q(`insert into player_ratings (game_id, member_id, salt) values ($1, $2, 5)`, [s1.id, mAS]);
+  await su(); await q(`insert into player_ratings (game_id, member_id, salt) values ($1, $2, 5)`, [s1.id, mAS]); await as(U.A);
   // X: D allein, nicht Admin (z. B. nachdem der Admin entfernt wurde)
   await as(U.D);
   [x] = await q(`select * from create_playgroup('X')`);
@@ -432,7 +432,7 @@ check('B1 Aufbau M: Decks von A in S, G4, G1, G2 gespielt; G5 mit übernommenem 
   await play('z1', M.G2.id, M.a2, M.AD, M.c2, M.CD, false);
   await play('z2', M.G2.id, M.a2, M.AS, M.c2, M.CD, true);
   await mas(U.C);
-  await mq(`insert into deck_salt_ratings (game_id, rater_id, deck_id, salt) values ($1, $2, $3, 4)`, [M.z1.id, M.c2, M.AD]);
+  await msu(); await mq(`insert into deck_salt_ratings (game_id, rater_id, deck_id, salt) values ($1, $2, $3, 4)`, [M.z1.id, M.c2, M.AD]);
   // Zeiten, Austritt aus G4, Beitritt/Übernahme in G5
   await msu();
   const ago = (game, d) => mq(`update games set started_at = now() - make_interval(days => $2) where id = $1`, [game, d]);
