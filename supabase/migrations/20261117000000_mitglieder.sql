@@ -344,6 +344,123 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- Block K5: delete_my_account (jüngste Definition 20261112000000_konto.sql:89–194) bekommt
+-- EINEN Block vor Schritt a); sonst wortgleich.
+-- ---------------------------------------------------------------------------
+create or replace function public.delete_my_account()
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  me constant uuid := auth.uid();
+  m members;
+  d decks;
+  heir uuid;
+  gid uuid;
+  ph uuid;
+  c decks;                 -- Kopie eines Decks für eine weitere Gruppe
+  used boolean;
+  former uuid[] := '{}';   -- umgewandelte Mitgliedschaften (bleiben als Platzhalter)
+begin
+  if me is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
+  -- Sperre: ein zweiter, gleichzeitiger Aufruf (Doppelklick) wartet hier und findet
+  -- danach kein Profil mehr.
+  perform 1 from profiles where id = me for update;
+  if not found then raise exception 'Konto nicht gefunden'; end if;
+
+  -- P10 Block K5 (20261117000000_mitglieder.sql): frühere Mitgliedschaften (verlassen/entfernt,
+  -- former_profile_id) heißen danach neutral und nehmen in c) die Decks auf, statt dass dort eine
+  -- neue aktive Zeile entsteht. Sonst unverändert gegenüber 20261112000000_konto.sql.
+  update members set display_name = 'Ehemaliges Mitglied' where former_profile_id = me;
+  former := former || array(select x.id from members x where x.former_profile_id = me order by x.created_at, x.id);
+
+  -- a) Mitgliedschaften
+  for m in select * from members where profile_id = me order by created_at, id loop
+    if not exists (select 1 from members o where o.playgroup_id = m.playgroup_id
+                   and o.profile_id is not null and o.profile_id <> me) then
+      perform public.purge_playgroup(m.playgroup_id);
+    else
+      if m.role = 'admin' and not exists (
+           select 1 from members o where o.playgroup_id = m.playgroup_id and o.id <> m.id
+             and o.profile_id is not null and o.role = 'admin') then
+        select o.id into heir from members o
+        where o.playgroup_id = m.playgroup_id and o.id <> m.id and o.profile_id is not null
+        order by coalesce(o.claimed_at, o.created_at), o.id limit 1;
+        update members set role = 'admin' where id = heir;
+      end if;
+      update members set profile_id = null, display_name = 'Ehemaliges Mitglied', claim_code = null,
+                         avatar_path = null, role = 'member', claimed_at = null
+      where id = m.id;
+      former := former || m.id;
+    end if;
+  end loop;
+
+  -- b) Ersteller von Gruppen (auch solchen, in denen das Konto nicht mehr Mitglied ist)
+  for gid in select id from playgroups where created_by = me loop
+    select o.profile_id into heir from members o
+    where o.playgroup_id = gid and o.profile_id is not null and o.profile_id <> me
+    order by (o.role = 'admin') desc, coalesce(o.claimed_at, o.created_at), o.id limit 1;
+    if heir is null then
+      perform public.purge_playgroup(gid);
+    else
+      update playgroups set created_by = heir where id = gid;
+    end if;
+  end loop;
+
+  -- c) Decks (nach a/b: Spiele mitgelöschter Gruppen zählen nicht mehr als Verwendung)
+  for d in select * from decks where owner_profile_id = me order by created_at, id loop
+    used := false;
+    -- Gruppen mit Verwendung, früheste zuerst
+    for gid in
+      select g.playgroup_id from (
+        select gp.game_id from game_players gp where gp.deck_id = d.id
+        union select r.game_id from deck_salt_ratings r where r.deck_id = d.id) u
+      join games g on g.id = u.game_id
+      group by g.playgroup_id
+      order by min(g.started_at), g.playgroup_id
+    loop
+      ph := null;
+      select x.id into ph from members x where x.id = any(former) and x.playgroup_id = gid;
+      if ph is null then
+        insert into members (playgroup_id, display_name) values (gid, 'Ehemaliges Mitglied') returning id into ph;
+        former := former || ph;
+      end if;
+      if not used then
+        -- Original: beide Besitzer-Spalten in EINEM update (check: genau einer gesetzt)
+        update decks set owner_profile_id = null, owner_member_id = ph, archived = true where id = d.id;
+        used := true;
+      else
+        -- Kopie aus der Zeile (alle Spalten, auch künftige), neuer Besitzer, archiviert
+        c := d;
+        c.id := gen_random_uuid();
+        c.owner_profile_id := null;
+        c.owner_member_id := ph;
+        c.archived := true;
+        c.version_of := null;
+        insert into decks select (c).*;
+        update game_players gp set deck_id = c.id
+          from games g where g.id = gp.game_id and g.playgroup_id = gid and gp.deck_id = d.id;
+        update deck_salt_ratings r set deck_id = c.id
+          from games g where g.id = r.game_id and g.playgroup_id = gid and r.deck_id = d.id;
+      end if;
+    end loop;
+    if not used then
+      update decks set version_of = null where version_of = d.id;
+      delete from decks where id = d.id;
+    end if;
+  end loop;
+
+  -- d) übrige Verweise auf das Profil
+  update members  set created_by = null where created_by = me;
+  update sessions set created_by = null where created_by = me;
+  update games    set created_by = null where created_by = me;
+
+  -- e) personenbezogene Protokollzeilen
+  delete from code_attempts where user_id = me;
+
+  -- f) Konto selbst (profiles fällt per on delete cascade)
+  delete from auth.users where id = me;
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- Ausführungsrechte (neue Funktionen bekommen per Default-Privileges anon + authenticated)
 -- ---------------------------------------------------------------------------
 revoke execute on function public.member_removal_check(uuid), public.remove_member(uuid, text),
@@ -362,6 +479,112 @@ revoke execute on function public._member_delete(uuid), public._member_deletable
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen):
 -- RÜCKWÄRTS-BEGINN
+-- create or replace function public.delete_my_account()
+-- returns void language plpgsql security definer set search_path = public as $$
+-- declare
+--   me constant uuid := auth.uid();
+--   m members;
+--   d decks;
+--   heir uuid;
+--   gid uuid;
+--   ph uuid;
+--   c decks;                 -- Kopie eines Decks für eine weitere Gruppe
+--   used boolean;
+--   former uuid[] := '{}';   -- umgewandelte Mitgliedschaften (bleiben als Platzhalter)
+-- begin
+--   if me is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
+--   -- Sperre: ein zweiter, gleichzeitiger Aufruf (Doppelklick) wartet hier und findet
+--   -- danach kein Profil mehr.
+--   perform 1 from profiles where id = me for update;
+--   if not found then raise exception 'Konto nicht gefunden'; end if;
+-- 
+--   -- a) Mitgliedschaften
+--   for m in select * from members where profile_id = me order by created_at, id loop
+--     if not exists (select 1 from members o where o.playgroup_id = m.playgroup_id
+--                    and o.profile_id is not null and o.profile_id <> me) then
+--       perform public.purge_playgroup(m.playgroup_id);
+--     else
+--       if m.role = 'admin' and not exists (
+--            select 1 from members o where o.playgroup_id = m.playgroup_id and o.id <> m.id
+--              and o.profile_id is not null and o.role = 'admin') then
+--         select o.id into heir from members o
+--         where o.playgroup_id = m.playgroup_id and o.id <> m.id and o.profile_id is not null
+--         order by coalesce(o.claimed_at, o.created_at), o.id limit 1;
+--         update members set role = 'admin' where id = heir;
+--       end if;
+--       update members set profile_id = null, display_name = 'Ehemaliges Mitglied', claim_code = null,
+--                          avatar_path = null, role = 'member', claimed_at = null
+--       where id = m.id;
+--       former := former || m.id;
+--     end if;
+--   end loop;
+-- 
+--   -- b) Ersteller von Gruppen (auch solchen, in denen das Konto nicht mehr Mitglied ist)
+--   for gid in select id from playgroups where created_by = me loop
+--     select o.profile_id into heir from members o
+--     where o.playgroup_id = gid and o.profile_id is not null and o.profile_id <> me
+--     order by (o.role = 'admin') desc, coalesce(o.claimed_at, o.created_at), o.id limit 1;
+--     if heir is null then
+--       perform public.purge_playgroup(gid);
+--     else
+--       update playgroups set created_by = heir where id = gid;
+--     end if;
+--   end loop;
+-- 
+--   -- c) Decks (nach a/b: Spiele mitgelöschter Gruppen zählen nicht mehr als Verwendung)
+--   for d in select * from decks where owner_profile_id = me order by created_at, id loop
+--     used := false;
+--     -- Gruppen mit Verwendung, früheste zuerst
+--     for gid in
+--       select g.playgroup_id from (
+--         select gp.game_id from game_players gp where gp.deck_id = d.id
+--         union select r.game_id from deck_salt_ratings r where r.deck_id = d.id) u
+--       join games g on g.id = u.game_id
+--       group by g.playgroup_id
+--       order by min(g.started_at), g.playgroup_id
+--     loop
+--       ph := null;
+--       select x.id into ph from members x where x.id = any(former) and x.playgroup_id = gid;
+--       if ph is null then
+--         insert into members (playgroup_id, display_name) values (gid, 'Ehemaliges Mitglied') returning id into ph;
+--         former := former || ph;
+--       end if;
+--       if not used then
+--         -- Original: beide Besitzer-Spalten in EINEM update (check: genau einer gesetzt)
+--         update decks set owner_profile_id = null, owner_member_id = ph, archived = true where id = d.id;
+--         used := true;
+--       else
+--         -- Kopie aus der Zeile (alle Spalten, auch künftige), neuer Besitzer, archiviert
+--         c := d;
+--         c.id := gen_random_uuid();
+--         c.owner_profile_id := null;
+--         c.owner_member_id := ph;
+--         c.archived := true;
+--         c.version_of := null;
+--         insert into decks select (c).*;
+--         update game_players gp set deck_id = c.id
+--           from games g where g.id = gp.game_id and g.playgroup_id = gid and gp.deck_id = d.id;
+--         update deck_salt_ratings r set deck_id = c.id
+--           from games g where g.id = r.game_id and g.playgroup_id = gid and r.deck_id = d.id;
+--       end if;
+--     end loop;
+--     if not used then
+--       update decks set version_of = null where version_of = d.id;
+--       delete from decks where id = d.id;
+--     end if;
+--   end loop;
+-- 
+--   -- d) übrige Verweise auf das Profil
+--   update members  set created_by = null where created_by = me;
+--   update sessions set created_by = null where created_by = me;
+--   update games    set created_by = null where created_by = me;
+-- 
+--   -- e) personenbezogene Protokollzeilen
+--   delete from code_attempts where user_id = me;
+-- 
+--   -- f) Konto selbst (profiles fällt per on delete cascade)
+--   delete from auth.users where id = me;
+-- end $$;
 -- create or replace function public.join_playgroup(p_code text)
 -- returns public.members language plpgsql security definer set search_path = public as $$
 -- declare gid uuid; m members; dn text;
