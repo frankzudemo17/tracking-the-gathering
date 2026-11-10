@@ -105,11 +105,24 @@ export default async function lifeE2e({ browser, base: BASE }) {
 
   // ---------------------------------------------------------------- Kriterium 4: Neuladen
   const before = await P.$$eval('.lc-field', (fs) => fs.map((f) => [f.dataset.pid, f.querySelector('[data-life]').textContent, f.classList.contains('turn'), f.querySelector('[data-part="badges"]').textContent.trim()]));
+  // Review P8: Verlauf und Zähler-Sheet gehören zur „identischen Anzeige“ (Kriterium 4)
+  const ctrOf = async (id) => { await P.click(`${field(id)} [data-act="counters"]`); await P.waitForSelector('[data-sheet="counters"]');
+    const v = await P.$$eval('[data-sheet="counters"] .lc-ctr', (rs) => rs.map((r) => [r.dataset.key, r.querySelector('[data-val]').textContent.trim()])); await closeSheet(); return v; };
+  const ctrBefore = await ctrOf(B);
+  await menu('log');
+  const logBefore = await P.locator('.lc-logrow').allTextContents();
+  await closeSheet();
   await P.reload();
   await P.waitForSelector('.lc-field');
   await P.waitForTimeout(500);
   const after = await P.$$eval('.lc-field', (fs) => fs.map((f) => [f.dataset.pid, f.querySelector('[data-life]').textContent, f.classList.contains('turn'), f.querySelector('[data-part="badges"]').textContent.trim()]));
   ok('K4 Neuladen ⇒ gleiche Anzeige (Leben, Zug, Abzeichen, Runde)', JSON.stringify(before) === JSON.stringify(after) && (await P.textContent('.lc-hub [data-round]')).trim() === '2', JSON.stringify([before, after]));
+  const ctrAfter = await ctrOf(B);
+  ok('K4 Neuladen ⇒ gleiche Zähler (B, Sheet)', ctrBefore.length > 0 && JSON.stringify(ctrBefore) === JSON.stringify(ctrAfter), JSON.stringify([ctrBefore, ctrAfter]));
+  await menu('log');
+  const logAfter = await P.locator('.lc-logrow').allTextContents();
+  ok('K4 Neuladen ⇒ gleicher Verlauf', logBefore.length >= 6 && JSON.stringify(logBefore) === JSON.stringify(logAfter), JSON.stringify([logBefore, logAfter]));
+  await closeSheet();
   await menu('log');
   await P.click('[data-sheet="menu"] [data-m="undo"]');
   await menu('zug');
@@ -140,6 +153,12 @@ export default async function lifeE2e({ browser, base: BASE }) {
   const on = await waitText('[data-live-text]', /Gespeichert/, 15000);
   ok('K9 wieder online ⇒ „Gespeichert“', /Gespeichert/.test(on), on);
   await closeSheet();
+  // Review P8: Ereignisse nach dem Nachholen wirklich in der DB, seq weiter lückenlos
+  const evOn = await poll("const r = await sb.from('game_events').select('seq, type, target, amount').eq('game_id', a).order('seq'); return r.data;", g1, (r) => r?.length === 20);
+  const tail2 = (evOn || []).slice(-2);
+  ok('K9 nachgeholt: 20 Ereignisse (16 + undo + roll + 2 Taps), seq 1..20 lückenlos, letzte zwei life −1 für C',
+    evOn?.length === 20 && evOn.every((e, i) => e.seq === i + 1) && tail2.every((e) => e.type === 'life' && e.target === C && e.amount === -1),
+    JSON.stringify((evOn || []).map((e) => [e.seq, e.type])));
 
   // ---------------------------------------------------------------- Kriterium 7: Anzeigetafel
   const ls = await poll("const r = await sb.from('games').select('live_state').eq('id', a).single(); return r.data?.live_state;", g1,
@@ -159,6 +178,26 @@ export default async function lifeE2e({ browser, base: BASE }) {
   await waitHash(P, '#/spiel/' + g1);
   ok('K7 Tippen auf die Karte ⇒ /spiel/<id>', hash(P) === '#/spiel/' + g1);
   await P.waitForSelector('.lc-field');
+
+  // ---------------------------------------------------------------- Review P8: Schreibfehler (Risiko-Szenario)
+  const failRoute = (r) => (r.request().method() === 'POST'
+    ? r.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'XX000', message: 'Testfehler', details: null, hint: null }) })
+    : r.continue());
+  await P.route('**/rest/v1/game_events*', failRoute);
+  await P.click(`${field(C)} .lc-tap.plus`);
+  await menu('tools');
+  const errTxt = await waitText('[data-live-text]', /Fehler/, 8000);
+  ok('Schreibfehler ⇒ „Fehler: …“ mit „Erneut versuchen“', /Fehler/.test(errTxt) && (await P.locator('[data-sheet="menu"] .lc-retry').count()) === 1, errTxt);
+  await P.shot('p8-06b-fehler');
+  await P.unroute('**/rest/v1/game_events*', failRoute);
+  await P.click('[data-sheet="menu"] [data-m="retry"]');
+  const okTxt = await waitText('[data-live-text]', /Gespeichert/, 10000);
+  ok('„Erneut versuchen“ ⇒ „Gespeichert“', /Gespeichert/.test(okTxt), okTxt);
+  const evErr = await poll("const r = await sb.from('game_events').select('seq').eq('game_id', a).order('seq'); return r.data;", g1, (r) => r?.length === 21);
+  ok('nach Erneut versuchen: 21 Ereignisse, seq lückenlos', evErr?.length === 21 && evErr.every((e, i) => e.seq === i + 1), JSON.stringify(evErr?.map((e) => e.seq)));
+  await closeSheet();
+  // die absichtlich erzeugten 400er nicht als HTTP-Fehler des Laufs zählen
+  P.bad = P.bad.filter((x) => !/^400 .*\/rest\/v1\/game_events$/.test(x));
 
   // ---------------------------------------------------------------- Kriterium 5: K.O.-Ablauf
   await tap(B, -1, 20);
