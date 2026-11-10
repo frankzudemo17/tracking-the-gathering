@@ -54,6 +54,7 @@ function fakeFetch(map) {
 }
 const okFetch = (est = EST_TO, fmc = FMC_TO) => fakeFetch({ '/estimate-bracket': est, '/find-my-combos': fmc });
 const quiet = { log: () => {} };
+// Zeitgrenzen-Fälle haben ein eigenes Test-Timeout: fehlt die Grenze im Code, wird der Fall rot statt zu hängen.
 
 /** Alle Schlüssel (rekursiv) eines JSON-Werts. */
 const allKeys = (v, out = new Set()) => {
@@ -187,7 +188,7 @@ test('Krit. 3: fremde Origins ⇒ kein ACAO', async () => {
   }
 });
 
-test('Krit. 3: POST-Fehlerantworten tragen ACAO (401, 403, 400, 413, 429, 502, 504, 405)', async () => {
+test('Krit. 3: POST-Fehlerantworten tragen ACAO (401, 403, 400, 413, 429, 502, 504, 405)', { timeout: 5000 }, async () => {
   const C = await core();
   const acao = (res) => res.headers.get('access-control-allow-origin');
   assert.equal(acao(await C.handle(post(INPUT_TO, { auth: null }))), PAGES);
@@ -324,7 +325,7 @@ test('Partner: zwei Commander-Einträge gehen durch; weitergereicht nur card + q
 
 // ---- Krit. 6: Zeitgrenze / Upstream -----------------------------------------------------------
 
-test('Krit. 6: fetch antwortet nie (ignoriert Abbruch) ⇒ 504 nach Grenze (verkürzt auf 30 ms)', async () => {
+test('Krit. 6: fetch antwortet nie (ignoriert Abbruch) ⇒ 504 nach Grenze (verkürzt auf 30 ms)', { timeout: 5000 }, async () => {
   const C = await core();
   const h = C.createHandler({ fetch: () => new Promise(() => {}), timeoutMs: 30, ...quiet });
   const t0 = Date.now();
@@ -335,7 +336,7 @@ test('Krit. 6: fetch antwortet nie (ignoriert Abbruch) ⇒ 504 nach Grenze (verk
   assert.ok(ms >= 25 && ms < 2000, `${ms} ms`);
 });
 
-test('Krit. 6: fetch hält sich an AbortSignal ⇒ 504; nur ein Aufruf langsam ⇒ trotzdem 504', async () => {
+test('Krit. 6: fetch hält sich an AbortSignal ⇒ 504; nur ein Aufruf langsam ⇒ trotzdem 504', { timeout: 5000 }, async () => {
   const C = await core();
   const abortable = (_url, init) => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
   const h1 = C.createHandler({ fetch: abortable, timeoutMs: 20, ...quiet });
@@ -344,7 +345,7 @@ test('Krit. 6: fetch hält sich an AbortSignal ⇒ 504; nur ein Aufruf langsam �
   assert.equal((await h2(post(INPUT_TO))).status, 504);
 });
 
-test('Krit. 6: Body hängt nach dem Kopf ⇒ 504', async () => {
+test('Krit. 6: Body hängt nach dem Kopf ⇒ 504', { timeout: 5000 }, async () => {
   const C = await core();
   const hang = async () => ({ ok: true, status: 200, json: () => new Promise(() => {}) });
   const h = C.createHandler({ fetch: hang, timeoutMs: 20, ...quiet });
@@ -482,7 +483,7 @@ test('Client checkDeck: gekürzte Antwort ⇒ bracketFloor; leere Liste ⇒ empt
   assert.equal(sb.calls.length, 1);
 });
 
-test('Client checkDeck: Fehlercodes 429 / 504 / 502 / 403 / 400 / Netz unterscheidbar', async () => {
+test('Client checkDeck: Fehlercodes 429 / 504 / 502 / 403 / 400 / Netz unterscheidbar', { timeout: 5000 }, async () => {
   const S = await client(); const C = await core();
   const rows = [{ section: 'main', qty: 1, name: 'Sol Ring' }];
   const expectCode = async (sb, code, status) => {
