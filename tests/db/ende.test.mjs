@@ -107,9 +107,9 @@ check('Aufbau: Gruppen X/Y, Mitglieder, Platzhalter, Decks, Spiele s1/s2/s3/sY',
 });
 
 // ---------------------------------------------------------------- K1 Migration
-check('K1 Migration liegt als letzte Datei vor, Kopfkommentar mit Bestandsprüfungen', async () => {
+check('K1 Migration liegt nach der Konto-Migration (P12), Kopfkommentar mit Bestandsprüfungen', async () => {
   const files = fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
-  ok(files.at(-1) === FILE, files.join(', '));
+  ok(files.includes(FILE) && files.indexOf(FILE) > files.indexOf('20261112000000_konto.sql') && files.includes('20261112000000_konto.sql'), files.join(', '));
   const sql = fs.readFileSync(path.join(MIGRATIONS, FILE), 'utf8');
   for (const t of ['player_ratings', 'deck_salt_ratings', 'potg_votes']) ok(sql.includes(`select count(*) from ${t};`), t);
   ok(sql.includes('select count(*) from games where char_length(note) > 500;'));
@@ -215,7 +215,7 @@ rejects('Spiel aborted ⇒ nicht gewertet', asA, () => s3.id, () => ({ salt: 1, 
 rejects('Spiel existiert nicht ⇒ nicht gewertet', asA, () => NOBODY, () => ({ salt: 1 }), /^Spiel ist nicht gewertet$/);
 rejects('Gruppenmitglied ohne Platz im Spiel ⇒ nur Mitspieler', () => as(U.C), () => s1.id, () => ({ salt: 1 }), /^Nur Mitspieler können bewerten$/);
 rejects('fremde Gruppe ⇒ nur Mitspieler', () => as(U.D), () => s1.id, () => ({ salt: 1 }), /^Nur Mitspieler können bewerten$/);
-rejects('fremde Gruppe, Spiel live ⇒ Status bleibt verborgen', () => as(U.D), () => s2.id, () => ({ salt: 1 }), /^Nur Mitspieler können bewerten$/);
+rejects('fremde Gruppe, Spiel live ⇒ nicht gewertet (Statusprüfung vor Mitgliedsprüfung, Spec-Reihenfolge)', () => as(U.D), () => s2.id, () => ({ salt: 1 }), /^Spiel ist nicht gewertet$/);
 for (const [k, v] of [['salt', 0], ['salt', 6], ['fun', 0], ['fun', 6], ['deck', 0], ['deck', 6]]) {
   rejects(`Wert ${k} = ${v}`, asA, () => s1.id, () => ({ salt: 2, fun: 2, deck: 2, [k]: v }), /^Bewertung muss zwischen 1 und 5 liegen$/);
 }

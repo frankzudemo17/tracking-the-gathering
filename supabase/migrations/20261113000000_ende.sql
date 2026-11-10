@@ -57,12 +57,10 @@ begin
   if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
 
   select * into g from games where id = p_game;
-  if g.id is null then raise exception 'Spiel ist nicht gewertet'; end if;
-  -- eigenes Mitglied in GENAU der Gruppe dieses Spiels (Konto in mehreren Gruppen);
-  -- vor der Statusprüfung, damit Fremde den Status eines Spiels nicht erfahren
+  if g.id is null or g.status <> 'finished' then raise exception 'Spiel ist nicht gewertet'; end if;
+  -- eigenes Mitglied in GENAU der Gruppe dieses Spiels (Konto in mehreren Gruppen)
   select m.id into me from members m where m.playgroup_id = g.playgroup_id and m.profile_id = auth.uid();
   if me is null then raise exception 'Nur Mitspieler können bewerten'; end if;
-  if g.status <> 'finished' then raise exception 'Spiel ist nicht gewertet'; end if;
   -- Spieler dieses Spiels; for update: zwei gleichzeitige Aufrufe desselben
   -- Bewerters laufen nacheinander (delete + insert beim Deck-Salz)
   select gp.deck_id into my_deck from game_players gp where gp.game_id = p_game and gp.member_id = me for update;
