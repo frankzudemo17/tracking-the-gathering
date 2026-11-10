@@ -29,8 +29,8 @@ export default async function setupE2e({ browser, base: BASE }) {
 
   // ---------------------------------------------------------------- Kriterium 8a
   await S.goto(BASE + '#/spielen');
-  await S.waitForSelector('.empty b');
-  ok('K8 /spielen zeigt weiter „kommt bald“', (await S.textContent('.empty b')).includes('kommt bald'));
+  await S.waitForSelector('.su-row');
+  ok('K8 /spielen zeigt seit P8 das Setup (Nav „Spielen“)', (await S.locator('[data-act="member"]').count()) >= 3 && (await S.locator('.empty b').count()) === 0);
 
   // ---------------------------------------------------------------- Negativraum: kaputter/abgelaufener Entwurf
   const gid0 = await db('return state.groupId;');
@@ -165,10 +165,12 @@ export default async function setupE2e({ browser, base: BASE }) {
   ok('Ein Deck bei zwei Spielern erlaubt (A und C mit Tymna)', gp?.filter((x) => x.decks?.short_name?.includes('Tymna')).length === 2);
 
   // ---------------------------------------------------------------- Kriterium 8b
-  await S.waitForSelector('[data-act="discard"]');
-  ok('K8 /spiel/<id> zeigt Platzhalter mit Spielern', (await S.locator('.su-ph-list .su-row').count()) === 3);
-  await S.shot('setup-05-platzhalter');
-  await S.click('[data-act="discard"]');
+  await S.waitForSelector('.lc-field');
+  ok('K8 /spiel/<id> zeigt den Lifecounter mit 3 Feldern', (await S.locator('.lc-field').count()) === 3);
+  await S.shot('setup-05-lifecounter');
+  await S.click('.lc-hub');
+  await S.click('[data-sheet="menu"] [data-m="end"]');
+  await S.click('[data-sheet="end"] [data-e="aborted"]');
   await waitHash(S, '#/start');
   const st = await poll("const r = await sb.from('games').select('status').eq('id', a).single(); return r.data?.status;", gameId, (v) => v === 'aborted');
   ok('K8 „Spiel verwerfen“ ⇒ Spiel aborted, zurück zum Start', st === 'aborted', st);

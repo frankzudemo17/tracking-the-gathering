@@ -31,6 +31,12 @@
     try { var th = localStorage.getItem('ttg.theme'); if (th === 'nacht' || th === 'arktis' || th === 'lachs') document.documentElement.dataset.theme = th; } catch (e) {}
   </script>
   <script type="module" src="src/main.js"></script>
+  <!-- Etappe 4/5 (Naht P13): je Feature eine Datei, Besitzer im Dateikopf -->
+  <link rel="stylesheet" href="src/styles/result.css">
+  <link rel="stylesheet" href="src/styles/history.css">
+  <link rel="stylesheet" href="src/styles/board.css">
+  <link rel="stylesheet" href="src/styles/recap.css">
+  <link rel="stylesheet" href="src/styles/stats.css">
 </head>
 <body>
   <div id="app"><div class="loading"><span class="spinner"></span></div></div>

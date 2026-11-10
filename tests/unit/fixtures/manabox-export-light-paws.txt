@@ -1,0 +1,71 @@
+// COMMANDER
+1 Light-Paws, Emperor's Voice (NEO) 25
+
+1 Ajani's Chosen (WOC) 59
+1 All That Glitters (CMM) 9
+1 Angelic Destiny (FDN) 565
+1 Angelic Gift (AFC) 64
+1 Archangel Elspeth (MOM) 6
+1 Archon of Sun's Grace (WOC) 61
+1 Armored Ascension (M11) 5
+1 Auramancer (DSC) 97
+1 Battle Mastery (BBD) 89
+1 Cartouche of Solidarity (AKH) 7
+1 Celestial Mantle (ZEN) 6
+1 Chains of Custody (J25) 180
+1 Cosmic Intervention (KHC) 3
+1 Danitha Capashen, Paragon (WOC) 64
+1 Darksteel Mutation (CMM) 21
+1 Daybreak Coronet (WOC) 65
+1 Devoted Caretaker (ODY) 18
+1 Eidolon of Countless Battles (WOC) 66
+1 Eiganjo, Seat of the Empire (NEO) 268
+1 Eland Umbra (ROE) 19
+1 Elspeth Resplendent (SNC) 11
+1 Elspeth, Sun's Champion (MKC) 62
+1 Emergence Zone (WAR) 245
+1 Esper Sentinel (H2R) 2
+1 Ethereal Armor (DSK) 7
+1 Fateful Absence (MID) 18
+1 Flawless Maneuver (CMM) 24
+1 Flickering Ward (TMP) 19
+1 Gift of Immortality (THS) 14
+1 Giver of Runes (MH1) 13
+1 Hall of Heliod's Generosity (DSC) 283
+1 Heliod's Pilgrim (THB) 20
+1 Hero of Iroas (UMA) 20
+1 Holy Mantle (GTC) 17
+1 Hyena Umbra (2X2) 13
+1 Idolized (PIP) 17
+1 Kor Spiritdancer (WOC) 69
+1 Loran's Escape (BRO) 14
+1 Mantle of the Ancients (WOC) 70
+1 Mesa Enchantress (DSC) 68
+1 Michiko's Reign of Truth (NEO) 29
+1 On Serra's Wings (CMR) 380
+1 Ossification (ONE) 26
+1 Pearl-Ear, Imperial Advisor (MH3) 39
+32 Plains (DFT) 277
+1 Sage's Reverie (WOC) 73
+1 Sejiri Shelter (ZNR) 37
+1 Sentinel's Eyes (THB) 36
+1 Sevinne's Reclamation (MH3) 267
+1 Sheltered by Ghosts (DSK) 30
+1 Shielded by Faith (SS2) 5
+1 Sigil of the Empty Throne (DSC) 103
+1 Sol Ring (DRC) 56
+1 Solitude (H2R) 3
+1 Spirit Mantle (CMR) 385
+1 Sram, Senior Edificer (NEC) 88
+1 Starfield Mystic (DSC) 105
+1 Starnheim Courser (KHM) 32
+1 Steelshaper's Gift (CMM) 59
+1 Tempest Technique (TDC) 16
+1 Timely Ward (DSC) 107
+1 Tocasia's Welcome (BRO) 30
+1 Transcendent Envoy (WOC) 81
+1 Twinblade Blessing (FDN) 26
+1 Umbra Mystic (WOC) 82
+1 Unbreakable Formation (RVR) 32
+1 Unquestioned Authority (CMR) 389
+1 Vanquish the Horde (INR) 49
