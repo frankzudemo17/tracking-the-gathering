@@ -23,6 +23,10 @@ route('/profil', v('profile'), { nav: 'me', group: true });
 route('/profil/:memberId', v('profile'), { nav: 'me', group: true });
 route('/gruppen', v('groups'));
 route('/einstellungen', v('settings'), { nav: 'me' });
+route('/einstellungen/konto', v('settings-account'), { nav: 'me' });
+// Rechtliches und Datenschutz auch ohne Anmeldung lesbar (ohne Navigationsleiste)
+route('/einstellungen/rechtliches', v('legal'), { public: true });
+route('/datenschutz', v('legal'), { public: true, arg: 'privacy' });
 route('/spieler-neu', v('add-player'), { group: true });
 route('/deck-neu/:memberId', v('add-deck'), { group: true });
 route('/deck/:id', v('deck'), { nav: 'me', group: true });

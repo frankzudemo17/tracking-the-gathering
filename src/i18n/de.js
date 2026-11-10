@@ -24,6 +24,7 @@ export default {
       rate: 'Zu viele Versuche. Bitte warte kurz.',
       generic: 'Das hat nicht geklappt. Bitte versuch es nochmal.',
       offline: 'Keine Verbindung. Bitte prüfe dein Internet.',
+      'A user with this email address has already been registered': 'Mit dieser E-Mail gibt es schon ein Konto.',
     },
   },
 
@@ -102,6 +103,64 @@ export default {
     changeBracket: 'Bracket ändern', remove: 'Deck entfernen', removed: 'Deck entfernt.', archived: 'Deck archiviert, weil es schon in Spielen vorkommt.',
     removeConfirm: 'Wirklich entfernen?', removeYes: 'Ja, entfernen', by: 'von {name}', notFound: 'Dieses Deck gibt es nicht oder du siehst es nicht.',
     art: 'Bild: {artist} · Scryfall',
+  },
+
+  settings: {
+    account: 'Konto', accountSub: 'Passwort, E-Mail, Konto löschen', about: 'Über die App',
+    legal: 'Rechtliches & Credits', legalSub: 'Fan-Content-Hinweis, Impressum, Lizenzen', privacy: 'Datenschutz', version: 'Version',
+  },
+
+  account: {
+    title: 'Konto', signedInAs: 'Angemeldet als {email}',
+    pwTitle: 'Passwort ändern', pwNew: 'Neues Passwort', pwRepeat: 'Neues Passwort wiederholen', pwSave: 'Passwort ändern',
+    pwDone: 'Passwort geändert.', pwMismatch: 'Die beiden Passwörter stimmen nicht überein.', pwSame: 'Das neue Passwort muss sich vom alten unterscheiden.',
+    emailTitle: 'E-Mail ändern', emailNew: 'Neue E-Mail-Adresse', emailSave: 'Bestätigungslinks schicken',
+    emailHint: 'Wir schicken einen Bestätigungslink an deine alte und an die neue Adresse. Erst wenn du beide Links geöffnet hast, gilt die neue Adresse.',
+    emailSent: 'Links sind unterwegs. Bitte bestätige in beiden Postfächern.',
+    emailBad: 'Das sieht nicht nach einer E-Mail-Adresse aus.', emailSame: 'Das ist schon deine Adresse.',
+    dangerTitle: 'Konto löschen', dangerSub: 'Endgültig. Lässt sich nicht rückgängig machen.', delete: 'Konto löschen',
+    deleteTitle: 'Konto wirklich löschen?',
+    deleteGone: 'Weg sind: dein Konto, dein Profil und Profilbild, deine Decks, die in keinem Spiel vorkommen.',
+    deleteKept: 'Bleiben für deine Gruppen: gemeinsame Spiele und Statistiken. Dort stehst du dann als „Ehemaliges Mitglied“, gespielte Decks werden archiviert.',
+    deleteSolo: 'Playgroups, in denen sonst niemand ein Konto hat, werden samt Spielen gelöscht. Bist du letzter Admin, wird das am längsten dabei befindliche Mitglied Admin.',
+    deleteType: 'Tippe {word} ein, um zu bestätigen', deleteYes: 'Endgültig löschen', deleted: 'Dein Konto wurde gelöscht.',
+  },
+
+  legal: {
+    title: 'Rechtliches & Credits', pending: 'Angaben folgen',
+    fanTitle: 'Fan-Content',
+    fan: 'Tracking the Gathering ist inoffizieller Fan-Content gemäß der Fan Content Policy. Nicht von Wizards of the Coast genehmigt oder unterstützt. Teile der verwendeten Materialien sind Eigentum von Wizards of the Coast. © Wizards of the Coast LLC.',
+    fanLink: 'Fan Content Policy lesen',
+    creditsTitle: 'Credits',
+    scryfall: 'Kartendaten und Kartenbilder', icons: 'Icons', iconsLic: 'Phosphor Icons · MIT-Lizenz',
+    fonts: 'Schriften', fontsLic: 'Bricolage Grotesque, Geist, Unbounded · SIL Open Font License 1.1 · selbst gehostet',
+    imprintTitle: 'Impressum', privacyLink: 'Datenschutzerklärung', version: 'App-Version {v}',
+  },
+
+  privacy: {
+    title: 'Datenschutz', updated: 'Stand: November 2026',
+    intro: 'Hier steht, welche Daten Tracking the Gathering verarbeitet, wo sie liegen und welche Rechte du hast.',
+    controllerTitle: 'Verantwortlich',
+    sections: [
+      { h: 'Was gespeichert wird', p: [
+        'Konto: E-Mail-Adresse, Passwort (nur verschlüsselt als Hash), Anzeigename, Sprache, Erscheinungsbild und optional ein Profilbild.',
+        'Gruppendaten: Playgroups, Mitglieder (auch Spieler ohne Konto), Decks, Spiele, Spielereignisse und Bewertungen. Diese Daten sehen nur Mitglieder derselben Playgroup.',
+        'Zweck ist allein der Betrieb der App für dich und deine Gruppe (Art. 6 Abs. 1 lit. b DSGVO).'] },
+      { h: 'Supabase (Server in Frankfurt, EU)', p: [
+        'Anmeldung, Datenbank und Bildspeicher laufen bei Supabase in der Region Frankfurt am Main (EU). Supabase verarbeitet die Daten in unserem Auftrag.'] },
+      { h: 'Scryfall (USA)', p: [
+        'Kartenbilder und die Commander-Suche kommen direkt von Scryfall (scryfall.com). Dabei überträgt dein Gerät deine IP-Adresse und den Suchbegriff an Scryfall in den USA. Konto- oder Gruppendaten gehen nicht an Scryfall.'] },
+      { h: 'GitHub Pages und esm.sh (Auslieferung der App)', p: [
+        'Die App-Dateien liegen bei GitHub Pages (GitHub Inc., USA). Beim Aufruf verarbeitet GitHub technisch nötige Daten wie IP-Adresse und Zeitpunkt.',
+        'Die Programmbibliothek für die Anmeldung (supabase-js) lädt die App beim Start von esm.sh; auch dabei wird deine IP-Adresse übertragen.',
+        'Schriften liegen in der App selbst, es gibt keine Anfrage an Google Fonts.'] },
+      { h: 'Keine Tracker', p: [
+        'Keine Analyse, keine Werbung, keine Cookies von Dritten. Im Browser speichert die App nur, was sie zum Funktionieren braucht: deine Anmeldung, Sprache, Look, die gewählte Playgroup, noch nicht gesendete Spielereignisse und die App-Dateien für den Offline-Betrieb.'] },
+      { h: 'Speicherdauer und Löschen', p: [
+        'Daten bleiben, solange dein Konto besteht. Unter Einstellungen → Konto kannst du dein Konto jederzeit selbst löschen. Dann sind Konto, Profil, Profilbild und ungespielte Decks weg. Gemeinsame Spiele bleiben für die Gruppe erhalten, du erscheinst dort als „Ehemaliges Mitglied“ ohne Namen und Bild.'] },
+      { h: 'Deine Rechte', p: [
+        'Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch. Du kannst dich außerdem bei einer Datenschutz-Aufsichtsbehörde beschweren. Für Anfragen wende dich an den oben genannten Verantwortlichen.'] },
+    ],
   },
 
   common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.' },

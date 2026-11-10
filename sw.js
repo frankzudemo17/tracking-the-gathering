@@ -1,12 +1,14 @@
 // Service Worker · Etappe 1: App-Shell offline verfügbar.
 // Strategie: eigene Dateien „Netz zuerst, sonst Cache“ (so kommen Updates sofort an),
-// Google Fonts „Cache zuerst“. Supabase-Anfragen werden nie gecacht.
+// esm.sh (supabase-js) „Cache zuerst“. Supabase-Anfragen werden nie gecacht.
+// Schriften liegen selbst gehostet unter assets/fonts/ und stehen in der SHELL (offline da).
 // Die Ereignis-Warteschlange für Offline-Spiele folgt in Etappe 5/6.
-const VERSION = 'ttg-v10';
+const VERSION = 'ttg-v11';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
-  './src/styles/tokens.css', './src/styles/base.css', './src/styles/components.css',
-  './src/main.js', './src/router.js', './src/state.js', './src/supabase.js', './src/config.js',
+  './src/styles/fonts.css', './src/styles/tokens.css', './src/styles/base.css', './src/styles/components.css',
+  './assets/fonts/bricolage-grotesque-latin-opsz.woff2', './assets/fonts/geist-latin-wght.woff2', './assets/fonts/unbounded-latin-wght.woff2',
+  './src/main.js', './src/router.js', './src/state.js', './src/supabase.js', './src/config.js', './src/version.js',
   './src/i18n/index.js', './src/i18n/de.js', './src/i18n/en.js',
   './src/lib/dom.js', './src/lib/icons.js', './src/lib/ui.js', './src/lib/parts.js', './src/lib/avatar.js', './src/lib/group-actions.js', './src/lib/scryfall.js', './src/lib/decks.js', './src/lib/game-store.js',
   './src/game/engine.js', './src/game/layouts.js', './src/game/rng.js', './src/game/ko.js',
@@ -38,7 +40,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  const cacheFirst = /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname) || url.hostname === 'esm.sh';
+  const cacheFirst = url.hostname === 'esm.sh';
   if (cacheFirst) {
     e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
       if (res.ok || res.type === 'opaque') { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); }

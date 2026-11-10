@@ -1,5 +1,6 @@
-// Einstellungen: Sprache, Erscheinungsbild, Playgroups, Abmelden (erreichbar über das Zahnrad im Profil)
+// Einstellungen: Sprache, Erscheinungsbild, Playgroups, Konto, Über die App, Abmelden (Zahnrad im Profil)
 import { sb } from '../supabase.js';
+import { APP_VERSION } from '../version.js';
 import { state, updateProfile } from '../state.js';
 import { html, mount, on } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
@@ -36,6 +37,37 @@ export default function settings(el) {
         <span class="grow"><span class="title">${t('profile.manageGroups')}</span></span>
         <span class="chev">${icon('chevRight', 18)}</span>
       </a>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h3 class="section-title">${t('settings.account')}</h3></div>
+      <div class="list">
+        <a class="row" href="#/einstellungen/konto" data-nav="account">
+          <span class="row-ic">${icon('key', 20)}</span>
+          <span class="grow"><span class="title">${t('settings.accountSub')}</span>${state.session?.user?.email ? html`<span class="sub">${state.session.user.email}</span>` : ''}</span>
+          <span class="chev">${icon('chevRight', 18)}</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h3 class="section-title">${t('settings.about')}</h3></div>
+      <div class="list">
+        <a class="row" href="#/einstellungen/rechtliches" data-nav="legal">
+          <span class="row-ic">${icon('shield', 20)}</span>
+          <span class="grow"><span class="title">${t('settings.legal')}</span><span class="sub">${t('settings.legalSub')}</span></span>
+          <span class="chev">${icon('chevRight', 18)}</span>
+        </a>
+        <a class="row" href="#/datenschutz" data-nav="privacy">
+          <span class="row-ic">${icon('lock', 20)}</span>
+          <span class="grow"><span class="title">${t('settings.privacy')}</span></span>
+          <span class="chev">${icon('chevRight', 18)}</span>
+        </a>
+        <div class="row static">
+          <span class="grow"><span class="title">${t('settings.version')}</span></span>
+          <span class="muted num" data-version>${APP_VERSION}</span>
+        </div>
+      </div>
     </div>
 
     <button type="button" class="btn danger" data-act="logout">${icon('logout', 18)}${t('profile.logout')}</button>`);
