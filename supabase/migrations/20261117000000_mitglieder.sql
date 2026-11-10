@@ -163,6 +163,59 @@ create trigger ttg_gp_member_active before insert on public.game_players
   for each row execute function public.gp_member_active();
 
 -- ---------------------------------------------------------------------------
+-- D. Eingefrorene Zeilen und Sichtbarkeit. Je die jüngste Definition (alle vier aus
+-- 20261106000000_init.sql, seither unverändert) fortgeschrieben, nur die eine Bedingung ergänzt.
+-- create or replace behält Rechte und Abhängigkeiten.
+-- ---------------------------------------------------------------------------
+-- mem_update (init.sql:276–278): entfernte Zeilen ändert nur noch ein RPC
+alter policy mem_update on public.members using (
+  removed_at is null and (
+  public.is_group_admin(playgroup_id) or (profile_id is null and public.is_group_member(playgroup_id)) or profile_id = auth.uid()
+  )
+);
+
+-- can_write_avatar (init.sql:508–518), Zweig members: + m.removed_at is null
+create or replace function public.can_write_avatar(obj_name text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select case (storage.foldername(obj_name))[1]
+    when 'profiles' then (storage.foldername(obj_name))[2] = auth.uid()::text
+    when 'members' then exists (
+      select 1 from public.members m
+      where m.id::text = (storage.foldername(obj_name))[2]
+        and m.profile_id is null
+        and m.removed_at is null
+        and public.is_group_member(m.playgroup_id))
+    else false end
+$$;
+
+-- can_edit_deck (init.sql:143–148), Platzhalter-Zweig: + m.removed_at is null
+-- (Decks entfernter Platzhalter sind lesbar, nicht änderbar)
+create or replace function public.can_edit_deck(d public.decks)
+returns boolean language sql stable security definer set search_path = public as $$
+  select
+    d.owner_profile_id = auth.uid()
+    or exists (select 1 from members m where m.id = d.owner_member_id and m.profile_id is null and m.removed_at is null and public.is_group_member(m.playgroup_id));
+$$;
+
+-- can_see_deck (init.sql:131–141): + Zweig „in einem Spiel einer meiner Gruppen gespielt“.
+-- Nach dem Verlassen hat das Konto-Deck des Gegangenen keinen Besitzer mehr in der Gruppe;
+-- ohne den Zweig verlören alte Spiele Name, Bild und Deckliste. Index game_players(deck_id) aus A.
+create or replace function public.can_see_deck(d public.decks)
+returns boolean language sql stable security definer set search_path = public as $$
+  select
+    d.owner_profile_id = auth.uid()
+    or exists (
+      select 1 from members mine join members theirs on theirs.playgroup_id = mine.playgroup_id
+      where mine.profile_id = auth.uid()
+        and (theirs.profile_id = d.owner_profile_id or theirs.id = d.owner_member_id)
+    )
+    or exists (
+      select 1 from game_players gp join games g on g.id = gp.game_id
+      where gp.deck_id = d.id and public.is_group_member(g.playgroup_id)
+    );
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Ausführungsrechte (neue Funktionen bekommen per Default-Privileges anon + authenticated)
 -- ---------------------------------------------------------------------------
 revoke execute on function public.member_removal_check(uuid), public.remove_member(uuid, text),
@@ -183,6 +236,36 @@ revoke execute on function public._member_delete(uuid), public._member_deletable
 -- drop function public.member_removal_check(uuid);
 -- drop function public._member_deletable(uuid);
 -- drop function public._member_delete(uuid);
+-- create or replace function public.can_see_deck(d public.decks)
+-- returns boolean language sql stable security definer set search_path = public as $$
+--   select
+--     d.owner_profile_id = auth.uid()
+--     or exists (
+--       select 1 from members mine join members theirs on theirs.playgroup_id = mine.playgroup_id
+--       where mine.profile_id = auth.uid()
+--         and (theirs.profile_id = d.owner_profile_id or theirs.id = d.owner_member_id)
+--     );
+-- $$;
+-- create or replace function public.can_edit_deck(d public.decks)
+-- returns boolean language sql stable security definer set search_path = public as $$
+--   select
+--     d.owner_profile_id = auth.uid()
+--     or exists (select 1 from members m where m.id = d.owner_member_id and m.profile_id is null and public.is_group_member(m.playgroup_id));
+-- $$;
+-- create or replace function public.can_write_avatar(obj_name text)
+-- returns boolean language sql stable security definer set search_path = public as $$
+--   select case (storage.foldername(obj_name))[1]
+--     when 'profiles' then (storage.foldername(obj_name))[2] = auth.uid()::text
+--     when 'members' then exists (
+--       select 1 from public.members m
+--       where m.id::text = (storage.foldername(obj_name))[2]
+--         and m.profile_id is null
+--         and public.is_group_member(m.playgroup_id))
+--     else false end
+-- $$;
+-- alter policy mem_update on public.members using (
+--   public.is_group_admin(playgroup_id) or (profile_id is null and public.is_group_member(playgroup_id)) or profile_id = auth.uid()
+-- );
 -- drop index public.game_players_deck_id_idx;
 -- drop index public.members_group_former_profile_key;
 -- alter table public.members drop constraint members_former_no_account, drop constraint members_removed_no_account;

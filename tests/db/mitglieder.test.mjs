@@ -16,7 +16,7 @@ import { freshDb, tools, U, MIGRATIONS } from './harness.mjs';
 
 const FILE = '20261117000000_mitglieder.sql';
 const GEGEN = process.env.GEGENPROBE || '';
-const EXPECTED = 11;
+const EXPECTED = 12;
 let ran = 0;
 let gegenDir = null;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
@@ -313,6 +313,26 @@ check('K7 Neue Spiele: markiertes Mitglied ⇒ member_removed, Deck eines Markie
   await su();
   eq(await q(`select member_id, place from game_players where game_id = $1 order by seat`, [gLive.id]), [{ member_id: mB, place: 1 }, { member_id: ph.c.id, place: 2 }]);
   eq((await q(`select status from games where id = $1`, [gLive.id]))[0].status, 'finished');
+});
+
+// ================================================================ Krit. 9: Eingefroren
+check('K9 Eingefroren: markierte Zeile als Admin und Mitglied nicht umbenennbar, kein Bild, Deck nicht änderbar; nach restore wieder', async () => {
+  const tryAll = async (who, tag) => {
+    await as(who);
+    const upd = (await q(`update members set display_name = $2 where id = $1 returning id`, [ph.d.id, 'Neu' + tag])).length;
+    const obj = await err(`insert into storage.objects (bucket_id, name) values ('avatars', $1)`, [`members/${ph.d.id}/${tag}.jpg`]);
+    const dck = (await q(`update decks set short_name = $2 where id = $1 returning id`, [dk.d, 'D' + tag])).length;
+    return { upd, obj: obj === null ? 'ok' : (/row-level security/.test(obj) ? 'rls' : obj), dck };
+  };
+  eq(await tryAll(U.A, 'a'), { upd: 0, obj: 'rls', dck: 0 }, 'Admin');
+  eq(await tryAll(U.B, 'b'), { upd: 0, obj: 'rls', dck: 0 }, 'Mitglied');
+  await as(U.A);
+  await q(`select * from restore_member($1)`, [ph.d.id]);
+  eq(await tryAll(U.A, 'c'), { upd: 1, obj: 'ok', dck: 1 }, 'Admin nach restore');
+  eq(await tryAll(U.B, 'e'), { upd: 1, obj: 'ok', dck: 1 }, 'Mitglied nach restore');
+  // Decks bleiben lesbar
+  await as(U.B);
+  ok((await q(`select id from decks where id = $1`, [dk.c])).length === 1, 'Deck eines Markierten lesbar');
 });
 
 // ================================================================ Krit. 13: Rechte und Stolperdraht
