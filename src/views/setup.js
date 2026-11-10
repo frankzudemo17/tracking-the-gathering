@@ -64,7 +64,7 @@ export default async function setup(el, { isStale }) {
     s.sel = (Array.isArray(draft.sel) ? draft.sel : []).filter((id, i, a) => byId.has(id) && a.indexOf(id) === i).slice(0, MAX);
     for (const id of s.sel) s.deck[id] = decks.has(draft.deck?.[id]) ? draft.deck[id] : (ownDecks(id)[0]?.id || null);
     if (LAYOUTS.includes(draft.layout)) s.layout = draft.layout;
-    s.life = clampLife(draft.life);
+    s.life = Number.isInteger(draft.life) && draft.life >= 5 && draft.life <= 99 ? draft.life : 40; // ungültig ⇒ Standard
     s.start = Number.isInteger(draft.start) && draft.start < s.sel.length ? draft.start : null;
   }
   if (!s.sel.length && me && byId.has(me)) { // kein oder abgelaufener Entwurf ⇒ eigenes Mitglied vorausgewählt
