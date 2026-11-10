@@ -1,6 +1,6 @@
 // Profil (eigenes oder fremdes Mitglied der aktuellen Playgroup)
 import { sb, must, avatarUrls, appUrl } from '../supabase.js';
-import { state, currentMembership, currentGroup, isAdmin, updateProfile, loadMe } from '../state.js';
+import { state, currentMembership, currentGroup, isAdmin, isSuperadmin, updateProfile, loadMe } from '../state.js';
 import { html, mount, on, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { avatar, backHead, empty, memberName, memberAvatarPath, roleChip, manaPips } from '../lib/parts.js';
@@ -103,7 +103,7 @@ export default async function profile(el, { params, isStale }) {
       </div>
     </div>
 
-    ${isAdmin() && !isGuest && !isMe ? html`
+    ${!isGuest && !isMe && (m.role === 'admin' ? isAdmin() || isSuperadmin() : isSuperadmin()) ? html`
     <button type="button" class="btn soft" data-act="role">${icon('shield', 18)}${m.role === 'admin' ? t('profile.removeAdmin') : t('profile.makeAdmin')}</button>` : ''}
 
 `);

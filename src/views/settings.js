@@ -50,6 +50,7 @@ export default function settings(el) {
           <span class="grow"><span class="title">${t('settings.accountSub')}</span>${state.session?.user?.email ? html`<span class="sub">${state.session.user.email}</span>` : ''}</span>
           <span class="chev">${icon('chevRight', 18)}</span>
         </a>
+        ${state.profile?.is_superadmin === true ? html`<a class="row" href="#/einstellungen/verwaltung" data-nav="admin"><span class="row-ic">${icon('shieldStar', 20)}</span><span class="grow"><span class="title">${t('access.adminTitle')}</span><span class="sub">${t('access.adminSub')}</span></span><span class="chev">${icon('chevRight', 18)}</span></a>` : ''}
       </div>
     </div>
 
