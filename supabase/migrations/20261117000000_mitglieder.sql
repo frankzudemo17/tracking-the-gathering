@@ -216,6 +216,110 @@ returns boolean language sql stable security definer set search_path = public as
 $$;
 
 -- ---------------------------------------------------------------------------
+-- F. Superadmin verlässt und betritt Gruppen
+-- ---------------------------------------------------------------------------
+-- Eigene Zeile mit Konto löschen (kein Verweis) oder in eine entfernte Zeile ohne Konto umwandeln
+-- (former_profile_id merkt sich das Konto, Name bleibt der zuletzt angezeigte). Intern.
+-- Hat das Konto in der Gruppe schon eine ältere frühere Zeile (Platzhalter übernommen, nachdem
+-- es gegangen war), verliert die ältere den Kontobezug und bleibt entfernt: die eindeutige
+-- (playgroup_id, former_profile_id) lässt nur eine zu, die jüngste kommt über Code/Betreten zurück.
+create or replace function public._member_detach(p_member uuid)
+returns text language plpgsql security definer set search_path = public as $$
+declare m members; nm text;
+begin
+  select * into m from members where id = p_member for update;
+  if public._member_deletable(m.id) then
+    perform public._member_delete(m.id);
+    return 'delete';
+  end if;
+  select left(coalesce(nullif(p.display_name, ''), m.display_name), 40) into nm from profiles p where p.id = m.profile_id;
+  update members set former_profile_id = null
+  where playgroup_id = m.playgroup_id and former_profile_id = m.profile_id;
+  update members set former_profile_id = m.profile_id, profile_id = null, display_name = coalesce(nm, m.display_name),
+    role = 'member', removed_at = now(), removed_by = auth.uid(), claim_code = null
+  where id = m.id;
+  return 'mark';
+end $$;
+
+-- Verlassen. Kein Letzter-Admin-Schutz für den Superadmin: seine Rechte hängen nicht an der
+-- Mitgliedschaft (set_member_role, renew_invite, remove_member/restore_member, enter_playgroup).
+create or replace function public.leave_playgroup(p_group uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare m members; mode text;
+begin
+  if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
+  if not public.is_superadmin() then raise exception 'superadmin_only'; end if;
+  select * into m from members where playgroup_id = p_group and profile_id = auth.uid() for update;
+  if m.id is null then return jsonb_build_object('result', 'already'); end if;
+  mode := public._member_detach(m.id);
+  return jsonb_build_object('result', 'left', 'mode', mode,
+    'admins_left', (select count(*) from members where playgroup_id = p_group and role = 'admin' and removed_at is null));
+end $$;
+
+-- Alle Gruppen (nur Superadmin), nach Name; Zählungen nur aktiver Zeilen
+create or replace function public.list_all_playgroups()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
+  if not public.is_superadmin() then raise exception 'superadmin_only'; end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', g.id, 'name', g.name,
+      'members', (select count(*) from members m where m.playgroup_id = g.id and m.removed_at is null),
+      'admins', (select count(*) from members m where m.playgroup_id = g.id and m.removed_at is null and m.role = 'admin'),
+      'is_member', exists (select 1 from members m where m.playgroup_id = g.id and m.profile_id = auth.uid()))
+      order by g.name, g.id)
+    from playgroups g), '[]'::jsonb);
+end $$;
+
+-- Betreten (nur Superadmin): aktive Zeile unverändert · frühere Zeile reaktiviert (gleiche ID,
+-- Rolle admin) · sonst neue Admin-Zeile (Name wie join_playgroup)
+create or replace function public.enter_playgroup(p_group uuid)
+returns public.members language plpgsql security definer set search_path = public as $$
+declare m members; dn text;
+begin
+  if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
+  if not public.is_superadmin() then raise exception 'superadmin_only'; end if;
+  perform 1 from playgroups where id = p_group;
+  if not found then raise exception 'group_not_found'; end if;
+  select * into m from members where playgroup_id = p_group and profile_id = auth.uid();
+  if m.id is not null then return m; end if;
+  update members set profile_id = auth.uid(), former_profile_id = null, removed_at = null, removed_by = null,
+    role = 'admin', claim_code = null
+  where playgroup_id = p_group and former_profile_id = auth.uid() returning * into m;
+  if m.id is not null then return m; end if;
+  select display_name into dn from profiles where id = auth.uid();
+  insert into members (playgroup_id, profile_id, display_name, role, created_by)
+  values (p_group, auth.uid(), left(coalesce(dn, 'Neu'), 40), 'admin', auth.uid()) returning * into m;
+  return m;
+end $$;
+
+-- join_playgroup (jüngste Definition 20261116000000_zugang.sql:176–193; Signatur, Rückgabe,
+-- Normalisierung, Drossel unverändert): nach „schon Mitglied“ frühere Zeile reaktivieren (member)
+create or replace function public.join_playgroup(p_code text)
+returns public.members language plpgsql security definer set search_path = public as $$
+declare gid uuid; m members; dn text;
+begin
+  if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
+  if not public.code_rate_ok() then raise exception 'Zu viele Versuche. Bitte in einer Stunde nochmal.'; end if;
+  select playgroup_id into gid from playgroup_invites where code = upper(trim(p_code));
+  if gid is null then
+    insert into code_attempts (user_id, kind) values (auth.uid(), 'join');
+    return null;
+  end if;
+  select * into m from members where playgroup_id = gid and profile_id = auth.uid();
+  if m.id is not null then return m; end if;
+  update members set profile_id = auth.uid(), former_profile_id = null, removed_at = null, removed_by = null,
+    role = 'member', claim_code = null
+  where playgroup_id = gid and former_profile_id = auth.uid() returning * into m;
+  if m.id is not null then return m; end if;
+  select display_name into dn from profiles where id = auth.uid();
+  insert into members (playgroup_id, profile_id, display_name, created_by)
+  values (gid, auth.uid(), left(coalesce(dn, 'Neu'), 40), auth.uid()) returning * into m;
+  return m;
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- Ausführungsrechte (neue Funktionen bekommen per Default-Privileges anon + authenticated)
 -- ---------------------------------------------------------------------------
 revoke execute on function public.member_removal_check(uuid), public.remove_member(uuid, text),
@@ -223,12 +327,38 @@ revoke execute on function public.member_removal_check(uuid), public.remove_memb
 grant execute on function public.member_removal_check(uuid), public.remove_member(uuid, text),
   public.restore_member(uuid) to authenticated;
 -- interne Hilfen: für keine Client-Rolle
-revoke execute on function public._member_delete(uuid), public._member_deletable(uuid), public.gp_member_active()
-  from public, anon, authenticated;
+revoke execute on function public.leave_playgroup(uuid), public.list_all_playgroups(),
+  public.enter_playgroup(uuid) from public, anon;
+grant execute on function public.leave_playgroup(uuid), public.list_all_playgroups(),
+  public.enter_playgroup(uuid) to authenticated;
+revoke execute on function public._member_delete(uuid), public._member_deletable(uuid), public._member_detach(uuid),
+  public.gp_member_active() from public, anon, authenticated;
 
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen):
 -- RÜCKWÄRTS-BEGINN
+-- create or replace function public.join_playgroup(p_code text)
+-- returns public.members language plpgsql security definer set search_path = public as $$
+-- declare gid uuid; m members; dn text;
+-- begin
+--   if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
+--   if not public.code_rate_ok() then raise exception 'Zu viele Versuche. Bitte in einer Stunde nochmal.'; end if;
+--   select playgroup_id into gid from playgroup_invites where code = upper(trim(p_code));
+--   if gid is null then
+--     insert into code_attempts (user_id, kind) values (auth.uid(), 'join');
+--     return null;
+--   end if;
+--   select * into m from members where playgroup_id = gid and profile_id = auth.uid();
+--   if m.id is not null then return m; end if;
+--   select display_name into dn from profiles where id = auth.uid();
+--   insert into members (playgroup_id, profile_id, display_name, created_by)
+--   values (gid, auth.uid(), left(coalesce(dn, 'Neu'), 40), auth.uid()) returning * into m;
+--   return m;
+-- end $$;
+-- drop function public.enter_playgroup(uuid);
+-- drop function public.list_all_playgroups();
+-- drop function public.leave_playgroup(uuid);
+-- drop function public._member_detach(uuid);
 -- drop trigger ttg_gp_member_active on public.game_players;
 -- drop function public.gp_member_active();
 -- drop function public.restore_member(uuid);

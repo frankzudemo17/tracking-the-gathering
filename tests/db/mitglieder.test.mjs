@@ -16,7 +16,7 @@ import { freshDb, tools, U, MIGRATIONS } from './harness.mjs';
 
 const FILE = '20261117000000_mitglieder.sql';
 const GEGEN = process.env.GEGENPROBE || '';
-const EXPECTED = 12;
+const EXPECTED = 16;
 let ran = 0;
 let gegenDir = null;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
@@ -335,6 +335,188 @@ check('K9 Eingefroren: markierte Zeile als Admin und Mitglied nicht umbenennbar,
   ok((await q(`select id from decks where id = $1`, [dk.c])).length === 1, 'Deck eines Markierten lesbar');
 });
 
+/// ================================================================ Krit. 10: Superadmin verlässt
+const Zs = {}; // Gruppe Z (Superadmin Admin, B Mitglied, Platzhalter pz) und Q (nur Superadmin, ohne Spiel)
+check('K10 Verlassen: Superadmin mit Spielen ⇒ umgewandelt (mark), Gruppe ohne Admin; ohne Verweis ⇒ delete; already; Nicht-Superadmin ⇒ superadmin_only', async () => {
+  Zs.Z = await mkGroup(SAU, 'Z');
+  Zs.Q = await mkGroup(SAU, 'Q');
+  await as(U.B);
+  Zs.mB = (await q(`select * from join_playgroup($1)`, [Zs.Z.invite_code]))[0].id;
+  Zs.dB = (await q(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'BZ', 'BZ') returning id`, [U.B]))[0].id;
+  await as(SAU);
+  Zs.mS = (await q(`select my_member_id($1) id`, [Zs.Z.id]))[0].id;
+  Zs.dS = (await q(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'S1', 'S1') returning id`, [SAU]))[0].id;
+  Zs.dS2 = (await q(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'S2', 'S2') returning id`, [SAU]))[0].id;
+  [Zs.pz] = await q(`select * from create_placeholder($1, 'Zed')`, [Zs.Z.id]);
+  Zs.dz = await mkDeck(Zs.pz.id, 'Z1');
+  const [g] = await q(START, [Zs.Z.id, J([P(Zs.mS, Zs.dS, 0), P(Zs.mB, Zs.dB, 1), P(Zs.pz.id, Zs.dz, 2)])]);
+  await q(`select * from finish_game($1, 'finished', 3, $2::jsonb)`, [g.id, J([R(Zs.mS, 1), R(Zs.mB, 2, Zs.mS), R(Zs.pz.id, 3, Zs.mB)])]);
+  await su();
+  await CARD(Zs.dS);
+  const shown = (await q(`select coalesce(p.display_name, m.display_name) n from members m join profiles p on p.id = m.profile_id where m.id = $1`, [Zs.mS]))[0].n;
+  // Nicht-Superadmin (Basis)
+  const c0 = await counts();
+  await as(U.A);
+  eq(await rpcErr('leave_playgroup', X.id), 'superadmin_only');
+  eq(await counts(), c0);
+  ok((await row(mA)).profile_id === U.A, 'A unverändert');
+  // Superadmin, hat gespielt, einziger Admin
+  await as(SAU);
+  eq(await rpc('leave_playgroup', Zs.Z.id), { result: 'left', mode: 'mark', admins_left: 0 });
+  const r = await row(Zs.mS);
+  ok(r.profile_id === null && r.former_profile_id === SAU && r.role === 'member' && r.removed_at && r.removed_by === SAU && r.claim_code === null, J(r));
+  eq(r.display_name, shown, 'Name wie vorher angezeigt');
+  await as(SAU);
+  ok((await q(`select is_group_member($1) x`, [Zs.Z.id]))[0].x === false);
+  eq(await q(`select (select count(*) from games where playgroup_id = $1)::int g, (select count(*) from members where playgroup_id = $1)::int m,
+                     (select count(*) from playgroups where id = $1)::int p`, [Zs.Z.id]), [{ g: 0, m: 0, p: 0 }]);
+  // verbliebenes Mitglied sieht alles aus der Historie
+  await as(U.B);
+  ok(await n(`select count(*)::int n from games where playgroup_id = $1`, [Zs.Z.id]) === 1);
+  ok(await n(`select count(*)::int n from members where id = $1`, [Zs.mS]) === 1, 'Zeile des Gegangenen sichtbar');
+  ok(await n(`select count(*)::int n from decks where id = $1`, [Zs.dS]) === 1, 'dort gespieltes Konto-Deck sichtbar');
+  ok(await n(`select count(*)::int n from deck_cards where deck_id = $1`, [Zs.dS]) === 1, 'samt deck_cards');
+  ok(await n(`select count(*)::int n from decks where id = $1`, [Zs.dS2]) === 0, 'nie dort gespieltes Deck unsichtbar');
+  // ohne Verweis ⇒ delete; danach already
+  await as(SAU);
+  eq(await rpc('leave_playgroup', Zs.Q.id), { result: 'left', mode: 'delete', admins_left: 0 });
+  await su();
+  ok(await n(`select count(*)::int n from members where playgroup_id = $1`, [Zs.Q.id]) === 0);
+  await as(SAU);
+  eq(await rpc('leave_playgroup', Zs.Q.id), { result: 'already' });
+  // Superadmin ohne Mitgliedschaft verwaltet weiter
+  await as(SAU);
+  eq((await q(`select * from set_member_role($1, 'admin')`, [Zs.mB]))[0].role, 'admin');
+  const oldCode = Zs.Z.invite_code;
+  const nc = (await q(`select renew_invite($1) c`, [Zs.Z.id]))[0].c;
+  ok(nc && nc !== oldCode);
+  Zs.Z.invite_code = nc;
+  eq(await rpc('remove_member', Zs.pz.id, 'mark'), { result: 'marked' });
+});
+
+// ================================================================ Krit. 11: Übersicht und Betreten (eigene Datenbank: exakte Liste)
+check('K11 Übersicht und Betreten: list_all_playgroups exakt; enter_playgroup gleiche ID / neue Zeile / unverändert / group_not_found; join nach Verlassen gleiche ID', async () => {
+  const d = await freshDb({ migrations: migrations() });
+  const t = tools(d);
+  const tq = t.q;
+  const terr = t.err;
+  try {
+    for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de'], [U.C, 'c@x.de'], [U.D, 'd@x.de']]) await t.seedUser(id, { email });
+    await t.su();
+    await tq(`update profiles set is_superadmin = true where id = $1`, [SAU]);
+    const al = await t.mkGroup(SAU, 'Alpha');
+    const be = await t.mkGroup(SAU, 'Beta');
+    const ga = await t.mkGroup(U.C, 'Gamma');
+    const de = await t.mkGroup(U.C, 'Delta');
+    await t.as(U.B);
+    await tq(`select * from join_playgroup($1)`, [al.invite_code]);
+    const mBb = (await tq(`select * from join_playgroup($1)`, [be.invite_code]))[0].id;
+    const dB = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'B', 'B') returning id`, [U.B]))[0].id;
+    await t.as(SAU);
+    await tq(`select * from join_playgroup($1)`, [de.invite_code]);
+    const mSb = (await tq(`select my_member_id($1) id`, [be.id]))[0].id;
+    const dS = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'S', 'S') returning id`, [SAU]))[0].id;
+    const [pl] = await tq(`select * from create_placeholder($1, 'Pia')`, [be.id]);
+    const [g] = await tq(START, [be.id, J([P(mSb, dS, 0), P(mBb, dB, 1)])]);
+    await tq(`select * from finish_game($1, 'finished', 2, $2::jsonb)`, [g.id, J([R(mSb, 1), R(mBb, 2, mSb)])]);
+    eq(await tq(`select leave_playgroup($1) r`, [be.id]).then((r) => r[0].r), { result: 'left', mode: 'mark', admins_left: 0 });
+    const list = (await tq(`select list_all_playgroups() r`))[0].r;
+    eq(list, [
+      { id: al.id, name: 'Alpha', members: 2, admins: 1, is_member: true },
+      { id: be.id, name: 'Beta', members: 2, admins: 0, is_member: false },
+      { id: de.id, name: 'Delta', members: 2, admins: 1, is_member: true },
+      { id: ga.id, name: 'Gamma', members: 1, admins: 1, is_member: false },
+    ]);
+    ok(pl.id);
+    // Nicht-Superadmin
+    await t.as(U.C);
+    eq(await terr(`select list_all_playgroups()`), 'superadmin_only');
+    eq(await terr(`select * from enter_playgroup($1)`, [be.id]), 'superadmin_only');
+    await t.as(null);
+    ok(/permission denied/.test(await terr(`select list_all_playgroups()`) || ''));
+    // Betreten nach Verlassen ⇒ dieselbe ID, Admin, drei Spalten leer, Historie hängt an ihm
+    await t.as(SAU);
+    const [re] = await tq(`select * from enter_playgroup($1)`, [be.id]);
+    ok(re.id === mSb && re.profile_id === SAU && re.role === 'admin' && re.removed_at === null && re.removed_by === null && re.former_profile_id === null, J(re));
+    ok((await tq(`select is_group_member($1) x`, [be.id]))[0].x === true);
+    eq((await tq(`select member_id from game_players where game_id = $1 and seat = 0`, [g.id]))[0].member_id, mSb);
+    // nie Mitglied ⇒ neue Admin-Zeile
+    const [nw] = await tq(`select * from enter_playgroup($1)`, [ga.id]);
+    ok(nw.profile_id === SAU && nw.role === 'admin' && nw.playgroup_id === ga.id, J(nw));
+    // schon Mitglied (Rolle member) ⇒ unverändert
+    await t.su();
+    const before = (await tq(`select * from members where playgroup_id = $1 and profile_id = $2`, [de.id, SAU]))[0];
+    await t.as(SAU);
+    eq((await tq(`select * from enter_playgroup($1)`, [de.id]))[0], before);
+    eq(before.role, 'member');
+    eq(await terr(`select * from enter_playgroup($1)`, ['00000000-0000-4000-8000-00000000beef']), 'group_not_found');
+    // join_playgroup nach Verlassen ⇒ dieselbe ID, Rolle member, keine zweite Zeile
+    eq((await tq(`select leave_playgroup($1) r`, [be.id]))[0].r, { result: 'left', mode: 'mark', admins_left: 0 });
+    const [jo] = await tq(`select * from join_playgroup($1)`, [be.invite_code]);
+    ok(jo.id === mSb && jo.role === 'member' && jo.profile_id === SAU && jo.former_profile_id === null && jo.removed_at === null, J(jo));
+    await t.su();
+    ok((await tq(`select count(*)::int n from members where playgroup_id = $1 and (profile_id = $2 or former_profile_id = $2)`, [be.id, SAU]))[0].n === 1);
+    // Kollision (Spec-Lücke): frühere Zeile + übernommener Platzhalter + erneutes Verlassen ⇒ kein 23505
+    await t.as(SAU);
+    eq((await tq(`select leave_playgroup($1) r`, [be.id]))[0].r.mode, 'mark');
+    await t.as(U.B);
+    const dPl = (await tq(`insert into decks (owner_member_id, commander_name, short_name) values ($1, 'P', 'P') returning id`, [pl.id]))[0].id;
+    const [g2] = await tq(START, [be.id, J([P(mBb, dB, 0), P(pl.id, dPl, 1)])]);
+    await tq(`select * from finish_game($1, 'finished', 2, $2::jsonb)`, [g2.id, J([R(mBb, 1), R(pl.id, 2, mBb)])]);
+    await t.as(SAU);
+    const [cl] = await tq(`select * from claim_member($1)`, [pl.claim_code]);
+    ok(cl.id === pl.id && cl.profile_id === SAU, J(cl));
+    eq((await tq(`select leave_playgroup($1) r`, [be.id]))[0].r, { result: 'left', mode: 'mark', admins_left: 0 });
+    await t.su();
+    eq(await tq(`select id, former_profile_id is not null f, removed_at is not null r from members where playgroup_id = $1 and id = any($2) order by f`, [be.id, [mSb, pl.id]]),
+      [{ id: mSb, f: false, r: true }, { id: pl.id, f: true, r: true }], 'jüngste Zeile behält den Kontobezug, ältere bleibt entfernt ohne');
+  } finally {
+    await d.close();
+  }
+});
+
+// ================================================================ Krit. 12: Zusammenspiel
+check('K12 Zusammenspiel: playgroup_files/delete_playgroup mit markiertem Platzhalter (Avatar) und umgewandelter Zeile; delete_my_account eines Admins, der entfernt hat', async () => {
+  const V = await mkGroup(U.A, 'V');
+  await as(SAU);
+  const mS = (await q(`select * from join_playgroup($1)`, [V.invite_code]))[0].id;
+  const dS = (await q(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'SV', 'SV') returning id`, [SAU]))[0].id;
+  await as(U.A);
+  const mAv = (await q(`select my_member_id($1) id`, [V.id]))[0].id;
+  const [pv] = await q(`select * from create_placeholder($1, 'Vic')`, [V.id]);
+  const dv = await mkDeck(pv.id, 'V1');
+  const [g] = await q(START, [V.id, J([P(mAv, dk.A, 0), P(mS, dS, 1), P(pv.id, dv, 2)])]);
+  await q(`select * from finish_game($1, 'finished', 3, $2::jsonb)`, [g.id, J([R(mAv, 1), R(mS, 2, mAv), R(pv.id, 3, mAv)])]);
+  await q(`insert into storage.objects (bucket_id, name) values ('avatars', $1)`, [`members/${pv.id}/avatar.jpg`]);
+  await q(`update members set avatar_path = $2 where id = $1`, [pv.id, `members/${pv.id}/avatar.jpg`]);
+  eq(await rpc('remove_member', pv.id, 'mark'), { result: 'marked' });
+  await as(SAU);
+  eq((await rpc('leave_playgroup', V.id)).mode, 'mark');
+  await as(U.A);
+  const files = await q(`select * from playgroup_files($1)`, [V.id]);
+  eq(files, [{ bucket: 'avatars', path: `members/${pv.id}/avatar.jpg` }]);
+  await q(`select delete_playgroup($1, 'V')`, [V.id]);
+  await su();
+  ok(await n(`select count(*)::int n from playgroups where id = $1`, [V.id]) === 0);
+  ok(await n(`select count(*)::int n from members where id = any($1)`, [[mS, pv.id]]) === 0);
+  // delete_my_account eines Admins, der entfernt hat: C in Y (B tritt bei, damit Y bleibt)
+  const Yc = (await q(`select code from playgroup_invites where playgroup_id = $1`, [Y.id]))[0].code;
+  await as(U.B);
+  const mBy = (await q(`select * from join_playgroup($1)`, [Yc]))[0].id;
+  const dBy = (await q(`select id from decks where owner_profile_id = $1 limit 1`, [U.B]))[0].id;
+  await as(U.C);
+  const [py] = await q(`select * from create_placeholder($1, 'Yan')`, [Y.id]);
+  const dy = await mkDeck(py.id, 'Y1');
+  const [gy] = await q(START, [Y.id, J([P(mBy, dBy, 0), P(py.id, dy, 1)])]);
+  await q(`select * from finish_game($1, 'finished', 2, $2::jsonb)`, [gy.id, J([R(mBy, 1), R(py.id, 2, mBy)])]);
+  eq(await rpc('remove_member', py.id, 'mark'), { result: 'marked' });
+  ok((await row(py.id)).removed_by === U.C);
+  await as(U.C);
+  await q(`select delete_my_account()`);
+  const ry = await row(py.id);
+  ok(ry && ry.removed_by === null && ry.removed_at !== null, J(ry));
+});
+
 // ================================================================ Krit. 13: Rechte und Stolperdraht
 check('K13 Stolperdraht: Fremdschlüssel auf members und decks = feste Liste aus B', async () => {
   await su();
@@ -363,7 +545,8 @@ check('K13 Ausführungsrechte: RPCs nur authenticated, interne Hilfen für keine
   await su();
   const want = {
     'member_removal_check(uuid)': [false, true], 'remove_member(uuid,text)': [false, true], 'restore_member(uuid)': [false, true],
-    '_member_delete(uuid)': [false, false], '_member_deletable(uuid)': [false, false], 'gp_member_active()': [false, false],
+    'leave_playgroup(uuid)': [false, true], 'list_all_playgroups()': [false, true], 'enter_playgroup(uuid)': [false, true], 'join_playgroup(text)': [false, true],
+    '_member_delete(uuid)': [false, false], '_member_deletable(uuid)': [false, false], 'gp_member_active()': [false, false], '_member_detach(uuid)': [false, false],
   };
   const got = {};
   for (const sig of Object.keys(want)) {
@@ -373,4 +556,44 @@ check('K13 Ausführungsrechte: RPCs nur authenticated, interne Hilfen für keine
   eq(got, want);
   const sd = await q(`select proname, prosecdef, proconfig from pg_proc where pronamespace = 'public'::regnamespace and proname = any($1) order by 1`, [Object.keys(want).map((s) => s.split('(')[0])]);
   ok(sd.length === Object.keys(want).length && sd.every((p) => p.prosecdef && J(p.proconfig) === '["search_path=public"]'), J(sd));
+});
+
+// ================================================================ Krit. 12: Rückwärts-Block (zuletzt: verändert das Schema der Haupt-Datenbank)
+const CATALOG = `select json_build_object(
+  'functions', (select json_agg(x order by x) from (select p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')|'
+      || md5(p.prosrc) || '|' || p.prosecdef || '|' || coalesce(p.proconfig::text, '') || '|' || coalesce(p.proacl::text, '') x
+      from pg_proc p where p.pronamespace = 'public'::regnamespace) f),
+  'policies', (select json_agg(x order by x) from (select tablename || '.' || policyname || '|' || cmd || '|' || coalesce(qual, '') || '|' || coalesce(with_check, '') x
+      from pg_policies where schemaname = 'public') f),
+  'columns', (select json_agg(x order by x) from (select table_name || '.' || column_name || '|' || data_type || '|' || is_nullable x
+      from information_schema.columns where table_schema = 'public') f),
+  'constraints', (select json_agg(x order by x) from (select conrelid::regclass::text || '.' || conname || '|' || pg_get_constraintdef(oid) x
+      from pg_constraint where connamespace = 'public'::regnamespace) f),
+  'indexes', (select json_agg(x order by x) from (select indexname || '|' || indexdef x from pg_indexes where schemaname = 'public') f),
+  'triggers', (select json_agg(x order by x) from (select tgrelid::regclass::text || '.' || tgname x from pg_trigger where not tgisinternal) f)
+)::text j`;
+check('K12 Rückwärts: Block (jede Zeile „-- “) läuft auf dem Bestand mit markierten Zeilen; Schema = Stand ohne die Migration', async () => {
+  const sql = fs.readFileSync(path.join(MIGRATIONS, FILE), 'utf8');
+  const m = sql.match(/-- RÜCKWÄRTS-BEGINN\r?\n([\s\S]*?)-- RÜCKWÄRTS-ENDE/);
+  ok(m, 'Rückwärts-Block nicht gefunden');
+  const lines = m[1].split(/\r?\n/).filter((l) => l !== '');
+  ok(lines.every((l) => l.startsWith('-- ')), 'jede Zeile beginnt mit „-- “');
+  const ref = await freshDb({ migrations: migrations(), until: FILE });
+  try {
+    const want = (await ref.query(CATALOG)).rows[0].j;
+    await su();
+    ok(await n(`select count(*)::int n from members where removed_at is not null`) > 0, 'Bestand hat markierte Zeilen');
+    const m0 = await n(`select count(*)::int n from members`);
+    await db.exec(lines.map((l) => l.slice(3)).join('\n'));
+    const got = (await q(CATALOG))[0].j;
+    if (got !== want) {
+      const a = JSON.parse(got), b = JSON.parse(want);
+      const diff = Object.keys(b).map((k) => [k, (a[k] || []).filter((x) => !(b[k] || []).includes(x)), (b[k] || []).filter((x) => !(a[k] || []).includes(x))])
+        .filter(([, x, y]) => x.length || y.length);
+      assert.fail(`Schema nach Rückwärts ≠ Stand ohne Migration: ${JSON.stringify(diff).slice(0, 2000)}`);
+    }
+    ok(await n(`select count(*)::int n from members`) === m0, 'Zeilen bleiben (Preis: Markierungen sind weg, Risiko 2)');
+  } finally {
+    await ref.close();
+  }
 });
