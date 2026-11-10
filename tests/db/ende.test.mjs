@@ -12,7 +12,7 @@ import path from 'node:path';
 import { freshDb, tools, U, MIGRATIONS } from './harness.mjs';
 
 const FILE = '20261113000000_ende.sql';
-const EXPECTED = 51;
+const EXPECTED = 52;
 let db, as, su, q, err;
 let ran = 0;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
@@ -383,6 +383,26 @@ const CATALOG = `select json_build_object(
   'constraints', (select json_agg(x order by x) from (select conrelid::regclass::text || '.' || conname || '|' || pg_get_constraintdef(oid) x
       from pg_constraint where connamespace = 'public'::regnamespace) f)
 )::text j`;
+check('K5 View hängt an game_events.seq: drop column seq ohne cascade scheitert, solange v_game_turn_times besteht', async () => {
+  await su();
+  await db.exec('begin');
+  try {
+    // v_turn_times und v_damage_matrix (spielen.sql) hängen ebenfalls an seq — weg, damit nur v_game_turn_times hält
+    await db.exec('drop view public.v_turn_times; drop view public.v_damage_matrix');
+    await db.exec('savepoint s');
+    let e1 = null;
+    try { await db.query('alter table public.game_events drop column seq'); } catch (e) { e1 = e; }
+    ok(e1 && /other objects depend on it/.test(e1.message) && /view v_game_turn_times depends on column seq/.test(e1.detail || ''),
+      `erwartet Abhängigkeitsfehler durch v_game_turn_times, bekam: ${e1?.message} / ${e1?.detail}`);
+    await db.exec('rollback to savepoint s');
+    await db.exec('drop view public.v_game_turn_times');
+    ok(await err('alter table public.game_events drop column seq') === null, 'ohne die View läuft drop column seq durch');
+  } finally {
+    await db.exec('rollback');
+  }
+  ok(await n(`select count(*)::int n from pg_attribute where attrelid = 'public.game_events'::regclass and attname = 'seq' and not attisdropped`) === 1);
+  ok(await n(`select count(*)::int n from pg_class where relname in ('v_turn_times', 'v_damage_matrix', 'v_game_turn_times') and relkind = 'v'`) === 3);
+});
 check('R1 Rückwärts-Block: Schema gleich dem Stand ohne die Migration, Bewertungen bleiben', async () => {
   const sql = fs.readFileSync(path.join(MIGRATIONS, FILE), 'utf8');
   const m = sql.match(/-- RÜCKWÄRTS-BEGINN\r?\n([\s\S]*?)-- RÜCKWÄRTS-ENDE/);

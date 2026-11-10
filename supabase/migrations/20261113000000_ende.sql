@@ -13,13 +13,10 @@
 --    Gruppe sehen alle Bewertungen ihrer Gruppe).
 -- 3. Ausführungsrechte rate_game: nicht für public/anon, nur authenticated.
 -- 4. v_game_turn_times (security_invoker): Zugzeiten je Spiel und Spieler, nur
---    gewertete Spiele, Undo-Filter wie v_turn_times. Den seq-Wert des Zugende-
---    Ereignisses liest die View über die ganze Zeile (to_jsonb(e) ->> 'seq')
---    statt über die Spalte e.seq: gleiches Ergebnis (fehlt seq ⇒ NULL), aber die
---    View hängt nicht an der Spalte game_events.seq — der Rückwärts-Block von
---    20261111000000_spielen.sql (drop column seq) bleibt ausführbar und diese
---    Migration läuft auch auf einem Stand ohne spielen.sql (DB-Test D10/X2 dort).
---    v_turn_times bleibt unverändert.
+--    gewertete Spiele, Undo-Filter wörtlich wie v_turn_times (spielen.sql:49-50,
+--    Vergleich mit der Spalte e.seq). Die View hängt damit an game_events.seq:
+--    der Rückwärts-Block von 20261111000000_spielen.sql (drop column seq) läuft
+--    erst nach dem Rückwärts-Block dieser Migration. v_turn_times bleibt unverändert.
 -- 5. Storage game-photos: Policy photos_update (Foto ersetzen, upsert: true).
 -- 6. games.note höchstens 500 Zeichen (games_note_len).
 --
@@ -155,7 +152,7 @@ select g.playgroup_id, e.game_id, e.actor as member_id,
 from game_events e join games g on g.id = e.game_id
 where g.status = 'finished' and e.type = 'turn_end' and e.payload ? 'seconds'
   and not exists (select 1 from game_events u where u.game_id = e.game_id and u.type = 'undo'
-                  and ((u.payload ->> 'event_id')::bigint = e.id or (u.payload ->> 'seq')::int = (to_jsonb(e) ->> 'seq')::int))
+                  and ((u.payload ->> 'event_id')::bigint = e.id or (u.payload ->> 'seq')::int = e.seq))
 group by g.playgroup_id, e.game_id, e.actor;
 
 -- ---------------------------------------------------------------------------

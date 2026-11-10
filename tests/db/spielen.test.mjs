@@ -445,7 +445,8 @@ check('D10 Bestand: Decks von vor der Migration bekommen art, Farbe bleibt, Migr
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ttg-p4-alt-'));
   let old;
   try {
-    for (const f of fs.readdirSync(MIGRATIONS)) if (f.endsWith('.sql') && f !== FILE) fs.copyFileSync(path.join(MIGRATIONS, f), path.join(dir, f));
+    // Alt-DB: nur Migrationen, die vor dieser liegen (spätere setzen sie voraus)
+    for (const f of fs.readdirSync(MIGRATIONS)) if (f.endsWith('.sql') && f < FILE) fs.copyFileSync(path.join(MIGRATIONS, f), path.join(dir, f));
     old = await freshDb({ migrations: dir });
     await old.query(`insert into auth.users (id, email) values ($1, 'a@x.de')`, [U.A]);
     await old.query(`insert into decks (owner_profile_id, commander_name, short_name, field_color) values ($1, 'Alt1', 'Alt1', '#2D6DB5'), ($1, 'Alt2', 'Alt2', null)`, [U.A]);
@@ -511,16 +512,25 @@ check('X2 Rückwärts-Block: neue Objekte weg, Schema gleich dem Stand ohne die 
   const lines = m[1].split(/\r?\n/).filter((l) => l !== '');
   ok(lines.every((l) => l.startsWith('-- ')), 'jede Zeile beginnt mit „-- “');
   const back = lines.map((l) => l.slice(3)).join('\n');
-  // Vergleichs-DB: alle Migrationen außer dieser
+  // Beide Seiten gleich geschnitten: Vergleichs-DB = nur Migrationen vor dieser;
+  // Test-DB nimmt zuerst die Rückwärts-Blöcke aller späteren Migrationen zurück (neueste zuerst).
+  const later = fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql') && f > FILE).sort().reverse().map((f) => {
+    const lm = fs.readFileSync(path.join(MIGRATIONS, f), 'utf8').match(/-- RÜCKWÄRTS-BEGINN\r?\n([\s\S]*?)-- RÜCKWÄRTS-ENDE/);
+    ok(lm, `Rückwärts-Block in ${f} nicht gefunden`);
+    const ll = lm[1].split(/\r?\n/).filter((l) => l !== '');
+    ok(ll.every((l) => l.startsWith('-- ')), `${f}: jede Zeile beginnt mit „-- “`);
+    return ll.map((l) => l.slice(3)).join('\n');
+  });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ttg-p4-'));
   let ref;
   try {
-    for (const f of fs.readdirSync(MIGRATIONS)) if (f.endsWith('.sql') && f !== FILE) fs.copyFileSync(path.join(MIGRATIONS, f), path.join(dir, f));
+    for (const f of fs.readdirSync(MIGRATIONS)) if (f.endsWith('.sql') && f < FILE) fs.copyFileSync(path.join(MIGRATIONS, f), path.join(dir, f));
     ref = await freshDb({ migrations: dir });
     const want = (await ref.query(CATALOG)).rows[0].j;
     await su();
     const pre = (await q(CATALOG))[0].j;
     ok(pre !== want, 'vor dem Rückwärts-Block unterscheiden sich die Schemata');
+    for (const b of later) await db.exec(b);
     await db.exec(back);
     const got = (await q(CATALOG))[0].j;
     if (got !== want) {
