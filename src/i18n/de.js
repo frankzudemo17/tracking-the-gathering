@@ -121,7 +121,7 @@ export default {
     dangerTitle: 'Konto löschen', dangerSub: 'Endgültig. Lässt sich nicht rückgängig machen.', delete: 'Konto löschen',
     deleteTitle: 'Konto wirklich löschen?',
     deleteGone: 'Weg sind: dein Konto, dein Profil und Profilbild, deine Decks, die in keinem Spiel vorkommen.',
-    deleteKept: 'Bleiben für deine Gruppen: gemeinsame Spiele und Statistiken. Dort stehst du dann als „Ehemaliges Mitglied“, gespielte Decks werden archiviert.',
+    deleteKept: 'Bleiben für deine Gruppen: gemeinsame Spiele und Statistiken. Dort stehst du dann als „Ehemaliges Mitglied“, gespielte Decks bleiben dort archiviert.',
     deleteSolo: 'Playgroups, in denen sonst niemand ein Konto hat, werden samt Spielen gelöscht. Bist du letzter Admin, wird das am längsten dabei befindliche Mitglied Admin.',
     deleteType: 'Tippe {word} ein, um zu bestätigen', deleteYes: 'Endgültig löschen', deleted: 'Dein Konto wurde gelöscht.',
   },
@@ -143,7 +143,7 @@ export default {
     controllerTitle: 'Verantwortlich',
     sections: [
       { h: 'Was gespeichert wird', p: [
-        'Konto: E-Mail-Adresse, Passwort (nur verschlüsselt als Hash), Anzeigename, Sprache, Erscheinungsbild und optional ein Profilbild.',
+        'Konto: E-Mail-Adresse, Passwort (nur als Hash, nicht im Klartext), Anzeigename, Sprache, Erscheinungsbild und optional ein Profilbild.',
         'Gruppendaten: Playgroups, Mitglieder (auch Spieler ohne Konto), Decks, Spiele, Spielereignisse und Bewertungen. Diese Daten sehen nur Mitglieder derselben Playgroup.',
         'Zweck ist allein der Betrieb der App für dich und deine Gruppe (Art. 6 Abs. 1 lit. b DSGVO).'] },
       { h: 'Supabase (Server in Frankfurt, EU)', p: [
@@ -157,7 +157,7 @@ export default {
       { h: 'Keine Tracker', p: [
         'Keine Analyse, keine Werbung, keine Cookies von Dritten. Im Browser speichert die App nur, was sie zum Funktionieren braucht: deine Anmeldung, Sprache, Look, die gewählte Playgroup, noch nicht gesendete Spielereignisse und die App-Dateien für den Offline-Betrieb.'] },
       { h: 'Speicherdauer und Löschen', p: [
-        'Daten bleiben, solange dein Konto besteht. Unter Einstellungen → Konto kannst du dein Konto jederzeit selbst löschen. Dann sind Konto, Profil, Profilbild und ungespielte Decks weg. Gemeinsame Spiele bleiben für die Gruppe erhalten, du erscheinst dort als „Ehemaliges Mitglied“ ohne Namen und Bild.'] },
+        'Daten bleiben, solange dein Konto besteht. Unter Einstellungen → Konto kannst du dein Konto jederzeit selbst löschen. Dann sind Konto, Profil, Profilbild und ungespielte Decks weg. Gemeinsame Spiele bleiben für die Gruppe erhalten, du erscheinst dort als „Ehemaliges Mitglied“ ohne Namen und Bild; gespielte Decks bleiben dort archiviert. Playgroups, in denen sonst niemand ein Konto hat, werden samt Spielen und Fotos gelöscht.'] },
       { h: 'Deine Rechte', p: [
         'Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch. Du kannst dich außerdem bei einer Datenschutz-Aufsichtsbehörde beschweren. Für Anfragen wende dich an den oben genannten Verantwortlichen.'] },
     ],

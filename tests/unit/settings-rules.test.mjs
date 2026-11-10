@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { passwordProblem, emailProblem, deleteConfirmed, filesByBucket, DELETE_WORD } from '../../src/views/settings-rules.js';
+import { passwordProblem, emailProblem, deleteConfirmed, filesByBucket, runAccountDeletion, DELETE_WORD } from '../../src/views/settings-rules.js';
 import { APP_VERSION } from '../../src/version.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -50,4 +50,44 @@ test('App-Version passt zur VERSION in sw.js', () => {
   const m = sw.match(/const VERSION = '([^']+)'/);
   assert.ok(m, 'VERSION in sw.js gefunden');
   assert.equal(m[1], `ttg-${APP_VERSION}`);
+});
+
+// ---- B2: Ablauf Konto löschen mit vorgespieltem Supabase (Reihenfolge Probelauf → Dateien → RPC)
+const FILES = [{ bucket: 'avatars', path: 'profiles/u/a.jpg' }, { bucket: 'game-photos', path: 'g/x.jpg' }];
+function fakeSb(rpcResults = {}) {
+  const calls = [];
+  return {
+    calls,
+    rpc: async (name) => {
+      calls.push(`rpc:${name}`);
+      const r = rpcResults[name];
+      return r ?? (name === 'my_account_files' ? { data: FILES, error: null } : { data: null, error: null });
+    },
+    storage: { from: (bucket) => ({ remove: async (paths) => { calls.push(`remove:${bucket}:${paths.join(',')}`); return { error: null }; } }) },
+  };
+}
+const fail = (message) => ({ data: null, error: { message } });
+
+test('B2: Probelauf gelingt ⇒ Probelauf, Dateiliste, Storage-remove, dann delete_my_account', async () => {
+  const sb = fakeSb();
+  assert.equal(await runAccountDeletion(sb), 'deleted');
+  assert.deepEqual(sb.calls, ['rpc:check_delete_my_account', 'rpc:my_account_files',
+    'remove:avatars:profiles/u/a.jpg', 'remove:game-photos:g/x.jpg', 'rpc:delete_my_account']);
+});
+test('B2: erzwungener RPC-Fehler im Probelauf ⇒ Fehler kommt durch, KEIN Storage-remove, keine Löschung', async () => {
+  const sb = fakeSb({ check_delete_my_account: fail('update or delete on table "decks" violates foreign key constraint') });
+  await assert.rejects(runAccountDeletion(sb), (e) => /foreign key/.test(e.message));
+  assert.deepEqual(sb.calls, ['rpc:check_delete_my_account']);
+});
+test('B2: Dateiliste scheitert ⇒ kein remove, keine Löschung', async () => {
+  const sb = fakeSb({ my_account_files: fail('Netz weg') });
+  await assert.rejects(runAccountDeletion(sb), (e) => /Netz weg/.test(e.message));
+  assert.ok(!sb.calls.some((c) => c.startsWith('remove:') || c === 'rpc:delete_my_account'), sb.calls.join(' '));
+});
+test('B2: Doppelklick ⇒ Probelauf meldet „Konto nicht gefunden“ ⇒ already, nichts gelöscht', async () => {
+  const sb = fakeSb({ check_delete_my_account: fail('Konto nicht gefunden') });
+  assert.equal(await runAccountDeletion(sb), 'already');
+  assert.deepEqual(sb.calls, ['rpc:check_delete_my_account']);
+  const sb2 = fakeSb({ delete_my_account: fail('Konto nicht gefunden') });
+  assert.equal(await runAccountDeletion(sb2), 'already');
 });

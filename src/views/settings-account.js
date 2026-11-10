@@ -1,5 +1,5 @@
 // Einstellungen → Konto: Passwort ändern, E-Mail ändern, Konto löschen (#/einstellungen/konto)
-import { sb, must, appUrl } from '../supabase.js';
+import { sb, appUrl } from '../supabase.js';
 import { state } from '../state.js';
 import { html, mount, on, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
@@ -7,24 +7,16 @@ import { backHead } from '../lib/parts.js';
 import { toast, sheet, errText } from '../lib/ui.js';
 import { t, getLang } from '../i18n/index.js';
 import { authField, bindPwToggles } from './login.js';
-import { passwordProblem, emailProblem, deleteConfirmed, filesByBucket, DELETE_WORD } from './settings-rules.js';
+import { passwordProblem, emailProblem, deleteConfirmed, runAccountDeletion, DELETE_WORD } from './settings-rules.js';
 
 const showErr = (box, msg) => { box.textContent = msg; box.hidden = !msg; };
 
 /**
- * Konto löschen: zuerst die Dateien per Storage-API (SQL darf storage.objects nicht löschen,
- * die Policies erlauben es nur, solange das Konto noch Mitglied ist), dann die RPC, dann lokal
+ * Konto löschen: Probelauf → Dateien → RPC (runAccountDeletion, Begründung dort), dann lokal
  * abmelden (die Server-Sitzung gibt es mit dem Konto nicht mehr).
  */
 export async function deleteAccount() {
-  const files = filesByBucket(must(await sb.rpc('my_account_files')));
-  for (const [bucket, paths] of Object.entries(files)) {
-    const { error } = await sb.storage.from(bucket).remove(paths);
-    if (error) throw error;
-  }
-  const { error } = await sb.rpc('delete_my_account');
-  // „Konto nicht gefunden“: ein früherer Aufruf (Doppelklick, zweiter Tab) hat schon gelöscht
-  if (error && !/Konto nicht gefunden/.test(error.message || '')) throw error;
+  await runAccountDeletion(sb);
   try {
     for (const k of Object.keys(localStorage)) if (k === 'ttg.group' || k.startsWith('ttg.queue.')) localStorage.removeItem(k);
   } catch { /* privat */ }

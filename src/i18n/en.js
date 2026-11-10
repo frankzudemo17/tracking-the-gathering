@@ -121,7 +121,7 @@ export default {
     dangerTitle: 'Delete account', dangerSub: 'Permanent. Cannot be undone.', delete: 'Delete account',
     deleteTitle: 'Really delete your account?',
     deleteGone: 'Gone: your account, your profile and picture, and your decks that never appeared in a game.',
-    deleteKept: 'Kept for your groups: shared games and statistics. You will appear there as “Ehemaliges Mitglied” (former member); played decks are archived.',
+    deleteKept: 'Kept for your groups: shared games and statistics. You will appear there as “Ehemaliges Mitglied” (former member); played decks stay there, archived.',
     deleteSolo: 'Playgroups where nobody else has an account are deleted together with their games. If you are the last admin, the longest-standing member becomes admin.',
     deleteType: 'Type {word} to confirm', deleteYes: 'Delete permanently', deleted: 'Your account has been deleted.',
   },
@@ -143,7 +143,7 @@ export default {
     controllerTitle: 'Controller',
     sections: [
       { h: 'What is stored', p: [
-        'Account: email address, password (only as an encrypted hash), display name, language, appearance and optionally a profile picture.',
+        'Account: email address, password (only as a hash, never in plain text), display name, language, appearance and optionally a profile picture.',
         'Group data: playgroups, members (including players without an account), decks, games, game events and ratings. Only members of the same playgroup can see this data.',
         'The sole purpose is running the app for you and your group (Art. 6(1)(b) GDPR).'] },
       { h: 'Supabase (servers in Frankfurt, EU)', p: [
@@ -157,7 +157,7 @@ export default {
       { h: 'No trackers', p: [
         'No analytics, no ads, no third-party cookies. In your browser the app only stores what it needs to work: your sign-in, language, look, selected playgroup, game events not yet sent and the app files for offline use.'] },
       { h: 'Retention and deletion', p: [
-        'Data is kept as long as your account exists. Under Settings → Account you can delete your account yourself at any time. Your account, profile, picture and unplayed decks are then gone. Shared games remain for the group; you appear there as “Ehemaliges Mitglied” (former member) without name or picture.'] },
+        'Data is kept as long as your account exists. Under Settings → Account you can delete your account yourself at any time. Your account, profile, picture and unplayed decks are then gone. Shared games remain for the group; you appear there as “Ehemaliges Mitglied” (former member) without name or picture, and played decks stay there archived. Playgroups where nobody else has an account are deleted together with their games and photos.'] },
       { h: 'Your rights', p: [
         'You have the right of access, rectification, erasure, restriction of processing, data portability and objection. You may also lodge a complaint with a data protection supervisory authority. For requests, contact the controller named above.'] },
     ],

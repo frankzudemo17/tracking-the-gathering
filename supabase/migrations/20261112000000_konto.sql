@@ -7,19 +7,37 @@
 --    Platzhalter-Bilder und Spielfotos). Grund: Supabase verbietet direktes DELETE auf
 --    storage.objects per SQL (Trigger storage.protect_delete), und eine gelöschte Zeile
 --    würde die Datei im Speicher ohnehin nicht entfernen. Die Storage-Policies erlauben
---    dem Konto genau diese Löschungen, solange es noch Mitglied ist.
+--    dem Konto genau diese Löschungen, solange es noch Mitglied ist. Fotos von Gruppen,
+--    die bestehen bleiben, stehen nie in der Liste.
+-- 1b. check_delete_my_account(): Probelauf. Führt delete_my_account() vollständig in
+--    einem Savepoint aus und rollt ihn zurück (eigener SQLSTATE TTG01 als Signal, nur
+--    dieser wird gefangen). Wirft denselben Fehler, an dem das echte Löschen scheitern
+--    würde. Der Client ruft ihn VOR dem Datei-Löschen: scheitert er, wird keine Datei
+--    gelöscht (Risiko 1, Befund B2). Reihenfolge im Client: Probelauf → Dateien → RPC.
 -- 2. delete_my_account(): kein Parameter, wirkt nur auf auth.uid(); alles in EINER
 --    Transaktion (Fehler irgendwo ⇒ nichts geändert):
 --    a) je Mitgliedschaft: einziges Konto-Mitglied ⇒ Spiele der Gruppe löschen (sie
 --       kaskadieren auf game_players/game_events/Bewertungen), dann die Gruppe.
---       Sonst: letzter Admin ⇒ am längsten dabei befindliches Konto-Mitglied wird Admin;
+--       Sonst: letzter Admin ⇒ am längsten dabei befindliches Konto-Mitglied wird Admin
+--       („dabei seit“ = coalesce(claimed_at, created_at): bei übernommenen Platzhaltern
+--       zählt die Übernahme, nicht das Anlegen des Platzhalters);
 --       Mitgliedschaft wird „Ehemaliges Mitglied“ ohne Konto, Bild, Code (Rolle member).
 --    b) playgroups.created_by (not null) geht auf den neuen/vorhandenen Admin bzw. ein
 --       anderes Konto-Mitglied; hat die Gruppe keins mehr, wird sie mitgelöscht.
 --    c) Decks: ohne Verwendung (game_players, deck_salt_ratings) gelöscht; mit Verwendung
---       archiviert und an die ehemalige Mitgliedschaft in der Gruppe des frühesten
---       Spiels gehängt (fehlt sie dort, neuer Platzhalter „Ehemaliges Mitglied“).
---       version_of-Verweise auf gelöschte Decks werden geleert.
+--       archiviert, und zwar JE GRUPPE MIT VERWENDUNG GENAU EIN DECK (Spec-Nachtrag 2,
+--       Befund B1): das Original geht an die ehemalige Mitgliedschaft in der Gruppe des
+--       frühesten Spiels; für jede weitere Gruppe entsteht eine archivierte Kopie bei der
+--       ehemaligen Mitgliedschaft dieser Gruppe, und game_players.deck_id sowie
+--       deck_salt_ratings.deck_id der Spiele dieser Gruppe zeigen auf die Kopie. Fehlt die
+--       Mitgliedschaft dort, entsteht ein Platzhalter „Ehemaliges Mitglied“ (einer je
+--       Gruppe). So hängt kein Deck an zwei Gruppen: Mitglieder jeder Gruppe sehen „ihr“
+--       Deck weiter (can_see_deck), und ein späteres purge_playgroup einer der Gruppen
+--       stößt auf keinen Verweis aus einer anderen Gruppe.
+--       Fremdschlüssel auf decks (vollständig aus allen Migrationen erhoben):
+--       game_players.deck_id, deck_salt_ratings.deck_id, decks.version_of.
+--       version_of: Kopien bekommen null (Versionskette bleibt beim Original);
+--       Verweise auf gelöschte Decks werden geleert.
 --    d) Fremdschlüssel ohne on delete auf profiles: members.created_by,
 --       sessions.created_by, games.created_by ⇒ null (playgroups.created_by s. b).
 --       Vollständig erhoben aus allen Migrationen: auf profiles verweisen nur
@@ -77,6 +95,8 @@ declare
   heir uuid;
   gid uuid;
   ph uuid;
+  c decks;                 -- Kopie eines Decks für eine weitere Gruppe
+  used boolean;
   former uuid[] := '{}';   -- umgewandelte Mitgliedschaften (bleiben als Platzhalter)
 begin
   if me is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
@@ -96,7 +116,7 @@ begin
              and o.profile_id is not null and o.role = 'admin') then
         select o.id into heir from members o
         where o.playgroup_id = m.playgroup_id and o.id <> m.id and o.profile_id is not null
-        order by o.created_at, o.id limit 1;
+        order by coalesce(o.claimed_at, o.created_at), o.id limit 1;
         update members set role = 'admin' where id = heir;
       end if;
       update members set profile_id = null, display_name = 'Ehemaliges Mitglied', claim_code = null,
@@ -110,7 +130,7 @@ begin
   for gid in select id from playgroups where created_by = me loop
     select o.profile_id into heir from members o
     where o.playgroup_id = gid and o.profile_id is not null and o.profile_id <> me
-    order by (o.role = 'admin') desc, o.created_at, o.id limit 1;
+    order by (o.role = 'admin') desc, coalesce(o.claimed_at, o.created_at), o.id limit 1;
     if heir is null then
       perform public.purge_playgroup(gid);
     else
@@ -120,23 +140,45 @@ begin
 
   -- c) Decks (nach a/b: Spiele mitgelöschter Gruppen zählen nicht mehr als Verwendung)
   for d in select * from decks where owner_profile_id = me order by created_at, id loop
-    select g.playgroup_id into gid from (
-      select gp.game_id from game_players gp where gp.deck_id = d.id
-      union select r.game_id from deck_salt_ratings r where r.deck_id = d.id) u
-    join games g on g.id = u.game_id
-    order by g.started_at, g.id limit 1;
-    if gid is null then
-      update decks set version_of = null where version_of = d.id;
-      delete from decks where id = d.id;
-    else
+    used := false;
+    -- Gruppen mit Verwendung, früheste zuerst
+    for gid in
+      select g.playgroup_id from (
+        select gp.game_id from game_players gp where gp.deck_id = d.id
+        union select r.game_id from deck_salt_ratings r where r.deck_id = d.id) u
+      join games g on g.id = u.game_id
+      group by g.playgroup_id
+      order by min(g.started_at), g.playgroup_id
+    loop
+      ph := null;
       select x.id into ph from members x where x.id = any(former) and x.playgroup_id = gid;
       if ph is null then
         insert into members (playgroup_id, display_name) values (gid, 'Ehemaliges Mitglied') returning id into ph;
+        former := former || ph;
       end if;
-      -- beide Besitzer-Spalten in EINEM update (check: genau einer gesetzt)
-      update decks set owner_profile_id = null, owner_member_id = ph, archived = true where id = d.id;
+      if not used then
+        -- Original: beide Besitzer-Spalten in EINEM update (check: genau einer gesetzt)
+        update decks set owner_profile_id = null, owner_member_id = ph, archived = true where id = d.id;
+        used := true;
+      else
+        -- Kopie aus der Zeile (alle Spalten, auch künftige), neuer Besitzer, archiviert
+        c := d;
+        c.id := gen_random_uuid();
+        c.owner_profile_id := null;
+        c.owner_member_id := ph;
+        c.archived := true;
+        c.version_of := null;
+        insert into decks select (c).*;
+        update game_players gp set deck_id = c.id
+          from games g where g.id = gp.game_id and g.playgroup_id = gid and gp.deck_id = d.id;
+        update deck_salt_ratings r set deck_id = c.id
+          from games g where g.id = r.game_id and g.playgroup_id = gid and r.deck_id = d.id;
+      end if;
+    end loop;
+    if not used then
+      update decks set version_of = null where version_of = d.id;
+      delete from decks where id = d.id;
     end if;
-    gid := null; ph := null;
   end loop;
 
   -- d) übrige Verweise auf das Profil
@@ -151,14 +193,28 @@ begin
   delete from auth.users where id = me;
 end $$;
 
-revoke execute on function public.my_account_files(), public.delete_my_account() from public, anon;
-grant execute on function public.my_account_files(), public.delete_my_account() to authenticated;
+-- Probelauf (Befund B2): dieselbe Wirkung in einem Savepoint, dann zurückgerollt.
+-- Nur das eigene Signal TTG01 wird gefangen; jeder echte Fehler kommt beim Client an.
+create or replace function public.check_delete_my_account()
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  begin
+    perform public.delete_my_account();
+    raise exception using errcode = 'TTG01', message = 'Probelauf ok';
+  exception when sqlstate 'TTG01' then
+    null;  -- Savepoint zurückgerollt: nichts geändert
+  end;
+end $$;
+
+revoke execute on function public.my_account_files(), public.delete_my_account(), public.check_delete_my_account() from public, anon;
+grant execute on function public.my_account_files(), public.delete_my_account(), public.check_delete_my_account() to authenticated;
 -- Hilfe ohne eigene Prüfung: für keine Client-Rolle
 revoke execute on function public.purge_playgroup(uuid) from public, anon, authenticated;
 
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen, kein Datenverlust):
 -- RÜCKWÄRTS-BEGINN
+-- drop function public.check_delete_my_account();
 -- drop function public.delete_my_account();
 -- drop function public.purge_playgroup(uuid);
 -- drop function public.my_account_files();
