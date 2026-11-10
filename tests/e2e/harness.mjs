@@ -70,7 +70,8 @@ export async function ctx(browser, name) {
 }
 
 /** Felder und Zeilen, die eine Konto-Adresse zeigen können — in jedem Bildschirmfoto abgedeckt. */
-export const MASK = ['#li-mail', '#rg-mail', 'input[type=email]', '[data-nav="account"] .sub', '[data-confirm]', '.sheet input[type=email]'];
+// p.muted.small mit „@“ = „Angemeldet als …“ in Einstellungen → Konto (Fehlerfoto beim Wegwerf-Konto, Spec H)
+export const MASK = ['#li-mail', '#rg-mail', 'input[type=email]', '[data-nav="account"] .sub', '[data-confirm]', '.sheet input[type=email]', 'p.muted.small:has-text("@")'];
 export const shot = (p, n, opts = {}) => { fs.mkdirSync(OUT, { recursive: true }); return p.screenshot({ path: path.join(OUT, `${n}.png`), mask: MASK.map((m) => p.locator(m)), ...opts }); };
 export const hash = (p) => new URL(p.url()).hash;
 export const waitHash = (p, h) => p.waitForFunction((x) => location.hash.startsWith(x), h, { timeout: 15000 });

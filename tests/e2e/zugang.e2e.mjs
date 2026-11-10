@@ -12,10 +12,11 @@ import { execFileSync } from 'node:child_process';
 import jsQR from 'jsqr';
 import {
   ok, skip, ctx, waitHash, login, ensureMember, ensurePlaceholder, zugangLive, inviteCode, fixtureIds, get, rpc,
-  TARGET, ROOT, FIXTURE_NAME,
+  TARGET, ROOT, FIXTURE_NAME, RUN,
 } from './harness.mjs';
 import { email, password } from './fixture-api.mjs';
 import de from '../../src/i18n/de.js';
+import { DELETE_WORD } from '../../src/views/settings-rules.js';
 
 const SB = TARGET.url;
 const LOOKS = ['nacht', 'arktis', 'lachs'];
@@ -27,8 +28,8 @@ const plus = (tag) => email('a').replace('@', `+${tag}@`);
 
 // ---------------------------------------------------------------- Helfer
 /** Sperre auf Kontext-Ebene: nichts davon erreicht Prod (Seiten-Mocks haben Vorrang). */
-async function guard(p, { allowRenew = false } = {}) {
-  const block = ['auth/v1/signup', 'rest/v1/rpc/create_playgroup', 'rest/v1/rpc/set_member_role', 'rest/v1/rpc/set_max_accounts',
+async function guard(p, { allowRenew = false, allowSignup = false } = {}) {
+  const block = [...(allowSignup ? [] : ['auth/v1/signup']), 'rest/v1/rpc/create_playgroup', 'rest/v1/rpc/set_member_role', 'rest/v1/rpc/set_max_accounts',
     'rest/v1/rpc/access_overview', ...(allowRenew ? [] : ['rest/v1/rpc/renew_invite'])];
   for (const b of block) await p.context().route(`${SB}/${b}*`, (r) => r.fulfill(json(418, { code: 'E2E', message: 'e2e_blocked' })));
 }
@@ -238,6 +239,108 @@ export async function anonPart({ browser, base, offline = false }) {
 
   footer([['ZP', P]], { ZP: [`500 ${SB}/rest/v1/rpc/check_invite`, `500 ${SB}/auth/v1/signup`] }, { ZP: [/^console: .*XX000.*boom/] });
   await P.context().close();
+}
+
+// ---------------------------------------------------------------- Echte Registrierung (Spec H, Opt-in TTG_E2E_SIGNUP=1)
+export const SIGNUP_CASE = 'Echte Registrierung über das Formular (Wegwerf-Konto)';
+const GONE = (s) => s.status === 400 && s.code === 'invalid_credentials';
+
+/** Konto-ID aus der Sitzung der App (storageKey ttg-auth, src/supabase.js) — die Adresse wird nicht gelesen. */
+const sessionUid = (p) => p.evaluate(() => { try { return JSON.parse(localStorage.getItem('ttg-auth') || 'null')?.user?.id ?? null; } catch { return null; } });
+
+/** „Konto löschen“ über die Oberfläche (Einstellungen → Konto), endet nach dem Abmelden auf #/login. */
+async function deleteViaUi(p, base) {
+  await fresh(p, base, '#/einstellungen/konto');
+  await p.waitForSelector('[data-act="delete"]');
+  await p.click('[data-act="delete"]');
+  await p.fill('#del-word', DELETE_WORD.de);
+  await p.click('[data-act="delete-yes"]');
+  await waitHash(p, '#/login');
+}
+
+/** Anmeldung mit Adresse + Passwort über die Auth-API (Node): Status, error_code, Konto-ID — nie die Adresse. */
+async function signInProbe(mail, pass) {
+  const r = await fetch(`${SB}/auth/v1/token?grant_type=password`, {
+    method: 'POST', headers: { apikey: TARGET.key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: mail, password: pass }), signal: AbortSignal.timeout(20000),
+  });
+  let d = {}; try { d = await r.json(); } catch { /* leer */ }
+  return { status: r.status, code: d?.error_code ?? null, uid: d?.user?.id ?? null };
+}
+
+/**
+ * Aufräumen nach einem roten Fall: gibt es das Wegwerf-Konto noch (Anmeldung klappt), zweiter Löschversuch über
+ * die Oberfläche; bleibt es, wird die Konto-ID des Rests gemeldet (rot), nie die Adresse.
+ */
+async function signupCleanup({ browser, base, mail, pass, probe, prep, uid }) {
+  let s = await probe.signIn(mail, pass).catch(() => ({ status: 0, code: 'netz', uid: null }));
+  if (GONE(s)) { console.log('  Aufräumen: kein Wegwerf-Konto vorhanden (Anmeldung scheitert)'); return; }
+  const rest = s.uid ?? uid;
+  const X = await page(browser, 'ZR2');
+  await prep(X);
+  try {
+    await X.goto(base + '#/login');
+    await X.waitForSelector('#li-mail');
+    await X.fill('#li-mail', mail);
+    await X.fill('#li-pass', pass);
+    await X.click('button[type=submit]');
+    await X.waitForFunction(() => /^#\/(start|willkommen)/.test(location.hash), null, { timeout: 15000 });
+    await deleteViaUi(X, base);
+  } catch (e) { console.log(`  Aufräumen: zweiter Löschversuch scheiterte (${String(e?.message || e).split('\n')[0].slice(0, 160)})`); }
+  await X.context().close();
+  s = await probe.signIn(mail, pass).catch(() => ({ status: 0, code: 'netz', uid: null }));
+  ok(GONE(s) ? 'H Aufräumen: Wegwerf-Konto im zweiten Versuch über „Konto löschen“ entfernt'
+    : `H Aufräumen: REST — Wegwerf-Konto ${rest ?? '(ID unbekannt)'} besteht noch (Anmeldung ${s.status} ${s.code ?? ''}) ⇒ von Hand löschen`, GONE(s));
+}
+
+/**
+ * Wegwerf-Konto über das Formular (Spec P9b H): #/beitreten/<code> ⇒ „Konto erstellen“ ⇒ Registrierung ⇒ Sitzung,
+ * /start ⇒ genau 1× Mitglied der Fixture (probe.members, API als A) ⇒ „Konto löschen“ in der App ⇒ Anmeldung mit
+ * der Adresse scheitert (400 invalid_credentials) und 0 Mitgliedschaften. Rot ⇒ Aufräumen (signupCleanup).
+ * Die Adresse steht nur im (maskierten) Feld, nie in Ausgaben.
+ * @param {{ browser: any, base: string, code: string, mail: string, pass: string,
+ *   probe: { members: (uid: string) => Promise<number>, signIn: (mail: string, pass: string) => Promise<{ status: number, code: string|null, uid: string|null }> },
+ *   prep?: (p: any) => Promise<void> }} o — prep: Seite vorbereiten (Offline-Beleg: abgefangene Antworten)
+ */
+export async function signupPart({ browser, base, code, mail, pass, probe, prep = async () => {} }) {
+  console.log(`\nZugang: ${SIGNUP_CASE}`);
+  const R = await page(browser, 'ZR', { allowSignup: true });
+  await prep(R);
+  let uid = null;
+  let gone = false;
+  try {
+    await R.goto(base + `#/beitreten/${code}`);
+    await R.waitForSelector('[data-act="create-account"]');
+    ok('H Fixture-Link abgemeldet ⇒ Einladung nennt TTG-E2E-Fixture', (await R.evaluate(() => document.body.innerText)).includes(FIXTURE_NAME));
+    await R.click('[data-act="create-account"]');
+    await waitHash(R, '#/registrieren');
+    await R.waitForSelector('#rg-code');
+    ok('H „Konto erstellen“ ⇒ #rg-code = Fixture-Code', (await R.inputValue('#rg-code')) === code);
+    await R.fill('#rg-name', 'E2E Wegwerf');
+    await R.fill('#rg-mail', mail);
+    await R.fill('#rg-pass', pass);
+    await R.shot('wegwerf-registrierung');
+    await R.click('form button[type=submit]');
+    await waitHash(R, '#/start');
+    uid = await sessionUid(R);
+    ok('H Registrierung ⇒ Sitzung, landet auf /start', typeof uid === 'string' && uid.length > 0);
+    const n = uid ? await probe.members(uid) : -1;
+    ok('H Wegwerf-Konto genau 1× Mitglied der Fixture (API-Zählung als A)', n === 1, String(n));
+    await R.shot('wegwerf-start');
+    await deleteViaUi(R, base);
+    const s = await probe.signIn(mail, pass);
+    gone = GONE(s);
+    ok('H nach „Konto löschen“ in der App ⇒ Anmeldung mit der Adresse scheitert (400 invalid_credentials)', gone, `${s.status} ${s.code ?? ''}`);
+    const n2 = uid ? await probe.members(uid) : -1;
+    ok('H nach dem Löschen ⇒ 0 Mitgliedschaften des Kontos in der Fixture', n2 === 0, String(n2));
+    if (gone) console.log(`  Wegwerf-Konto ${uid} über die App gelöscht (keins von A, B, C)`);
+  } catch (e) {
+    ok(`${SIGNUP_CASE}: lief durch`, false, String(e?.message || e).split('\n')[0].slice(0, 240));
+    await R.shot('fehler-wegwerf').catch(() => {});
+  }
+  footer([['ZR', R]]);
+  await R.context().close();
+  if (!gone) await signupCleanup({ browser, base, mail, pass, probe, prep, uid });
 }
 
 // ---------------------------------------------------------------- Gesamtlauf
@@ -510,7 +613,19 @@ export default async function zugangE2e({ browser, base }) {
       await P2.context().close();
     });
   }
-  skip('Echte Registrierung über das Formular (Wegwerf-Konto)', 'TTG_E2E_SIGNUP nicht gesetzt (Standard; Einschalten ist Sache des Dirigenten)');
+  // Spec H: legt ein echtes Konto an und löscht es wieder ⇒ nur auf ausdrücklichen Wunsch UND nur hinter dem Tor
+  if (process.env.TTG_E2E_SIGNUP !== '1') {
+    skip(SIGNUP_CASE, 'TTG_E2E_SIGNUP nicht gesetzt (Standard) — legt ein echtes Konto an und löscht es; nach dem db push mit Francos Ja: TTG_E2E_SIGNUP=1 npm run e2e -- --nur zugang');
+  } else if (!live) {
+    skip(SIGNUP_CASE, 'TTG_E2E_SIGNUP=1, aber Migration nicht in Prod (zugangLive=false) — ohne Tor entstünde ein Konto ohne Code');
+  } else {
+    const now = await inviteCode(); // K13 hat den Link eben erneuert
+    if (!now) throw new Error('Fixture-Code nach K13 nicht lesbar');
+    await signupPart({
+      browser, base, code: now, mail: plus(`p9breg${RUN}`), pass: password(),
+      probe: { members: async (uid) => (await get('a', `members?select=id&playgroup_id=eq.${G}&profile_id=eq.${uid}`)).length, signIn: signInProbe },
+    });
+  }
 
   footer([['ZJ', J], ['ZA', A]], { ZA: [`400 ${SB}/rest/v1/rpc/set_max_accounts`] });
   await decoder.context().close();
