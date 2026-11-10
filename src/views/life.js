@@ -23,6 +23,7 @@ import { go } from '../router.js';
 import { MEMBER_SELECT } from './groups.js';
 import { openFieldColor } from './setup.js';
 import { showKo } from './ko.js';
+import { attachAttack } from './attack.js';
 import {
   mmss, signed, counterRows, togglePin, DEFAULT_PINS, rollText, logText, lowLife, cmdLine, shortCmd, byPlace, flickerValue, secondsSince,
 } from './life-ui.js';
@@ -173,7 +174,7 @@ export default async function life(el, { params, isStale }) {
     const hubTop = L.layout === 'rundum' && n >= 3 ? `${(100 / L.rows).toFixed(3)}%` : '50%';
     return html`<div class="lc-board" data-layout="${L.layout}" style="grid-template-columns:repeat(${L.cols},minmax(0,1fr));grid-template-rows:repeat(${L.rows},minmax(0,1fr))">
       ${s.players.map((p, i) => fieldHtml(p, L.slots[i]))}
-      <button type="button" class="lc-hub" data-act="menu" style="top:${hubTop}" aria-label="${t('life.hub', { n: s.round })}"><small>${t('life.round')}</small><b class="num" data-round>${s.round}</b></button>
+      <button type="button" class="lc-hub" data-act="menu" data-pid="__all" style="top:${hubTop}" aria-label="${t('life.hub', { n: s.round })}"><small>${t('life.round')}</small><b class="num" data-round>${s.round}</b></button>
     </div>`;
   }
 
@@ -538,6 +539,7 @@ export default async function life(el, { params, isStale }) {
 
   el.classList.add('lc-screen');
   mount(el, html`<div class="lc" data-game="${id}"></div>`);
+  attachAttack(el, { getState: () => s, onApply: doAct, name: nm, deck: deckOf, busy: () => koOpen || stopped });
   renderBoard();
   // Spiel schon entschieden (z. B. nach Neuladen): Abschluss-Sheet anbieten
   if (s.finished) openEnd();

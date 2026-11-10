@@ -1,3 +1,26 @@
 // i18n-Namensraum „attack“ (de) · Besitzer: P10 (Angriff per Ziehen, Angriffsfenster).
 // Naht aus P7: eingebunden in de.js unter `attack`; nur dieses Paket schreibt hier. Schlüssel in de/en gleich halten (lint L5).
-export default {};
+export default {
+  label: 'Angriff eintragen',
+  all: 'ALLE',
+  allOpp: 'Alle Gegner',
+  nOpp: '{n} Gegner',
+  noTarget: 'Kein Ziel',
+  targets: 'Ziele',
+  damage: 'Schaden',
+  cmd: 'Commander',
+  poison: 'Gift',
+  life: 'Leben',
+  cmdFrom: 'Commander-Schaden von {name}',
+  lifelink: 'Lifelink',
+  lifelinkRow: 'Lifelink · {amount} × {n}',
+  less: 'Weniger',
+  more: 'Mehr',
+  amount: 'Menge',
+  pick: 'Ziel wählen',
+  apply: '{amount} {word} eintragen',
+  applyMulti: '{amount} {word} an {n} Gegner eintragen',
+  word: { damage: 'Schaden', cmd: 'Commander-Schaden', poison: 'Gift' },
+  hint: 'Ziehe von deinem Feld auf einen Gegner, um einen Angriff einzutragen. Auf den Knopf in der Mitte ziehen trifft alle Gegner.',
+  hintOk: 'Verstanden',
+};
