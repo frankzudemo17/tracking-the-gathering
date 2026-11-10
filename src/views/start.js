@@ -100,7 +100,7 @@ export default async function start(el, { isStale }) {
       <div class="section-head"><h3 class="section-title">${t('home.leaderboard')}</h3>${top.length ? html`<a class="home-all" href="#/rangliste">${t('result.homeAll')}</a>` : ''}</div>
       ${top.length ? html`<div class="card home-top">${top.map((r) => {
         const m = dbMember.get(r.memberId);
-        return html`<a class="home-top-row" href="#/profil/${encodeURIComponent(r.memberId)}" data-top="${r.memberId}">
+        return html`<a class="home-top-row" href="#/profil/${encodeURIComponent(r.memberId)}" data-top="${r.memberId}" data-rank="${r.rank}">
           <span class="home-rank num" aria-label="${t('result.homeRank', { n: r.rank })}">${r.rank}</span>
           ${m ? personAv(m, 36) : avatar({ name: statName(r.memberId), url: null, size: 36 })}
           <span class="rs-name">${statName(r.memberId)}</span>
