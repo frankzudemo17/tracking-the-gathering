@@ -35,7 +35,7 @@ export default async function history(el, { isStale }) {
     return avatar({ name: m?.name || '?', url: m?.avatarPath ? urls[m.avatarPath] : null, size, ...extra });
   };
 
-  const chips = () => FILTERS.map((f) => html`<button type="button" class="hist-chip" data-filter="${f}" aria-pressed="${f === filter}">${t(`history.filters.${f}`)}</button>`);
+  const chips = () => FILTERS.map((f) => html`<button type="button" class="hist-chip" data-filter="${f}" aria-pressed="${String(f === filter)}">${t(`history.filters.${f}`)}</button>`);
 
   const gameCard = (gid) => {
     const s = gameSummary(data, gid);

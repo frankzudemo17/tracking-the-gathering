@@ -219,7 +219,11 @@ function openPhoto(url, alt) {
     window.removeEventListener('hashchange', close);
     if (prev instanceof HTMLElement && prev.isConnected) prev.focus();
   };
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  // Fokusfalle: einziges Bedienelement im Dialog ist Schließen
+  const onKey = (e) => {
+    if (e.key === 'Escape') close();
+    else if (e.key === 'Tab') { e.preventDefault(); /** @type {HTMLElement|null} */ (wrap.querySelector('[data-act="close"]'))?.focus(); }
+  };
   document.addEventListener('keydown', onKey);
   window.addEventListener('hashchange', close);
   wrap.addEventListener('click', (e) => { if (e.target === wrap || (e.target instanceof Element && e.target.closest('[data-act="close"]'))) close(); });
