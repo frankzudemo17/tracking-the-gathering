@@ -18,8 +18,8 @@ route('/passwort-neu', v('newpass'));
 route('/code/:code', v('code'), { public: true });
 route('/willkommen', v('welcome'));
 // Spielende, Historie, Statistik (Etappe 4/5, Naht P13).
-route('/historie', v('history'), { nav: 'history', group: true, arg: 'history' });
-route('/rangliste', v('board'), { nav: 'board', group: true, arg: 'board' });
+route('/historie', v('history'), { nav: 'history', group: true, arg: 'history', swap: true });
+route('/rangliste', v('board'), { nav: 'board', group: true, arg: 'board', swap: true });
 route('/partie/:id', v('game-detail'), { nav: 'history', group: true, arg: 'history' });
 route('/abend/:id', v('recap'), { nav: 'history', group: true, arg: 'history' });
 route('/spiel/:id/ende', v('result'), { group: true, arg: 'history' });

@@ -194,7 +194,7 @@ test('K14 Update-Suche: sichtbar ⇒ registration.update(); zweimal binnen 60 s 
 // Ruhige Routen laut Spec E3. /historie und /rangliste fehlen hier bewusst: tests/unit/naehte-e45.test.mjs
 // (K1 „Naht-Block“) vergleicht ihre Optionen wörtlich, bestehende Tests sind gesperrt ⇒ Entscheid
 // Dirigent (Bericht P11, Abweichung A1). Ohne Kennzeichen halten sie — der sichere Normalfall.
-const QUIET = ['/login', '/start', '/profil', '/profil/:memberId', '/gruppen', '/einstellungen', '/einstellungen/rechtliches', '/datenschutz'];
+const QUIET = ['/login', '/start', '/historie', '/rangliste', '/profil', '/profil/:memberId', '/gruppen', '/einstellungen', '/einstellungen/rechtliches', '/datenschutz'];
 const HELD = ['/spiel/:id', '/spiel/:id/ende', '/spielen', '/spiel-neu', '/spieler-neu', '/deck-neu/:memberId', '/beitreten', '/beitreten/:code',
   '/code/:code', '/passwort-neu', '/registrieren', '/passwort-vergessen', '/historie', '/rangliste'];
 
