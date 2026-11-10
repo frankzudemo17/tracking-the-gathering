@@ -171,7 +171,7 @@ export default {
     ],
   },
 
-  common: { back: 'Back', close: 'Close', cancel: 'Cancel', loading: 'Loading …', error: 'Something went wrong.' },
+  common: { back: 'Back', close: 'Close', cancel: 'Cancel', loading: 'Loading …', error: 'Something went wrong.', reload: 'Reload' },
 
   setup, life, dice, attack, ko,
 };

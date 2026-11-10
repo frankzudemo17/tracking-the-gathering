@@ -4,11 +4,14 @@
 
 /* ---------- Brett */
 .screen.lc-screen { padding: 0; gap: 0; }
+/* Der Tisch füllt den Bildschirm genau: nichts scrollt, nichts federt (iOS zieht sonst die Seite mit, wenn man über die Felder wischt). */
+html:has(.lc-screen), html:has(.lc-screen) body { overflow: hidden; overscroll-behavior: none; }
+.lc { touch-action: none; }
 .lc { height: 100dvh; display: flex; background: var(--bg); }
 .lc-board { position: relative; flex: 1; display: grid; gap: 8px; padding: calc(8px + var(--safe-t)) 8px calc(8px + var(--safe-b)); min-height: 0; }
 
 .lc-field { position: relative; container-type: size; min-width: 0; min-height: 0; border-radius: 24px; overflow: hidden;
-  background: var(--hero); color: var(--hero-ink); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  background: var(--hero); color: var(--hero-ink); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
 .lc-field::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 8;
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--hero-ink) 14%, transparent); transition: box-shadow .2s; }
 .lc-field.turn::after { box-shadow: inset 0 0 0 4px var(--turn), 0 0 0 1px var(--turn); }

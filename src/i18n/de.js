@@ -171,7 +171,7 @@ export default {
     ],
   },
 
-  common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.' },
+  common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.', reload: 'Neu laden' },
 
   setup, life, dice, attack, ko,
 };
