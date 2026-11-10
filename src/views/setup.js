@@ -99,7 +99,7 @@ export default async function setup(el, { isStale }) {
     return html`<div class="su-chips">${members.map((m) => {
       const on = s.sel.includes(m.id);
       const full = !on && s.sel.length >= MAX;
-      return html`<button type="button" class="su-pill" data-act="member" data-id="${m.id}" aria-pressed="${on}" ${full ? html`aria-disabled="true"` : ''}>${on ? icon('check', 16) : ''}<span>${memberName(m)}</span>${m.profile_id ? '' : html`<small>${t('setup.guest')}</small>`}</button>`;
+      return html`<button type="button" class="su-pill" data-act="member" data-id="${m.id}" aria-pressed="${String(on)}" ${full ? html`aria-disabled="true"` : ''}>${on ? icon('check', 16) : ''}<span>${memberName(m)}</span>${m.profile_id ? '' : html`<small>${t('setup.guest')}</small>`}</button>`;
     })}<a class="su-pill dash" href="#/spieler-neu?zurueck=setup" data-act="detour">${icon('plus', 16)}<span>${t('setup.addPlayer')}</span></a></div>`;
   }
 
@@ -111,7 +111,7 @@ export default async function setup(el, { isStale }) {
     const cells = s.sel.map((id, i) => {
       const sl = L.slots[i]; const d = decks.get(s.deck[id]);
       const art = d?.image_url ? `--img:${cssUrl(d.image_url)};` : '';
-      return html`<button type="button" data-act="swap" data-i="${i}" aria-pressed="${s.swap === i}" aria-label="${t('setup.seat', { n: i + 1, name: name(id) })}"
+      return html`<button type="button" data-act="swap" data-i="${i}" aria-pressed="${String(s.swap === i)}" aria-label="${t('setup.seat', { n: i + 1, name: name(id) })}"
         class="${d?.image_url ? '' : 'nodeck'}" style="grid-column:${sl.c} / span ${sl.cs};grid-row:${sl.r} / span ${sl.rs};${art}">
         <span class="lab" style="${rot(sl.rot)}"><small>${i + 1}</small><b>${name(id)}</b></span></button>`;
     });
@@ -167,7 +167,7 @@ export default async function setup(el, { isStale }) {
         ${members.length < 2 ? html`<p class="su-note">${icon('warn', 16)}<span>${t('setup.onlyOne')}</span></p>` : ''}</section>
 
       <section class="su-sec"><div class="su-sec-head"><span class="su-eyebrow">${t('setup.seats')}</span><span class="su-mu">${n >= 2 ? swapHint : ''}</span></div>
-        <div class="su-layouts">${LAYOUTS.map((k) => html`<button type="button" class="su-pill" data-act="layout" data-l="${k}" aria-pressed="${s.layout === k}">${t(`setup.layouts.${k}`)}</button>`)}</div>
+        <div class="su-layouts">${LAYOUTS.map((k) => html`<button type="button" class="su-pill" data-act="layout" data-l="${k}" aria-pressed="${String(s.layout === k)}">${t(`setup.layouts.${k}`)}</button>`)}</div>
         ${seatsHtml()}</section>
 
       <section class="su-sec"><span class="su-eyebrow">${t('setup.decks')}</span>
@@ -182,7 +182,7 @@ export default async function setup(el, { isStale }) {
         <div class="su-stepper"><button type="button" data-act="life" data-v="-5" aria-label="${t('setup.lifeLess')}">${icon('minus', 18)}</button>
           <span class="su-lifebig num" aria-live="polite">${s.life}</span>
           <button type="button" data-act="life" data-v="5" aria-label="${t('setup.lifeMore')}">${icon('plus', 18)}</button></div></div>
-        <div class="su-chips4">${LIVES.map((v) => html`<button type="button" class="su-pill" data-act="lifeset" data-v="${v}" aria-pressed="${s.life === v}">${v}</button>`)}</div></div>
+        <div class="su-chips4">${LIVES.map((v) => html`<button type="button" class="su-pill" data-act="lifeset" data-v="${v}" aria-pressed="${String(s.life === v)}">${v}</button>`)}</div></div>
 
       <div class="su-sec su-go"><button type="button" class="btn block" data-act="start" ${why || s.starting ? 'disabled' : ''} ${s.starting ? html`aria-busy="true"` : ''}>${t('setup.start')}</button>
         ${why ? html`<span class="su-why" data-why>${icon('warn', 16)}${why}</span>` : ''}
@@ -259,12 +259,12 @@ export default async function setup(el, { isStale }) {
           <button type="button" class="btn small" data-act="done">${t('setup.field.done')}</button></div>
         <div class="su-preview" style="${styleText(st)}">${artLayers(d)}<div class="su-tint"></div><div class="su-scrim"></div>
           <div class="pv"><b>${name(mid)}</b><span class="n num">${s.life}</span></div></div>
-        <button type="button" class="su-opt" data-mode="art" aria-pressed="${mode === 'art'}"><span class="sw art" style="${d.image_url ? `--img:${cssUrl(d.image_url)}` : ''}"></span>
+        <button type="button" class="su-opt" data-mode="art" aria-pressed="${String(mode === 'art')}"><span class="sw art" style="${d.image_url ? `--img:${cssUrl(d.image_url)}` : ''}"></span>
           <span class="grow"><b>${t('setup.field.art')}</b><small>${t('setup.field.artSub')}</small></span>${mode === 'art' ? icon('check', 20) : ''}</button>
-        <button type="button" class="su-opt" data-mode="commander" aria-pressed="${mode === 'commander'}"><span class="sw" style="background:${fieldBg(cmdCols, 100)}"></span>
+        <button type="button" class="su-opt" data-mode="commander" aria-pressed="${String(mode === 'commander')}"><span class="sw" style="background:${fieldBg(cmdCols, 100)}"></span>
           <span class="grow"><b>${t('setup.field.commander')}</b><small>${manaNames}</small></span>${mode === 'commander' ? icon('check', 20) : ''}</button>
         <span class="su-eyebrow">${t('setup.field.own')}</span>
-        <div class="su-palette">${PALETTE.map((c, i) => html`<button type="button" data-mode="color" data-c="${c}" aria-pressed="${own === c}" aria-label="${t(`setup.colors.${PALETTE_KEYS[i]}`)}">
+        <div class="su-palette">${PALETTE.map((c, i) => html`<button type="button" data-mode="color" data-c="${c}" aria-pressed="${String(own === c)}" aria-label="${t(`setup.colors.${PALETTE_KEYS[i]}`)}">
           <i style="background:${c}">${own === c ? icon('check', 20) : ''}</i>${t(`setup.colors.${PALETTE_KEYS[i]}`)}</button>`)}</div>`;
     };
     sheet(t('setup.field.title'), html`<div class="su-sheet">${body()}</div>`, (sh, close) => {
@@ -302,5 +302,5 @@ async function loadGroup(gid) {
   const decks = ors.length
     ? await sb.from('decks').select(DECK_COLS).eq('archived', false).or(ors.join(',')).order('created_at', { ascending: false }).then(must)
     : [];
-  return [members, decks];
+  return [members, decks.filter((d) => !d.archived)]; // archivierte nie (Server filtert schon; doppelt hält)
 }
