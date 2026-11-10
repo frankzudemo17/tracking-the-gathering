@@ -131,8 +131,9 @@ test('K13 Abbildung snake ⇒ camel an einer Zeile je Tabelle', async () => {
   const data = await createHistoryData(sb).loadGroup(GID);
   assert.equal(data.groupId, GID);
   assert.deepEqual(data.members, [
-    { id: 'm1', name: 'Franco', profileId: 'p1', avatarPath: 'p1/avatar.jpg', isPlaceholder: false },
-    { id: 'm2', name: 'Tim', profileId: null, avatarPath: 'members/m2/avatar.jpg', isPlaceholder: true },
+    // P10 Krit. 15: zwei neue Felder (ohne die neuen Spalten ⇒ false/null)
+    { id: 'm1', name: 'Franco', profileId: 'p1', avatarPath: 'p1/avatar.jpg', isPlaceholder: false, removed: false, formerProfileId: null },
+    { id: 'm2', name: 'Tim', profileId: null, avatarPath: 'members/m2/avatar.jpg', isPlaceholder: true, removed: false, formerProfileId: null },
   ]);
   assert.deepEqual(data.games, [{ id: 'g1', sessionId: 's1', status: 'finished', startedAt: '2026-10-01T19:00:00Z', endedAt: '2026-10-01T20:00:00Z', round: 7, wincon: 'kombo', note: 'n', photoPath: `${GID}/g1.jpg`, startingLife: 40 }]);
   assert.deepEqual(data.sessions, [{ id: 's1', playedOn: '2026-10-01', location: 'WG' }]);
@@ -253,4 +254,23 @@ test('K13 loadGroup ohne Spiele ⇒ leere Listen, keine in-Aufrufe', async () =>
   const data = await createHistoryData(sb).loadGroup(GID);
   assert.deepEqual(data, emptyGroupData(GID));
   assert.equal(sb.calls.filter((c) => c.in.length).length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Spec P10 Krit. 15/19: toMember liefert removed/formerProfileId — auch ohne die neuen Spalten (vor db push)
+
+test('P10 toMember: removed/formerProfileId aus removed_at/former_profile_id; fehlende Spalten ⇒ false/null', async () => {
+  const { createHistoryData } = await load();
+  const db = {
+    members: [
+      { id: 'm1', playgroup_id: GID, profile_id: null, display_name: 'Ex', avatar_path: null, removed_at: '2026-11-10T10:00:00Z', removed_by: 'p9', former_profile_id: 'p7', profiles: null },
+      { id: 'm2', playgroup_id: GID, profile_id: null, display_name: 'Tim', avatar_path: null, removed_at: '2026-11-10T10:00:00Z', removed_by: 'p9', former_profile_id: null, profiles: null },
+      { id: 'm3', playgroup_id: GID, profile_id: 'p3', display_name: 'Alt', avatar_path: null, removed_at: null, removed_by: null, former_profile_id: null, profiles: { display_name: 'Lu', avatar_path: null } },
+      { id: 'm4', playgroup_id: GID, profile_id: null, display_name: 'Ohne', avatar_path: null, profiles: null },
+    ],
+  };
+  const data = await createHistoryData(fakeSb(db)).loadGroup(GID);
+  assert.deepEqual(data.members.map((m) => [m.id, m.removed, m.formerProfileId]), [
+    ['m1', true, 'p7'], ['m2', true, null], ['m3', false, null], ['m4', false, null],
+  ]);
 });

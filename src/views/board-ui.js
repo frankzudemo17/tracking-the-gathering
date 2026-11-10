@@ -75,13 +75,15 @@ export function saltFill(avg) {
 /**
  * Besitzer eines Decks: Konto-Deck über ownerProfileId ⇒ Mitglied mit dieser profileId, sonst ownerMemberId.
  * @param {{ ownerProfileId?: string|null, ownerMemberId?: string|null }|null|undefined} deck
- * @param {{ id: string, profileId: string|null }[]} members
+ * @param {{ id: string, profileId: string|null, formerProfileId?: string|null }[]} members
  * @returns {string|null} memberId
  */
 export function deckOwnerId(deck, members) {
   if (!deck) return null;
   if (deck.ownerProfileId) {
-    const m = (members || []).find((x) => x.profileId === deck.ownerProfileId);
+    const m = (members || []).find((x) => x.profileId === deck.ownerProfileId)
+      // P10: Konto-Deck eines Gegangenen ⇒ seine frühere Zeile
+      || (members || []).find((x) => x.formerProfileId && x.formerProfileId === deck.ownerProfileId);
     if (m) return m.id;
   }
   return deck.ownerMemberId || null;

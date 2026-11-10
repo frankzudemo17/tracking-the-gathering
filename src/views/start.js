@@ -68,7 +68,9 @@ export default async function start(el, { isStale }) {
   });
 
   // eigenes Profil zuerst, dann alphabetisch
-  members.sort((a, b) => (b.profile_id === me?.id) - (a.profile_id === me?.id) || memberName(a).localeCompare(memberName(b), 'de'));
+  // P10: Leute-Leiste nur aktive Mitglieder (Filter im Client, Übergangsregel H); Namen oben lösen weiter alle auf
+  const people = members.filter((m) => !m.removed_at)
+    .sort((a, b) => (b.profile_id === me?.id) - (a.profile_id === me?.id) || memberName(a).localeCompare(memberName(b), 'de'));
 
   mount(el, html`
     <div class="top">
@@ -92,7 +94,7 @@ export default async function start(el, { isStale }) {
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('home.players')}</h3><a href="#/gruppen">${t('home.all')}</a></div>
       <div class="people">
-        ${members.map((m) => html`<a class="person" href="#/profil/${m.id}">${personAv(m, 54)}<span>${memberName(m)}</span></a>`)}
+        ${people.map((m) => html`<a class="person" href="#/profil/${m.id}">${personAv(m, 54)}<span>${memberName(m)}</span></a>`)}
         <a class="person" href="#/spieler-neu"><span class="add">${icon('userPlus', 22)}</span><span>${t('home.addShort')}</span></a>
       </div>
     </div>

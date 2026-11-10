@@ -80,6 +80,19 @@ test('Deck-Besitzer über ownerProfileId, sonst ownerMemberId', async () => {
   assert.equal(deckOwnerId(null, d.members), null);
 });
 
+test('P10 K15 deckOwnerId: Konto-Deck eines Gegangenen ⇒ dessen frühere Mitglieds-ID (formerProfileId)', async () => {
+  const { deckOwnerId } = await ui();
+  const members = [
+    { id: 'm-X', profileId: null, formerProfileId: 'p-x' },
+    { id: 'm-Y', profileId: 'p-y', formerProfileId: null },
+  ];
+  assert.equal(deckOwnerId({ ownerProfileId: 'p-x', ownerMemberId: null }, members), 'm-X');
+  assert.equal(deckOwnerId({ ownerProfileId: 'p-y', ownerMemberId: null }, members), 'm-Y');
+  assert.equal(deckOwnerId({ ownerProfileId: 'p-z', ownerMemberId: null }, members), null);
+  // ohne die neue Spalte (vor db push): wie bisher
+  assert.equal(deckOwnerId({ ownerProfileId: 'p-y', ownerMemberId: null }, [{ id: 'm-Y', profileId: 'p-y' }]), 'm-Y');
+});
+
 test('Commander-Bild: Stil nur mit Adresse, Hochkomma maskiert', async () => {
   const { artStyle } = await ui();
   assert.equal(artStyle(null), '');

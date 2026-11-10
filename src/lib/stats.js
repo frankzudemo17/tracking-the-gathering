@@ -184,7 +184,9 @@ function table(c, keyField, keyOf, nameOf) {
 /** @param {GroupData} data @returns {PlayerTableRow[]} */
 export function playerTable(data) {
   const c = ctx(data);
-  return /** @type {PlayerTableRow[]} */ (table(c, 'memberId', (p) => p.memberId, c.name));
+  // P10: Zeilen entfernter Mitglieder entfallen; ihre Spiele zählen für die anderen weiter (Plätze neu, lückenlos)
+  const gone = new Set((data.members || []).filter((m) => m.removed).map((m) => m.id));
+  return /** @type {PlayerTableRow[]} */ (table(c, 'memberId', (p) => (gone.has(p.memberId) ? null : p.memberId), c.name));
 }
 
 /** @param {GroupData} data @returns {DeckTableRow[]} */
