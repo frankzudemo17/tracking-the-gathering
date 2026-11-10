@@ -208,7 +208,8 @@ export default async function etappe12({ browser, base: BASE }) {
   ok('Link ohne Login → Einladungsseite mit „Ich habe schon ein Konto“', (await C.evaluate(() => location.hash)) === '#/code/' + timCode);
   await C.click('[data-act="have-account"]');
   await waitHash(C, '#/login');
-  ok('Link ohne Login → Login mit Hinweis', (await C.textContent('.screen')).includes(timCode));
+  // Der Hash wechselt vor dem Einhängen der Login-Seite (Lauf mwav8ohc5bf23a: rot, obwohl die Übernahme danach grün war) ⇒ auf den Hinweis warten
+  ok('Link ohne Login → Login mit Hinweis', await C.waitForFunction((c) => !!document.querySelector('.screen form.auth-card .note')?.textContent.includes(c), timCode, { timeout: 5000 }).then(() => true, () => false));
   await login(C, 'c');
   await waitHash(C, '#/start');
   ok('Nach Anmeldung automatisch übernommen → Start', (await C.textContent('.group-switch')).includes(FIXTURE_NAME));

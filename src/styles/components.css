@@ -264,6 +264,7 @@ button.cam::after { content: ''; position: absolute; inset: -10px; border-radius
 .auth-card { position: relative; margin-top: -40px; background: var(--sf); border-radius: 26px; padding: 22px 18px 18px; gap: 14px;
   box-shadow: 0 24px 50px -28px rgba(0,0,0,.55), 0 0 0 1px var(--ln); }
 .auth-card .input { background: var(--bg); }
+.auth-card + .form { margin-top: 12px; }
 .input-icon { position: relative; display: flex; align-items: center; }
 .input-icon > svg { position: absolute; left: 15px; color: var(--mu); pointer-events: none; }
 .input-icon .input { padding-left: 46px; }

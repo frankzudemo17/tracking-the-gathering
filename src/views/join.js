@@ -14,9 +14,11 @@ import { t } from '../i18n/index.js';
 import { go } from '../router.js';
 import { authArt } from './login.js';
 
-/** Feld „Code oder Link“ + Weiter ⇒ #/beitreten/<code> */
-const codeForm = (value = '') => html`
-  <form class="form auth-card" novalidate data-form="join-code">
+/** Feld „Code oder Link“ + Weiter ⇒ #/beitreten/<code>. `warn`: Hinweis oben IN der Karte — davor gestellt
+ *  überdeckt ihn die Karte (margin-top −40px), gemessen bei 375 px in v32. */
+const codeForm = (value = '', warn = '') => html`
+  <form class="form auth-card" novalidate data-form="join-code"${warn ? html` data-state="invalid"` : ''}>
+    ${warn ? html`<p class="note warn" role="alert">${warn}</p>` : ''}
     <div class="field"><label for="jn-code">${t('access.codeLabel')}</label>
       <input id="jn-code" class="input code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="200"
         placeholder="${t('groups.codePh')}" value="${value}"></div>
@@ -96,7 +98,6 @@ export default async function join(el, { params }) {
   }
   // invalid
   mount(el, html`${authArt(t('access.joinTitle'), '')}
-    <div class="form" data-state="invalid"><p class="note warn" role="alert">${t('access.invalid')}</p></div>
-    ${codeForm(code)}
+    ${codeForm(code, t('access.invalid'))}
     <div class="form">${haveAccount}</div>`);
 }
