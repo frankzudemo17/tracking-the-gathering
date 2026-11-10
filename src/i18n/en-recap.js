@@ -1,3 +1,40 @@
-// i18n-Namensraum „recap“ (en) · Besitzer: P19 (Abend-Recap + Teilen-Karte).
-// Naht aus P13: eingebunden in en.js unter `recap`; nur dieses Paket schreibt hier. Schlüssel in de/en gleich halten (lint L5).
-export default {};
+// i18n namespace "recap" (en) · Owner: P19 (evening recap + share card).
+// Seam from P13: included in en.js as `recap`; only this package writes here. Keep keys equal to de (lint L5).
+export default {
+  title: 'Evening recap',
+  evening: 'Game night',
+  dayKing: 'King of the night',
+  saltiest: 'Saltiest',
+  longestTurn: 'Longest turn',
+  potg: 'Play of the Game',
+  wins1: '1 win',
+  winsN: '{n} wins',
+  points1: '1 point',
+  pointsN: '{n} points',
+  withDeck: 'with {deck}',
+  saltSub: 'Avg. salt {v} of 5',
+  saltLabel: 'Salt {v} of 5',
+  turnSub: '{t} minutes in one go',
+  turnLink: 'View game',
+  votes1: '1 vote',
+  votesN: '{n} votes',
+  noWords: 'No words needed.',
+  games1: '1 game',
+  gamesN: '{n} games',
+  share: 'Share',
+  save: 'Save as image',
+  shareHint: 'The card is rendered as an image and goes straight to WhatsApp or any other app.',
+  saved: 'Card saved',
+  shareFailed: 'The card could not be created.',
+  gamesTitle: 'Games of the night',
+  winnerWith: '{name} wins',
+  minutes: '{n} min',
+  noWinner: 'No winner',
+  unknown: 'Evening not found',
+  unknownSub: 'This game night does not exist or belongs to another playgroup.',
+  backToHistory: 'Back to history',
+  loadError: 'Could not load the evening',
+  deckArt: 'Commander art: {name}',
+  brand: 'Tracking the Gathering',
+  tag: '#TTG',
+};

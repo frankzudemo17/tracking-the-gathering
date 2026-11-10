@@ -1,2 +1,74 @@
 /* Styles „recap“ · Besitzer: P19 (Abend-Recap + Teilen-Karte). Naht aus P13 (eingebunden in index.html, SHELL in sw.js).
-   Nur Token-Farben aus tokens.css, keine Hex-Werte (WELLE ttg-ende-statistik, UI-Regel 1). */
+   Nur Token-Farben aus tokens.css, keine Hex-Werte (WELLE ttg-ende-statistik, UI-Regel 1).
+   Commander-Bilder ungetönt: oben frei, unten Verlauf in die Fläche (--sf), Text steht auf der Fläche.
+   Hierarchie über Größe/Gewicht; Farbe nur --hi für Krone/Stern (Platz 1, wie Historie). */
+
+.rc { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.rc-head { display: flex; flex-direction: column; gap: 4px; padding: 6px 2px 4px; min-width: 0; }
+.rc-head h2 { font-size: 27px; letter-spacing: -.03em; line-height: 1.08; overflow-wrap: anywhere; }
+.rc-where { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; color: var(--mu); min-width: 0; }
+.rc-where svg { flex-shrink: 0; }
+.rc-where > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rc-label { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--mu); }
+.rc-label.hi, .rc-label.hi svg { color: var(--hi); }
+.rc-sub { font-size: 13px; color: var(--mu); line-height: 1.35; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-name { font-family: var(--f-display); font-size: 21px; font-weight: 700; letter-spacing: -.02em; line-height: 1.12;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Tageskönig: großes Commander-Bild, ungetönt, Verlauf in die Fläche */
+.rc-king { position: relative; display: flex; flex-direction: column; border-radius: var(--r-xl); overflow: hidden; background: var(--sf); }
+.rc-king-art { display: block; height: 196px; position: relative;
+  background: var(--art, none) center 22% / cover, var(--art-fb, none) center / cover, var(--sf2); }
+.rc-king-art::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, transparent 45%, color-mix(in srgb, var(--sf) 72%, transparent) 80%, var(--sf) 100%); }
+.rc-king-body { position: relative; display: flex; align-items: flex-end; gap: 14px; padding: 0 18px 18px; margin-top: -44px; min-width: 0; }
+.rc-king-body .avatar { box-shadow: 0 0 0 4px var(--sf); font-size: 24px; }
+.rc-king-body .grow-col { gap: 3px; }
+.rc-king-name { font-family: var(--f-display); font-size: 30px; font-weight: 700; letter-spacing: -.035em; line-height: 1.02;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Halbkacheln: Salzigster, Längster Zug */
+.rc-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rc-pair.one { grid-template-columns: minmax(0, 1fr); }
+.rc-tile { display: flex; flex-direction: column; gap: 5px; padding: 16px; border-radius: var(--r-lg); background: var(--sf); color: var(--ink);
+  min-width: 0; margin: 0; text-decoration: none; }
+.rc-tile .rc-sub { white-space: normal; overflow-wrap: anywhere; }
+.rc-tile-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; margin-bottom: 4px; }
+.rc-ic { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: var(--sf2); color: var(--ink); flex-shrink: 0; }
+.rc-salts { display: inline-flex; gap: 1px; color: var(--mu); }
+.rc-salts > span { display: grid; opacity: .35; }
+.rc-salts > span.on { opacity: 1; color: var(--ink); }
+.rc-link { min-height: var(--tap); }
+.rc-link:active { transform: scale(.985); background: var(--sf2); }
+.rc-chev { color: var(--mu); display: grid; }
+
+/* Play of the Game */
+.rc-potg { gap: 6px; }
+.rc-potg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.rc-potg-head .rc-sub { flex-shrink: 0; }
+.rc-quote { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 10px; padding-top: 10px; margin-top: 4px; box-shadow: inset 0 1px 0 var(--ln); }
+.rc-quote-ic { color: var(--mu); padding-top: 2px; display: grid; align-content: start; }
+.rc-quote blockquote { margin: 0; font-size: 15px; font-style: italic; line-height: 1.45; overflow-wrap: anywhere; }
+
+.rc-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px 2px 0; font-size: 13px; color: var(--mu); }
+.rc-tag { font-weight: 700; letter-spacing: .08em; }
+
+/* Teilen */
+.rc-actions { display: flex; gap: 8px; }
+.rc-actions .grow-btn { flex: 1; min-width: 0; }
+.rc-save { width: 52px; height: 52px; border-radius: var(--r-md); box-shadow: inset 0 0 0 1px var(--ln); }
+.rc-actions .btn:focus-visible, .rc-save:focus-visible, .rc-link:focus-visible, .rc-game:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+.rc-hint { text-align: center; margin: -2px 8px 0; }
+
+/* Spiele des Abends */
+.rc-games { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.rc-game { min-height: 68px; }
+.rc-game-art { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: var(--art, none) center 25% / cover, var(--art-fb, none) center / cover, var(--sf2); }
+.rc-game .title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-game .sub { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-game-side { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex-shrink: 0; font-size: 12px; color: var(--mu); }
+.rc-game-side b { font-size: 15px; color: var(--ink); font-weight: 650; }

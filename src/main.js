@@ -125,6 +125,8 @@ async function boot() {
   if (location.search) history.replaceState(null, '', location.pathname + (cameFromReset && state.session ? '#/passwort-neu' : location.hash));
 
   window.addEventListener('hashchange', render);
+  // iOS: Zwei-Finger-Zoom abfangen (Safari ignoriert user-scalable=no; die App soll sich nicht zoomen lassen)
+  for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
   render();
 }
 
