@@ -41,8 +41,9 @@ export default async function lifeE2e({ browser, base: BASE }) {
   ok('Gruppe hat A, B, C', !!(A && B && C), JSON.stringify(mem));
   const deck = await db("const q = await sb.from('decks').select('id, short_name, commander_name').ilike('commander_name', 'Tymna%').eq('archived', false).limit(1); return q.data?.[0];");
   ok('Deck Tymna vorhanden', !!deck?.id, JSON.stringify(deck));
-  const start = (life, layout = 'seiten') => db(`return createStore(sb).startGame({ groupId: a.gid, layout: a.layout, startingLife: a.life, firstSeat: 1,
-      players: a.ids.map((id, i) => ({ memberId: id, deckId: a.deck, seat: i + 1 })) });`, { gid, layout, life, ids: [A, B, C], deck: deck.id });
+  // Sitze 0..n-1 (start_game), A beginnt
+  const start = (life, layout = 'seiten') => db(`return createStore(sb).startGame({ groupId: a.gid, layout: a.layout, startingLife: a.life, firstSeat: 0,
+      players: a.ids.map((id, i) => ({ memberId: id, deckId: a.deck, seat: i })) });`, { gid, layout, life, ids: [A, B, C], deck: deck.id });
   const field = (id) => `.lc-field[data-pid="${id}"]`;
   const lifeOf = async (id) => Number((await P.textContent(`${field(id)} [data-life]`)).trim());
   const tap = async (id, sign, n = 1) => { for (let i = 0; i < n; i++) await P.click(`${field(id)} .lc-tap.${sign < 0 ? 'minus' : 'plus'}`); };
@@ -193,7 +194,7 @@ export default async function lifeE2e({ browser, base: BASE }) {
   const place = Object.fromEntries((fin?.p || []).map((x) => [x.member_id, x.place]));
   ok('K6 „Werten und beenden“ ⇒ finished, Plätze A1 · C2 · B3', fin?.st === 'finished' && place[A] === 1 && place[C] === 2 && place[B] === 3, JSON.stringify(fin));
   ok('K6 C durch A ausgeschieden (eliminated_by)', fin?.p?.find((x) => x.member_id === C)?.eliminated_by === A);
-  await P.waitForTimeout(300);
+  await P.waitForSelector('.art-hero');
   ok('K7 Karte nach Spielende weg', (await P.locator(`[data-live-game="${g1}"]`).count()) === 0);
 
   // ---------------------------------------------------------------- Kriterium 6: verwerfen
