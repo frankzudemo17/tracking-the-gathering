@@ -1,15 +1,79 @@
-// Playgroups: wechseln, anlegen, Code einlösen, einladen, Mitglieder
+// Playgroups: wechseln, anlegen, Code einlösen, einladen, Mitglieder, Gruppe löschen (nur Admin)
 import { sb, must, avatarUrls, appUrl } from '../supabase.js';
-import { state, setGroup, currentGroup } from '../state.js';
-import { html, mount, on } from '../lib/dom.js';
+import { state, setGroup, currentGroup, isAdmin, loadMe } from '../state.js';
+import { html, mount, on, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { avatar, backHead, roleChip, memberName, memberAvatarPath } from '../lib/parts.js';
-import { copyText } from '../lib/ui.js';
+import { copyText, sheet, toast, errText } from '../lib/ui.js';
 import { openNewGroup, openEnterCode } from '../lib/group-actions.js';
+import { groupNameMatches, runGroupDeletion } from './group-delete.js';
 import { t } from '../i18n/index.js';
 import { go } from '../router.js';
 
 export const MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path)';
+
+// ---------------------------------------------------------------- Gruppe löschen (Spec P3 Block A)
+// Ablauf ohne DOM in group-delete.js (Unit-Test); hier nur das Sheet.
+
+const deleteErrText = (e) => {
+  const m = e?.message || '';
+  if (/deck_used_elsewhere/.test(m)) return t('groups.deleteDeckElsewhere');
+  if (/member_used_elsewhere/.test(m)) return t('groups.deleteMemberElsewhere');
+  if (/Name stimmt nicht/.test(m)) return t('groups.deleteNameWrong');
+  return errText(e);
+};
+const plural = (n, one, many) => (n === 1 ? t(one) : t(many, { n }));
+
+function openDeleteGroup(g, { games, members, guests }) {
+  const warn = t('groups.deleteWarn', {
+    games: plural(games, 'groups.deleteGamesOne', 'groups.deleteGames'),
+    members: plural(members, 'groups.deleteMembersOne', 'groups.deleteMembers'),
+    guests: plural(guests, 'groups.deleteGuestsOne', 'groups.deleteGuests'),
+  });
+  sheet(t('groups.deleteTitle', { name: g.name }), html`
+    <h2 class="sheet-title">${t('groups.deleteTitle', { name: g.name })}</h2>
+    <ul class="facts">
+      <li>${icon('trash', 18)}<span data-warn>${warn}</span></li>
+      <li>${icon('users', 18)}<span>${t('groups.deleteKept')}</span></li>
+    </ul>
+    <form class="form" novalidate data-form="delete-group">
+      <div class="field"><label for="dg-name">${t('groups.deleteType')}</label>
+        <input id="dg-name" class="input" type="text" autocomplete="off" spellcheck="false" maxlength="80" placeholder="${g.name}"></div>
+      <p class="error" role="alert" hidden></p>
+      <button class="btn block danger-fill" type="submit" disabled data-act="delete-group-yes">${icon('trash', 18)}${t('groups.deleteYes')}</button>
+      <button class="btn block soft" type="button" data-act="cancel">${t('common.cancel')}</button>
+    </form>`, (sh, close) => {
+    const input = sh.querySelector('#dg-name');
+    const yes = sh.querySelector('[data-act="delete-group-yes"]');
+    const box = sh.querySelector('.error');
+    let running = false;
+    const showErr = (msg) => { box.textContent = msg; box.hidden = !msg; };
+    input.addEventListener('input', () => { yes.disabled = running || !groupNameMatches(input.value, g.name); });
+    on(sh, 'click', '[data-act="cancel"]', () => { if (!running) close(); });
+    on(sh, 'submit', 'form', async (e) => {
+      e.preventDefault();
+      if (running || !groupNameMatches(input.value, g.name)) return;
+      running = true;
+      input.readOnly = true;
+      showErr('');
+      sh.setAttribute('aria-busy', 'true');
+      try {
+        await busy(yes, () => runGroupDeletion(sb, g, input.value));
+        await loadMe();
+        setGroup(state.groupId); // Merker in localStorage nie auf der gelöschten Gruppe lassen
+        close();
+        toast(t('groups.deleted', { name: g.name }));
+        go(state.groupId ? '/start' : '/willkommen', { replace: true });
+      } catch (ex) {
+        running = false;
+        input.readOnly = false;
+        sh.removeAttribute('aria-busy');
+        yes.disabled = !groupNameMatches(input.value, g.name);
+        showErr(deleteErrText(ex));
+      }
+    });
+  });
+}
 
 export default async function groups(el, { isStale }) {
   const ids = state.memberships.map((m) => m.playgroup_id);
@@ -67,7 +131,13 @@ export default async function groups(el, { isStale }) {
       </div>
       <a class="btn soft" href="#/spieler-neu">${icon('userPlus', 20)}${t('groups.addPlaceholder')}</a>
       <span class="hint">${t('groups.addPlaceholderHint')}</span>
-    </div>` : ''}`);
+    </div>
+
+    ${isAdmin() ? html`
+    <div class="card danger-zone">
+      <div class="grow-col"><h3 class="section-title">${t('groups.dangerTitle')}</h3><span class="hint">${t('groups.dangerSub')}</span></div>
+      <button type="button" class="btn danger" data-act="delete-group">${icon('trash', 18)}${t('groups.deleteGroup')}</button>
+    </div>` : ''}` : ''}`);
 
   on(el, 'click', '[data-group]', (e, b) => { setGroup(b.dataset.group); go('/gruppen'); });
   on(el, 'click', '[data-act="new"]', () => openNewGroup());
@@ -78,5 +148,16 @@ export default async function groups(el, { isStale }) {
     const text = t('groups.shareText', { name: g.name });
     if (navigator.share) { try { await navigator.share({ title: 'Tracking the Gathering', text, url }); return; } catch (e) { if (e.name === 'AbortError') return; } }
     copyText(url);
+  });
+  on(el, 'click', '[data-act="delete-group"]', async (e, b) => {
+    if (!isAdmin()) return;
+    await busy(b, async () => {
+      try {
+        const { count, error } = await sb.from('games').select('id', { count: 'exact', head: true }).eq('playgroup_id', g.id);
+        if (error) throw error;
+        const guests = members.filter((m) => !m.profile_id).length;
+        openDeleteGroup(g, { games: count ?? 0, members: members.length - guests, guests });
+      } catch (ex) { toast(errText(ex)); }
+    });
   });
 }

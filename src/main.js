@@ -40,6 +40,8 @@ route('/deck/:id', v('deck'), { nav: 'me', group: true });
 // Spielen (Etappe 3, P8 schaltet frei): /spielen (Nav) und /spiel-neu zeigen das Setup, /spiel/:id den Lifecounter.
 route('/spiel-neu', v('setup'), { group: true });
 route('/spiel/:id', v('life'), { group: true });
+route('/beitreten', v('join'), { public: true }); // Naht P3: Platzhalter, P6 ersetzt join.js (Live-Beitritt)
+route('/beitreten/:code', v('join'), { public: true });
 
 const NAV = [
   ['start', '#/start', 'home'], ['play', '#/spielen', 'play'], ['history', '#/historie', 'history'],
