@@ -25,7 +25,8 @@
 .su-pill[aria-disabled="true"] { opacity: .5; }
 .su-pill.dash { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ln); }
 .su-pill.dash svg { color: var(--acc2); }
-.su-layouts .su-pill { min-height: 40px; }
+.su-layouts .su-pill { min-height: 40px; padding: 0 10px; border-radius: 10px; font-weight: 700; }
+.su-layouts .su-pill:not([aria-pressed="true"]) { background: transparent; color: var(--mu); }
 .su-note { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--mu); }
 
 /* Sitzordnung: Mini-Vorschau */

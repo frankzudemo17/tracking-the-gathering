@@ -156,7 +156,8 @@ export default async function setup(el, { isStale }) {
     const noDecks = decksRaw.length === 0;
     const hint = s.life === 40 ? t('setup.lifeHint.std') : s.life < 40 ? t('setup.lifeHint.fast') : t('setup.lifeHint.long');
     const swapHint = s.swap == null ? t('setup.swapHint') : t('setup.swapPicked', { name: name(s.sel[s.swap]) });
-    const starter = n ? (s.start == null ? t('setup.notRolled', { name: name(s.sel[firstSeat()]) }) : t('setup.startsName', { name: name(s.sel[firstSeat()]) })) : '–';
+    const starter = n ? (s.start == null ? t('setup.notRolled') : t('setup.startsName', { name: name(s.sel[firstSeat()]) })) : '–';
+    const starterSub = n && s.start == null ? t('setup.startsDefault', { name: name(s.sel[firstSeat()]) }) : '';
     return html`<div class="su">
       <div class="head"><a class="icon-btn" href="#/start" aria-label="${t('common.back')}">${icon('back', 20)}</a><h2 class="su-title">${t('setup.title')}</h2></div>
 
@@ -173,7 +174,7 @@ export default async function setup(el, { isStale }) {
         ${n ? html`<div class="su-decks">${s.sel.map(rowHtml)}</div>` : ''}
         <span class="su-mu su-small">${t('setup.decksHint')}</span></section>
 
-      <div class="su-card su-startrow">${icon('diceFive', 30)}<span class="grow"><span class="su-eyebrow">${t('setup.starter')}</span><b>${starter}</b></span>
+      <div class="su-card su-startrow">${icon('diceFive', 30)}<span class="grow"><span class="su-eyebrow">${t('setup.starter')}</span><b>${starter}</b>${starterSub ? html`<span class="su-mu su-small" data-starter>${starterSub}</span>` : ''}</span>
         <button type="button" class="btn small" data-act="roll" ${n < 2 ? 'disabled' : ''}>${t('setup.roll')}</button></div>
 
       <div class="su-card"><div class="su-liferow"><span class="grow"><span class="su-eyebrow">${t('setup.life')}</span><span class="su-mu su-small">${hint}</span></span>
