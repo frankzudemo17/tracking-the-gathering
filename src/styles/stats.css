@@ -1,6 +1,7 @@
 /* Styles „stats“ · Besitzer: P18 (Profil- + Deck-Statistik). Naht aus P13 (eingebunden in index.html, SHELL in sw.js).
    Nur Token-Farben aus tokens.css, keine Hex-Werte (WELLE ttg-ende-statistik, UI-Regel 1).
-   Diagramme in --acc2 (Kontrast gegen --sf: Nacht 7,0:1 · Arktis 3,5:1 · Lachs 3,4:1), keine Spielerfarben. */
+   Diagramme in --acc2 (Kontrast gegen --sf: Nacht 7,0:1 · Arktis 3,5:1 · Lachs 3,4:1), keine Spielerfarben.
+   Balken-Spuren ohne Flächenton (nur --ln-Kontur), damit der Balken auf --sf steht (--sf2 wäre in Lachs nur 3,0:1). */
 
 /* Kennzahlen: fünf Kacheln in der bestehenden .stats-Reihe */
 .stats.st-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
@@ -20,14 +21,14 @@
 .st-mood .st-ic { grid-row: 1 / span 2; }
 .st-mood-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 15px; font-weight: 600; }
 .st-mood-txt .tiny { font-weight: 500; }
-.st-bar { grid-column: 2 / span 2; height: 6px; border-radius: 3px; background: var(--sf2); overflow: hidden; }
+.st-bar { grid-column: 2 / span 2; height: 6px; border-radius: 3px; background: transparent; box-shadow: inset 0 0 0 1px var(--ln); overflow: hidden; }
 .st-bar i { display: block; height: 100%; width: calc(var(--v) / 5 * 100%); max-width: 100%; border-radius: 3px; background: var(--acc2); }
 
 /* Salz-Verlauf: Balken 1–5, Höhe = Wert/5 */
 .st-salt-bars { display: flex; align-items: flex-end; gap: 8px; height: 104px; padding-top: 2px; }
 .st-sb { flex: 1 1 0; max-width: 40px; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .st-sb-n { font-size: 12px; font-weight: 700; color: var(--mu); font-variant-numeric: tabular-nums; }
-.st-sb-track { flex: 1; width: 100%; display: flex; align-items: flex-end; border-radius: 8px; background: var(--sf2); overflow: hidden; }
+.st-sb-track { flex: 1; width: 100%; display: flex; align-items: flex-end; border-radius: 8px; background: transparent; box-shadow: inset 0 0 0 1.5px var(--ln); overflow: hidden; }
 .st-sb-track i { display: block; width: 100%; height: calc(var(--v) / 5 * 100%); max-height: 100%; border-radius: 8px; background: var(--acc2); }
 
 /* Punkte-Verlauf (inline-SVG, skaliert über viewBox) */
