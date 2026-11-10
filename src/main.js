@@ -6,6 +6,7 @@ import { html, mount, $ } from './lib/dom.js';
 import { icon } from './lib/icons.js';
 import { loading } from './lib/parts.js';
 import { t } from './i18n/index.js';
+import { applyDevicePrefs, onPrefs, keepAwake } from './lib/prefs.js';
 
 // ---------- Routen ----------
 const v = (name) => () => import(`./views/${name}.js`);
@@ -99,6 +100,13 @@ export async function render() {
 // ---------- Start ----------
 async function boot() {
   applyPrefs(null);
+  // Tisch-Einstellungen (P7): html[data-motion]/[data-turntime] und Wake Lock auf /spiel/…, je Gerät (src/lib/prefs.js)
+  applyDevicePrefs();
+  const awake = keepAwake(() => location.hash.startsWith('#/spiel/'));
+  onPrefs((p) => { applyDevicePrefs(p); awake.check(); });
+  window.addEventListener('hashchange', awake.check);
+  document.addEventListener('visibilitychange', awake.check);
+  awake.check();
   if (!configured) { mount(app, html`<main class="screen"><p>Supabase ist noch nicht konfiguriert (src/config.js).</p></main>`); return; }
 
   // Nach Klick auf einen Passwort-Link: ?code=… wird von supabase-js eingelöst

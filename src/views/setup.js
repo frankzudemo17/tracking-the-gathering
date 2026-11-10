@@ -3,6 +3,9 @@
 // (eigene zuerst, dann Leihdecks), Feldfarbe-Sheet, Startspieler, Startleben, Start.
 // Der Entwurf liegt in sessionStorage `ttg.setup.<groupId>` und übersteht den Umweg über
 // „+ Spieler“ (#/spieler-neu?zurueck=setup) und „+ Commander“ (#/deck-neu/<id>?zurueck=setup).
+// P7 (Welle ttg-live-feinschliff-decks): Startleben und Tischlayout kommen aus den Spiel-Standards (src/lib/prefs.js);
+// der Entwurf stellt sie nur wieder her, wenn sie hier angefasst wurden (lifeSet/layoutSet). Bracket-Hinweis über dem
+// Start-Knopf (bracket-hint.js), blockiert nie.
 import { sb, must } from '../supabase.js';
 import { state, currentMembership } from '../state.js';
 import { html, mount, on, $ } from '../lib/dom.js';
@@ -18,10 +21,12 @@ import { t } from '../i18n/index.js';
 import { go } from '../router.js';
 import { MEMBER_SELECT } from './groups.js';
 import { openDiceTable } from './dice.js';
+import { bracketHint } from './bracket-hint.js';
+import { getPrefs } from '../lib/prefs.js';
 
 const MAX = 6;
 const LIVES = [20, 25, 30, 40];
-const DECK_COLS = 'id, owner_profile_id, owner_member_id, short_name, commander_name, partner_name, image_url, partner_image_url, color_identity, field_color, field_mode, created_at';
+const DECK_COLS = 'id, owner_profile_id, owner_member_id, short_name, commander_name, partner_name, image_url, partner_image_url, color_identity, field_color, field_mode, bracket, bracket_check, created_at';
 const draftKey = (gid) => `ttg.setup.${gid}`;
 const clampLife = (v) => Math.max(5, Math.min(99, Math.round(Number(v) || 40)));
 const cssUrl = (u) => `url('${String(u).replace(/'/g, '%27')}')`;
@@ -30,7 +35,7 @@ function readDraft(gid) {
   try { const raw = sessionStorage.getItem(draftKey(gid)); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 function writeDraft(gid, s) {
-  try { sessionStorage.setItem(draftKey(gid), JSON.stringify({ sel: s.sel, deck: s.deck, layout: s.layout, life: s.life, start: s.start, roll: s.roll })); } catch { /* Privatmodus */ }
+  try { sessionStorage.setItem(draftKey(gid), JSON.stringify({ sel: s.sel, deck: s.deck, layout: s.layout, life: s.life, layoutSet: s.layoutSet, lifeSet: s.lifeSet, start: s.start, roll: s.roll })); } catch { /* Privatmodus */ }
 }
 function clearDraft(gid) { try { sessionStorage.removeItem(draftKey(gid)); } catch { /* egal */ } }
 
@@ -58,13 +63,16 @@ export default async function setup(el, { isStale }) {
 
   // ---------- Zustand (Entwurf wiederherstellen, Rückkehr vom Umweg einarbeiten)
   // roll = letzter übernommener Startwurf (P9) { key: Sitzbelegung, startRoll } ⇒ roll-Ereignis beim Start
-  const s = { sel: [], deck: {}, layout: 'seiten', life: 40, start: null, roll: null, swap: null, starting: false, error: '' };
+  // Standards je Gerät (P7); layoutFor() fällt beim Start auf ein passendes Layout zurück, wenn es zur Spielerzahl nicht passt
+  const std = getPrefs();
+  const s = { sel: [], deck: {}, layout: std.layout, life: std.startLife, layoutSet: false, lifeSet: false, start: null, roll: null, swap: null, starting: false, error: '' };
   const draft = readDraft(gid);
   if (draft) {
     s.sel = (Array.isArray(draft.sel) ? draft.sel : []).filter((id, i, a) => byId.has(id) && a.indexOf(id) === i).slice(0, MAX);
     for (const id of s.sel) s.deck[id] = decks.has(draft.deck?.[id]) ? draft.deck[id] : (ownDecks(id)[0]?.id || null);
-    if (LAYOUTS.includes(draft.layout)) s.layout = draft.layout;
-    s.life = Number.isInteger(draft.life) && draft.life >= 5 && draft.life <= 99 ? draft.life : 40; // ungültig ⇒ Standard
+    // Nur hier angefasste Werte gehen dem Standard vor (sonst wirkt eine neue Einstellung erst mit neuem Tab)
+    if (draft.layoutSet === true && LAYOUTS.includes(draft.layout)) { s.layout = draft.layout; s.layoutSet = true; }
+    if (draft.lifeSet === true && Number.isInteger(draft.life) && draft.life >= 5 && draft.life <= 99) { s.life = draft.life; s.lifeSet = true; } // ungültig ⇒ Standard
     s.start = Number.isInteger(draft.start) && draft.start < s.sel.length ? draft.start : null;
     // Wurf übersteht Umweg und Neuladen, aber nur passend zu Sitzbelegung und Startspieler (sonst verfallen)
     const r = draft.roll, v = r?.startRoll?.values;
@@ -188,10 +196,21 @@ export default async function setup(el, { isStale }) {
           <button type="button" data-act="life" data-v="5" aria-label="${t('setup.lifeMore')}">${icon('plus', 18)}</button></div></div>
         <div class="su-chips4">${LIVES.map((v) => html`<button type="button" class="su-pill" data-act="lifeset" data-v="${v}" aria-pressed="${String(s.life === v)}">${v}</button>`)}</div></div>
 
-      <div class="su-sec su-go"><button type="button" class="btn block" data-act="start" ${why || s.starting ? 'disabled' : ''} ${s.starting ? html`aria-busy="true"` : ''}>${t('setup.start')}</button>
+      <div class="su-sec su-go">${hintHtml()}<button type="button" class="btn block" data-act="start" ${why || s.starting ? 'disabled' : ''} ${s.starting ? html`aria-busy="true"` : ''}>${t('setup.start')}</button>
         ${why ? html`<span class="su-why" data-why>${icon('warn', 16)}${why}</span>` : ''}
         ${s.error ? html`<p class="error" role="alert">${s.error}</p>` : ''}</div>
     </div>`;
+  }
+
+  /** Bracket-Hinweis (P7): unaufdringlich über dem Start-Knopf, nur bei ≥ 2 Stufen bzw. höher geprüftem Deck. */
+  function hintHtml() {
+    const list = s.sel.map((id) => decks.get(s.deck[id]) || null);
+    const hints = bracketHint(list);
+    if (!hints) return '';
+    const lines = hints.map((h) => (h.kind === 'spread'
+      ? t('table.hint.spread', { min: h.min, max: h.max })
+      : t('table.hint.check', { deck: list[h.deck]?.short_name || list[h.deck]?.commander_name || '?', n: h.floor })));
+    return html`<p class="tb-hint" data-bracket-hint role="note">${icon('shieldStar', 16)}<span>${lines.map((l) => html`<span>${l}</span>`)}</span></p>`;
   }
 
   const render = () => { if (el.isConnected) mount(el, view()); };
@@ -206,7 +225,7 @@ export default async function setup(el, { isStale }) {
       else if (s.sel.length >= MAX) { toast(t('setup.max')); return; }
       else { s.sel.push(id); s.deck[id] = ownDecks(id)[0]?.id || null; }
       s.swap = null; s.start = null;
-    } else if (act === 'layout') { s.layout = b.dataset.l; s.swap = null; }
+    } else if (act === 'layout') { s.layout = b.dataset.l; s.layoutSet = true; s.swap = null; }
     else if (act === 'swap') {
       const i = +b.dataset.i;
       if (s.swap == null) s.swap = i;
@@ -217,8 +236,8 @@ export default async function setup(el, { isStale }) {
       if (!list.length) return;
       const at = list.findIndex((d) => d.id === s.deck[id]);
       s.deck[id] = list[(at + 1) % list.length].id;
-    } else if (act === 'life') s.life = clampLife(s.life + Number(b.dataset.v));
-    else if (act === 'lifeset') s.life = clampLife(b.dataset.v);
+    } else if (act === 'life') { s.life = clampLife(s.life + Number(b.dataset.v)); s.lifeSet = true; }
+    else if (act === 'lifeset') { s.life = clampLife(b.dataset.v); s.lifeSet = true; }
     else if (act === 'roll') {
       if (s.sel.length < 2) return;
       const sel = s.sel.slice(); // Würfeltisch (P9); Schließen ohne Übernehmen ändert nichts

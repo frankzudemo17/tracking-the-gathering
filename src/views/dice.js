@@ -14,6 +14,7 @@ import {
   placeTags, gridLayout, settleLayout, blendPaths,
 } from '../game/dice.js';
 import { t } from '../i18n/index.js';
+import { buzz, reducedMotion } from '../lib/prefs.js';
 
 const HALF = 32; // halbe Würfelgröße (64 px)
 const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
@@ -22,8 +23,10 @@ const TILT = [-8, 6, -12, 10, -4, 12]; // leichte Schräglage in Ruhe (fest, kei
 const INSET = { x: 44, y: 46 };         // Mittelpunkt-Abstand zum Filzrand (Main.dc.html diceTray)
 const TAG_INSET = 12;                   // Namensschilder bleiben so weit im Filz (7 px Rand + Luft)
 
-const reduced = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-const vibrate = (p) => { try { if (navigator.vibrate) navigator.vibrate(p); } catch { /* iOS: nicht vorhanden */ } };
+// Weniger Bewegung und Vibration nach den Tisch-Einstellungen (P7, src/lib/prefs.js): „System“ fragt
+// prefers-reduced-motion; buzz() vibriert nur bei eingeschaltetem Schalter und vorhandener API (iOS: still nichts).
+const reduced = () => reducedMotion();
+const vibrate = (p) => buzz(p);
 const innerTf = (r) => `rotateZ(${r.rz}deg) rotateX(${r.rx}deg) rotateY(${r.ry}deg)`;
 const outerTf = (p, scale = 1) => `translate(${(p.x - HALF).toFixed(1)}px,${(p.y - HALF).toFixed(1)}px)${scale !== 1 ? ` scale(${scale.toFixed(3)})` : ''}`;
 const joinNames = (list) => (list.length <= 1 ? list.join('') : `${list.slice(0, -1).join(', ')} ${t('dice.and')} ${list[list.length - 1]}`);

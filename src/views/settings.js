@@ -8,6 +8,7 @@ import { backHead } from '../lib/parts.js';
 import { toast, errText } from '../lib/ui.js';
 import { t } from '../i18n/index.js';
 import { go } from '../router.js';
+import { renderTableSettings } from './settings-table.js';
 
 // Vorschau je Look: Hintergrund, Fläche, Hauptknopf
 const LOOKS = {
@@ -38,6 +39,8 @@ export default function settings(el) {
         <span class="chev">${icon('chevRight', 18)}</span>
       </a>
     </div>
+
+    <div data-slot="table"></div>
 
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('settings.account')}</h3></div>
@@ -72,6 +75,7 @@ export default function settings(el) {
 
     <button type="button" class="btn danger" data-act="logout">${icon('logout', 18)}${t('profile.logout')}</button>`);
 
+  renderTableSettings(el.querySelector('[data-slot="table"]')); // „Am Tisch“ + „Spiel-Standards“ (P7)
   const rerender = () => go(location.hash.slice(1));
   on(el, 'click', '[data-lang]', async (e, b) => { try { await updateProfile({ locale: b.dataset.lang }); rerender(); } catch (ex) { toast(errText(ex)); } });
   on(el, 'click', '[data-look]', async (e, b) => { try { await updateProfile({ theme: b.dataset.look }); rerender(); } catch (ex) { toast(errText(ex)); } });

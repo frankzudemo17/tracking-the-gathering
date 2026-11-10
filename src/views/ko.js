@@ -17,11 +17,15 @@
 // (ein zweiter K.O. aus der Warteschlange kann sofort einen neuen Screen öffnen).
 // Ablauf: Stufen 0–9 nach Main.dc.html:1897–1903 (data-stage + Klassen ko-s1…ko-sN am Wurzelelement,
 // Aussehen je Stufe in ko.css), Wackeln in Stufen 3–8 (Main.dc.html:2549–2550, Klasse ko-shake).
-// prefers-reduced-motion: sofort Stufe 9, kein Blitz, kein Wackeln. Knöpfe erst ab Stufe 9.
+// Weniger Bewegung (prefers-reduced-motion oder Einstellung „Weniger Bewegung“, P7): sofort Stufe 9, kein Blitz, kein Wackeln.
+// Knöpfe erst ab Stufe 9.
+// Tisch-Einstellungen (P7, src/lib/prefs.js): „K.O.-Screens aus“ ⇒ statt des Screens ein schlichtes Sheet
+// (Bestätigen bzw. „Wer war es?“), Vertrag wie oben; „einzelne“ ⇒ nur die erlaubten Varianten; Haptik über buzz().
 import { html, raw, mount, initials } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { sheet } from '../lib/ui.js';
 import { fieldColors } from '../lib/field-color.js';
+import { getPrefs, buzz, reducedMotion, koVariantFor } from '../lib/prefs.js';
 import { t } from '../i18n/index.js';
 import { cmdLine, shortCmd } from './life-ui.js';
 import * as ART from './ko-art.js';
@@ -50,7 +54,6 @@ function loadKoFonts() {
 }
 const KO_FACES = ['400 1em Bangers', '400 1em Cinzel', '700 1em Cinzel', '400 1em "Press Start 2P"', '900 1em "Noto Sans JP"'];
 
-const reduceMotion = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
 const cut = (s, n) => { const a = [...String(s ?? '')]; return a.length > n ? a.slice(0, n - 1).join('') + '…' : a.join(''); };
 const len = (s) => [...String(s ?? '')].length;
 
@@ -236,12 +239,12 @@ function buttons(v, banish) {
 }
 
 // ------------------------------------------------------------------ „Wer war es?“ (aus P8)
-function pickerHtml(player, candidates) {
+function pickerHtml(player, candidates, backLabel = t('ko.back')) {
   return html`<div class="su-sheet lc-ko-sheet" data-sheet="ko"><div class="su-sh-head"><span class="t"><h3>${t('ko.whoTitle', { name: player.name })}</h3><small>${t('ko.whoSub')}</small></span></div>
     <div class="lc-opps">${candidates.map((c) => html`<button type="button" class="lc-pill ${c.top ? 'top' : ''}" data-ko="by" data-by="${c.id}">
       ${c.top ? icon('crown', 15) : ''}<span>${c.name}</span><small class="num">${c.poison && !c.damage ? t('ko.poison', { n: c.poison }) : t('ko.damage', { n: c.damage })}</small></button>`)}
       <button type="button" class="lc-pill dash" data-ko="gaveup">${icon('flag', 15)}<span>${t('ko.gaveUp')}</span></button></div>
-    <button type="button" class="btn soft" data-ko="back">${t('ko.back')}</button></div>`;
+    <button type="button" class="btn soft" data-ko="back">${backLabel}</button></div>`;
 }
 
 /** Kurzer, unsichtbarer Klick-Schild nach dem Schließen: der zweite Tipp eines Doppeltipps auf
@@ -254,10 +257,53 @@ function shield() {
   setTimeout(() => s.remove(), 350);
 }
 
+/** „K.O.-Screens aus“ (P7): kein .ko im DOM, nur ein Sheet — bekannter Verursacher ⇒ „Doch nicht“/„Ausscheiden“,
+ *  sonst gleich „Wer war es?“. Schließen über Hintergrund, Escape oder Seitenwechsel ⇒ onCancel. */
+function quietKo({ player, by, candidates, onEliminate, onCancel }) {
+  const name = String(player?.name ?? '');
+  let done = false;
+  let closeSheet = null;
+  let wrap = null;
+  const mo = new MutationObserver(() => { if (!done && wrap && !wrap.isConnected) finish(onCancel); });
+  function finish(fn, arg) {
+    if (done) return;
+    done = true;
+    mo.disconnect();
+    const c = closeSheet;
+    closeSheet = null;
+    c?.();
+    shield();
+    fn?.(arg);
+  }
+  const byName = by != null ? (candidates.find((c) => c.id === by)?.name || '?') : '';
+  const body = by != null
+    ? html`<div class="su-sheet lc-ko-sheet tb-ko-quiet" data-sheet="ko"><div class="su-sh-head"><span class="t"><h3>${t('table.koQuiet.title', { name })}</h3><small>${t('ko.by', { name: byName })}</small></span></div>
+      <div class="two"><button type="button" class="btn soft" data-ko="cancel">${t('ko.cancel')}</button><button type="button" class="btn" data-ko="out">${t('ko.out')}</button></div></div>`
+    : pickerHtml(player, candidates, t('ko.cancel'));
+  buzz(KO_BUZZ);
+  closeSheet = sheet(t('ko.label', { name }), body, (sh) => {
+    wrap = sh.closest('.sheet-wrap');
+    sh.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-ko]');
+      if (!b) return;
+      const k = b.dataset.ko;
+      if (k === 'cancel' || k === 'back') finish(onCancel);
+      else if (k === 'out') finish(onEliminate, by);
+      else if (k === 'by') finish(onEliminate, b.dataset.by);
+      else if (k === 'gaveup') finish(onEliminate, null);
+    });
+  });
+  mo.observe(document.body, { childList: true, subtree: true });
+  return () => finish(onCancel);
+}
+
+const KO_BUZZ = [40, 60, 90]; // kurzer Doppelschlag beim Treffer (Stufe 3) bzw. beim Öffnen des Sheets
+
 export function showKo(host, { player, deck = null, by = null, pick = null, candidates = [], round, life, onEliminate, onCancel }) {
+  if (getPrefs().koScreens === 'off') return quietKo({ player, by, candidates, onEliminate, onCancel });
   loadKoFonts();
-  const v = viewModel({ player, deck, by, pick, candidates, round, life });
-  const reduce = reduceMotion();
+  const v = viewModel({ player, deck, by, pick: pick ? { ...pick, variant: koVariantFor(pick) } : { variant: koVariantFor(null), quote: 0 }, candidates, round, life });
+  const reduce = reducedMotion();
   const timers = [];
   let done = false;
   let stage = 0;
@@ -355,7 +401,8 @@ export function showKo(host, { player, deck = null, by = null, pick = null, cand
   document.addEventListener('keydown', onKey);
   window.addEventListener('hashchange', onLeave);
   window.addEventListener('resize', fit);
-  if (!reduce) for (const [ms, n] of PLAN) timers.push(setTimeout(() => { if (!done) setStage(n); }, ms));
+  if (!reduce) for (const [ms, n] of PLAN) timers.push(setTimeout(() => { if (!done) { setStage(n); if (n === 3) buzz(KO_BUZZ); } }, ms));
+  else buzz(KO_BUZZ);
   root.focus({ preventScroll: true }); // Tab führt zu den Knöpfen; kein Fokus auf „Ausscheiden“ (Enter scheidet nicht aus Versehen aus)
   return cancel;
 }
