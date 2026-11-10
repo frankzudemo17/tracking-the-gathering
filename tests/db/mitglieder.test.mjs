@@ -16,7 +16,7 @@ import { freshDb, tools, U, MIGRATIONS } from './harness.mjs';
 
 const FILE = '20261117000000_mitglieder.sql';
 const GEGEN = process.env.GEGENPROBE || '';
-const EXPECTED = 10;
+const EXPECTED = 11;
 let ran = 0;
 let gegenDir = null;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
@@ -124,6 +124,7 @@ const counts = async () => { await su(); return allCounts(db); };
 before(async () => {
   db = await freshDb({ migrations: migrations() });
   ({ as, su, q, err, seedUser, mkGroup } = tools(db));
+  if (GEGEN === 'trigger') await db.exec('alter table public.game_players disable trigger ttg_gp_member_active;');
 });
 after(async () => { await db?.close(); });
 
@@ -295,6 +296,25 @@ check('K8 Wiederherstellen: aktiv, neuer Code im Format, Spiel startbar, Überna
   ok(cl.id === ph.s2.id && cl.profile_id === uid(101), J(cl));
 });
 
+// ================================================================ Krit. 7: Neue Spiele gesperrt, laufende nicht
+check('K7 Neue Spiele: markiertes Mitglied ⇒ member_removed, Deck eines Markierten ⇒ „Deck nicht verfügbar“; laufendes Spiel läuft weiter', async () => {
+  const c0 = await counts();
+  await as(U.A);
+  eq(await err(START, [X.id, J([P(mA, dk.A, 0), P(ph.c.id, dk.c, 1)])]), 'member_removed');
+  eq(await err(START, [X.id, J([P(mA, dk.d, 0), P(mB, dk.B, 1)])]), 'Deck nicht verfügbar');
+  eq(await counts(), c0, '0 neue Zeilen');
+  // nur Aktive ⇒ gelingt
+  const [g] = await q(START, [X.id, J([P(mA, dk.A, 0), P(mB, dk.B, 1)])]);
+  await q(`select * from finish_game($1, 'finished', 2, $2::jsonb)`, [g.id, J([R(mA, 1), R(mB, 2, mA)])]);
+  // laufendes Spiel mit dem (danach markierten) c: Ereignis schreiben und beenden gelingt
+  await as(U.B);
+  await q(`insert into game_events (game_id, round, type, actor, source, target, amount, seq) values ($1, 1, 'life', $2, $2, $3, -3, 1)`, [gLive.id, mB, ph.c.id]);
+  await q(`select * from finish_game($1, 'finished', 4, $2::jsonb)`, [gLive.id, J([R(mB, 1), R(ph.c.id, 2, mB)])]);
+  await su();
+  eq(await q(`select member_id, place from game_players where game_id = $1 order by seat`, [gLive.id]), [{ member_id: mB, place: 1 }, { member_id: ph.c.id, place: 2 }]);
+  eq((await q(`select status from games where id = $1`, [gLive.id]))[0].status, 'finished');
+});
+
 // ================================================================ Krit. 13: Rechte und Stolperdraht
 check('K13 Stolperdraht: Fremdschlüssel auf members und decks = feste Liste aus B', async () => {
   await su();
@@ -323,7 +343,7 @@ check('K13 Ausführungsrechte: RPCs nur authenticated, interne Hilfen für keine
   await su();
   const want = {
     'member_removal_check(uuid)': [false, true], 'remove_member(uuid,text)': [false, true], 'restore_member(uuid)': [false, true],
-    '_member_delete(uuid)': [false, false], '_member_deletable(uuid)': [false, false],
+    '_member_delete(uuid)': [false, false], '_member_deletable(uuid)': [false, false], 'gp_member_active()': [false, false],
   };
   const got = {};
   for (const sig of Object.keys(want)) {
@@ -332,5 +352,5 @@ check('K13 Ausführungsrechte: RPCs nur authenticated, interne Hilfen für keine
   }
   eq(got, want);
   const sd = await q(`select proname, prosecdef, proconfig from pg_proc where pronamespace = 'public'::regnamespace and proname = any($1) order by 1`, [Object.keys(want).map((s) => s.split('(')[0])]);
-  ok(sd.length === 5 && sd.every((p) => p.prosecdef && J(p.proconfig) === '["search_path=public"]'), J(sd));
+  ok(sd.length === Object.keys(want).length && sd.every((p) => p.prosecdef && J(p.proconfig) === '["search_path=public"]'), J(sd));
 });

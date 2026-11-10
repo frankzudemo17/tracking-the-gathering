@@ -139,6 +139,30 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- C. Sperre für neue Spiele: Trigger statt Neuschreiben von start_game/gp_valid/deck_in_group
+-- (erfasst jeden heutigen und künftigen Einfügepfad). Nur insert ⇒ laufende Spiele (Leben,
+-- K.O., Beenden) bleiben unberührt. for share gegen for update in remove_member: ein
+-- gleichzeitiges start_game wartet und sieht danach den neuen Stand.
+-- ---------------------------------------------------------------------------
+create or replace function public.gp_member_active()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare rm timestamptz; owner uuid;
+begin
+  select removed_at into rm from members where id = new.member_id for share;
+  if rm is not null then raise exception 'member_removed'; end if;
+  if new.deck_id is not null then
+    select d.owner_member_id into owner from decks d where d.id = new.deck_id;
+    if owner is not null then
+      select removed_at into rm from members where id = owner for share;
+      if rm is not null then raise exception 'Deck nicht verfügbar'; end if;
+    end if;
+  end if;
+  return new;
+end $$;
+create trigger ttg_gp_member_active before insert on public.game_players
+  for each row execute function public.gp_member_active();
+
+-- ---------------------------------------------------------------------------
 -- Ausführungsrechte (neue Funktionen bekommen per Default-Privileges anon + authenticated)
 -- ---------------------------------------------------------------------------
 revoke execute on function public.member_removal_check(uuid), public.remove_member(uuid, text),
@@ -146,11 +170,14 @@ revoke execute on function public.member_removal_check(uuid), public.remove_memb
 grant execute on function public.member_removal_check(uuid), public.remove_member(uuid, text),
   public.restore_member(uuid) to authenticated;
 -- interne Hilfen: für keine Client-Rolle
-revoke execute on function public._member_delete(uuid), public._member_deletable(uuid) from public, anon, authenticated;
+revoke execute on function public._member_delete(uuid), public._member_deletable(uuid), public.gp_member_active()
+  from public, anon, authenticated;
 
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen):
 -- RÜCKWÄRTS-BEGINN
+-- drop trigger ttg_gp_member_active on public.game_players;
+-- drop function public.gp_member_active();
 -- drop function public.restore_member(uuid);
 -- drop function public.remove_member(uuid, text);
 -- drop function public.member_removal_check(uuid);
