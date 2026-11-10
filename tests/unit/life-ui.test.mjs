@@ -135,3 +135,107 @@ test('secondsSince: nie negativ', () => {
   assert.equal(secondsSince(5000, 1000), 0);
   assert.equal(secondsSince(NaN, 1000), 0);
 });
+
+// ---------- Treffer (Spec P13, Entscheid 6 und 12): dynamischer Import, damit die neuen Tests am
+// Start-main rot sind (Export fehlt), statt die ganze Datei am Laden scheitern zu lassen.
+const hit = () => import('../../src/views/life-ui.js');
+
+test('P13 hitStep: ein Tipp, großer Einzeltreffer, knapp darunter', async () => {
+  const { hitStep, HIT_BIG } = await hit();
+  assert.equal(HIT_BIG, 10);
+  assert.deepEqual(hitStep(null, -1, 0), { level: 'dmg', acc: { sum: 1, at: 0 } });
+  assert.equal(hitStep(null, -10, 0).level, 'big');
+  assert.equal(hitStep(null, -9, 0).level, 'dmg');
+});
+
+test('P13 hitStep: Tippserie — Schritte 1–9 dmg, 10 big, 11 (1000 ms) big', async () => {
+  const { hitStep } = await hit();
+  let acc = null; const lv = [];
+  for (let i = 0; i <= 10; i++) { const r = hitStep(acc, -1, i * 100); acc = r.acc; lv.push(r.level); }
+  assert.deepEqual(lv, [...Array(9).fill('dmg'), 'big', 'big']);
+  assert.equal(acc.sum, 11);
+});
+
+test('P13 hitStep: Fenster abgelaufen (1800 außerhalb), gerade noch (1799), verlängert', async () => {
+  const { hitStep } = await hit();
+  const a = hitStep(null, -9, 0).acc;
+  const out = hitStep(a, -1, 1800);
+  assert.equal(out.level, 'dmg'); assert.equal(out.acc.sum, 1);
+  assert.equal(hitStep(a, -1, 1799).level, 'big');
+  const b = hitStep(hitStep(null, -5, 0).acc, -4, 1500).acc;
+  assert.equal(hitStep(b, -1, 3000).level, 'big');
+});
+
+test('P13 hitStep: Gewinn ⇒ gain, acc null; Gewinn setzt zurück', async () => {
+  const { hitStep } = await hit();
+  assert.deepEqual(hitStep(null, 1, 0), { level: 'gain', acc: null });
+  assert.deepEqual(hitStep(null, 25, 0), { level: 'gain', acc: null });
+  const a = hitStep(null, -9, 0).acc;
+  const g = hitStep(a, 1, 100);
+  const r = hitStep(g.acc, -1, 200);
+  assert.equal(r.level, 'dmg'); assert.equal(r.acc.sum, 1);
+});
+
+test('P13 hitStep: keine Änderung und Unsinn ⇒ level null, acc unverändert, kein Wurf', async () => {
+  const { hitStep } = await hit();
+  const acc = { sum: 4, at: 0 };
+  const r = hitStep(acc, 0, 50);
+  assert.equal(r.level, null); assert.deepEqual(r.acc, { sum: 4, at: 0 });
+  for (const d of [NaN, undefined, 'x']) {
+    const q = hitStep(acc, d, 50);
+    assert.equal(q.level, null); assert.deepEqual(q.acc, { sum: 4, at: 0 });
+  }
+});
+
+// hitDiff: drei Spieler a, b, c, Startleben 40 (Engine createGame/act)
+const g0 = () => createGame({ players: [{ id: 'a', seat: 0 }, { id: 'b', seat: 1 }, { id: 'c', seat: 2 }], startingLife: 40 });
+const step = (s, action) => act(s, action).state;
+const tip = () => { const s0 = g0(); return [s0, step(s0, { type: 'life', target: 'a', d: -3 })]; };
+
+test('P13 hitDiff: Tipp, Angriff, Commander-Schaden, Lebensverknüpfung', async () => {
+  const { hitDiff } = await hit();
+  const [s0, s1] = tip();
+  assert.deepEqual(hitDiff(s0, s1), [{ id: 'a', d: -3 }]);
+  assert.deepEqual(hitDiff(s0, step(s0, { type: 'attack', from: 'a', to: ['b'], kind: 'damage', amount: 12 })), [{ id: 'b', d: -12 }]);
+  assert.deepEqual(hitDiff(s0, step(s0, { type: 'attack', from: 'a', to: ['b'], kind: 'cmd', amount: 5 })), [{ id: 'b', d: -5 }]);
+  const ll = hitDiff(s0, step(s0, { type: 'attack', from: 'a', to: ['b'], kind: 'damage', amount: 4, lifelink: true }));
+  assert.deepEqual(ll.slice().sort((x, y) => x.id.localeCompare(y.id)), [{ id: 'a', d: 4 }, { id: 'b', d: -4 }]);
+});
+
+test('P13 hitDiff: Gift, Zähler, Zugwechsel ⇒ leer', async () => {
+  const { hitDiff } = await hit();
+  const s0 = g0();
+  assert.deepEqual(hitDiff(s0, step(s0, { type: 'poison', target: 'b', d: 1 })), []);
+  assert.deepEqual(hitDiff(s0, step(s0, { type: 'counter', target: 'a', key: 'energy', d: 1 })), []);
+  assert.deepEqual(hitDiff(s0, step(s0, { type: 'endTurn', at: 1000 })), []);
+});
+
+test('P13 hitDiff: Rückgängig still, auch mit Treffer im selben Übergang; gleicher Zustand leer', async () => {
+  const { hitDiff } = await hit();
+  const [, s1] = tip();
+  const s2 = step(s1, { type: 'undo' });
+  assert.notEqual(s2.players.find((p) => p.id === 'a').life, s1.players.find((p) => p.id === 'a').life);
+  assert.deepEqual(hitDiff(s1, s2), []);
+  const s3 = step(s2, { type: 'life', target: 'b', d: -2 });
+  assert.deepEqual(hitDiff(s1, s3), []);
+  assert.deepEqual(hitDiff(s1, s1), []);
+});
+
+test('P13 hitDiff: Gründe — local/remote pulsen, alles andere still', async () => {
+  const { hitDiff } = await hit();
+  const [s0, s1] = tip();
+  for (const r of ['local', 'remote']) assert.deepEqual(hitDiff(s0, s1, r), [{ id: 'a', d: -3 }], r);
+  for (const r of ['catchup', 'rebase', 'status', 'reload', 'irgendwas']) assert.deepEqual(hitDiff(s0, s1, r), [], r);
+});
+
+test('P13 hitDiff: Erstaufbau, neuer Spieler, ausgeschieden', async () => {
+  const { hitDiff } = await hit();
+  const [s0, s1] = tip();
+  assert.deepEqual(hitDiff(null, s1), []);
+  assert.deepEqual(hitDiff(undefined, s1), []);
+  assert.deepEqual(hitDiff(s0, null), []);
+  const neu = { ...s1, players: [...s1.players, { ...s1.players[0], id: 'd', life: 12 }] };
+  assert.deepEqual(hitDiff(s0, neu), [{ id: 'a', d: -3 }]);
+  const out = { ...s1, players: s1.players.map((p) => (p.id === 'b' ? { ...p, out: true, life: 0 } : p)) };
+  assert.deepEqual(hitDiff(s0, out), [{ id: 'a', d: -3 }]);
+});
