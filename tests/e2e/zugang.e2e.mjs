@@ -175,6 +175,8 @@ export async function anonPart({ browser, base, offline = false }) {
     s = await openJoin('#/beitreten/TTG-INVAAA');
     ok('K2 invalid ⇒ Meldung „kennen wir nicht (mehr)“, kein „Konto erstellen“', s.s === 'invalid' && s.text.includes(de.access.invalid) && !s.create, s.s);
     ok('K2 invalid ⇒ Feld „Code oder Link“ zum Neu-Eingeben', (await P.locator('#jn-code').count()) === 1);
+    // v32 live gemessen: der Hinweis stand vor der Karte und wurde von ihr überdeckt
+    ok('K2 invalid ⇒ Hinweis liegt frei (nichts überdeckt ihn)', await P.evaluate(() => { const n = document.querySelector('[data-state="invalid"] .note.warn'); if (!n) return false; const r = n.getBoundingClientRect(); return [[r.left + 8, r.top + 4], [r.right - 8, r.bottom - 4], [r.left + r.width / 2, r.top + r.height / 2]].every(([x, y]) => n.contains(document.elementFromPoint(x, y))); }));
 
     mockCheck(json(200, { status: 'full' }));
     s = await openJoin('#/beitreten/TTG-FULAAA');
