@@ -283,3 +283,23 @@
 .deck-minis i + i { margin-left: -9px; }
 .collapse-head[aria-expanded="true"] .deck-minis { display: none; }
 .row-ic { color: var(--acc2); display: grid; }
+
+/* ================= Einstellungen: Konto, Rechtliches, Datenschutz (P12) ================= */
+.row .sub { font-size: 13px; color: var(--mu); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .sub.wrap { white-space: normal; }
+.row.static:active { background: transparent; }
+.center { text-align: center; }
+.card.form .input { background: var(--bg); }
+.danger-zone { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--danger) 35%, transparent); }
+.btn.danger-outline { background: transparent; color: var(--danger); font-weight: 600; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--danger) 55%, transparent); }
+.btn.danger-fill { background: var(--danger); color: #fff; font-weight: 700; }
+.btn.danger-fill:disabled { background: var(--sf2); color: var(--mu); opacity: 1; }
+.facts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.facts li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; }
+.facts li svg { flex-shrink: 0; margin-top: 2px; color: var(--mu); }
+.legal p { font-size: 14px; line-height: 1.6; }
+.legal .link.acc { color: var(--acc2); gap: 6px; align-self: flex-start; }
+.pending { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 6px 12px; border-radius: 999px;
+  background: color-mix(in srgb, var(--turn) 18%, transparent); color: var(--ink); font-size: 13px; font-weight: 600; }
+.pending svg { color: var(--turn); }
+.pre { white-space: pre-line; }
