@@ -22,6 +22,7 @@ a.hist-ev-head:active { background: var(--sf2); }
 .hist-ev-loc > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hist-ev-loc svg { flex-shrink: 0; }
 .hist-ev-meta > span + span::before { content: "·"; margin-right: 10px; }
+.hist-ev-meta > span:not(.hist-ev-loc) { white-space: nowrap; flex-shrink: 0; }
 .hist-king { position: relative; display: grid; flex-shrink: 0; padding: 4px; }
 .hist-king-ic { position: absolute; right: -2px; bottom: -2px; width: 18px; height: 18px; border-radius: 50%;
   display: grid; place-items: center; background: var(--hi); color: var(--bg); box-shadow: 0 0 0 2px var(--bg); }
