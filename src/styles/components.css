@@ -332,3 +332,5 @@ button.cam::after { content: ''; position: absolute; inset: -10px; border-radius
 [data-removed] .row .tiny { white-space: normal; }
 [data-all-groups] .list { margin-top: 4px; }
 [data-all-groups] .row { padding-left: 0; padding-right: 0; }
+[data-all-groups] .grow-col b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-all-groups] .row > .chip, [data-all-groups] .row > .btn { flex-shrink: 0; }

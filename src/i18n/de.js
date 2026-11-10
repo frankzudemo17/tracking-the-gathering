@@ -120,6 +120,7 @@ export default {
   memberRemove: {
     button: 'Aus Gruppe entfernen', title: '{name} entfernen?', chip: 'Entfernt',
     deleteText: '{name} hat noch kein Spiel und wird vollständig gelöscht.',
+    deleteTextAccount: '{name} hat noch kein Spiel in dieser Gruppe und wird aus der Gruppe entfernt. Das Konto bleibt bestehen.',
     deleteDecks: '{n} Decks werden mitgelöscht.', deleteDecksOne: '1 Deck wird mitgelöscht.',
     markGames: '{name} ist in {n} Spielen eingetragen.', markGamesOne: '{name} ist in einem Spiel eingetragen.',
     markGamesNone: '{name} kommt in der Historie vor.',

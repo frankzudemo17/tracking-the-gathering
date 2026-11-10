@@ -121,12 +121,12 @@ export async function ctx(browser, name) {
   const p = await c.newPage();
   p.errs = [];
   p.bad = [];
-  p.transit = []; // 404 der zwei Übergangsstellen (src/zugang/invite.js) vor dem db push — gewollt, kein Fehler
+  p.transit = []; // 404 der Übergangsstellen vor dem db push — gewollt, kein Fehler: src/zugang/invite.js (P9b), rpc/list_all_playgroups (P10, Verwaltung „Alle Gruppen“)
   p.on('pageerror', (e) => p.errs.push('pageerror: ' + e.message));
   p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) p.errs.push('console: ' + m.text()); });
   p.on('response', (r) => {
     const u = r.url();
-    if (r.status() === 404 && u.startsWith(TARGET.url + '/rest/v1/') && /\/rest\/v1\/(rpc\/check_invite|playgroup_invites)(\?|$)/.test(u)) { p.transit.push(u.split('?')[0]); return; }
+    if (r.status() === 404 && u.startsWith(TARGET.url + '/rest/v1/') && /\/rest\/v1\/(rpc\/check_invite|rpc\/list_all_playgroups|playgroup_invites)(\?|$)/.test(u)) { p.transit.push(u.split('?')[0]); return; }
     if (r.status() === 429 && u.startsWith(TARGET.url + '/auth/')) env.rateLimited = true;
     if (/api\.scryfall\.com/.test(u) && (r.status() === 429 || r.status() >= 500)) env.scryfallDown = true;
     if (r.status() >= 400) p.bad.push(r.status() + ' ' + u.split('?')[0] + (u.includes('grant_type=password') ? '?grant_type=password' : ''));

@@ -157,7 +157,7 @@ export default async function profile(el, { params, isStale }) {
 function removalLines({ name, check: c, account }) {
   const n = (k1, kn, v) => t(v === 1 ? k1 : kn, { n: v, name });
   if (c.mode === 'delete') {
-    return [t('memberRemove.deleteText', { name }), c.decks > 0 ? n('memberRemove.deleteDecksOne', 'memberRemove.deleteDecks', c.decks) : '',
+    return [t(account ? 'memberRemove.deleteTextAccount' : 'memberRemove.deleteText', { name }), c.decks > 0 ? n('memberRemove.deleteDecksOne', 'memberRemove.deleteDecks', c.decks) : '',
       account ? t('memberRemove.accountBack', { name }) : ''].filter(Boolean);
   }
   return [

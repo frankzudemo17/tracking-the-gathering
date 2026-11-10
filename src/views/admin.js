@@ -58,8 +58,8 @@ export default async function admin(el, { isStale }) {
       ${allErr ? html`<p class="hint" data-all-error>${allErr}</p>`
         : all.length ? html`<div class="list">${all.map((gr) => html`
           <div class="row" data-group-row="${gr.id}">
-            <span class="grow-col"><b>${gr.name}</b><span class="tiny muted">${countText(gr.members)}</span></span>
-            ${gr.admins === 0 ? html`<span class="chip guest" data-no-admin>${icon('warn', 13)}${t('access.noAdmin')}</span>` : ''}
+            <span class="grow-col"><b>${gr.name}</b><span class="tiny muted">${countText(gr.members)}</span>
+              ${gr.admins === 0 ? html`<span class="chip guest" data-no-admin>${icon('warn', 13)}${t('access.noAdmin')}</span>` : ''}</span>
             ${gr.is_member ? '' : html`<button type="button" class="btn small soft" data-act="enter" data-id="${gr.id}">${icon('signIn', 16)}${t('access.enter')}</button>`}
           </div>`)}</div>`
         : html`<p class="hint">${t('access.allNone')}</p>`}

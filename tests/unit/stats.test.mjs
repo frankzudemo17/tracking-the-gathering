@@ -370,6 +370,7 @@ test('P10 K15 deckTable, deckSaltTable, gameSummary, evenings, recap vor = nach;
   assert.deepEqual(s.evenings(b), s.evenings(a));
   for (const g of a.games) assert.deepEqual(s.gameSummary(b, g.id), s.gameSummary(a, g.id), g.id);
   for (const sid of ['s0', 's1', 's2']) assert.deepEqual(s.recap(b, sid), s.recap(a, sid), sid);
+  for (const id of ['m-F', 'm-T', 'm-M']) assert.deepEqual(s.memberProfile(b, id), s.memberProfile(a, id), `memberProfile ${id}`);
   assert.ok(s.gameSummary(b, 'g1').placements.some((p) => p.memberId === 'm-F'), 'm-F steht in g1');
   assert.equal(b.members.find((m) => m.id === 'm-F').name, 'Franco', 'Name löst weiter auf');
 });
