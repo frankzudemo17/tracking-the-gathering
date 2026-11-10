@@ -1,6 +1,7 @@
 // E2E Gruppe löschen (Spec P3, Kriterium 6) + Platzhalter #/beitreten (Kriterium 8).
 // Läuft nach etappe1-2.e2e.mjs und vor setup.e2e.mjs im selben Lauf und nutzt nur deren Konten
-// (Harness: höchstens 3 je Lauf): A = mail('a') Admin von „Küchentisch <b>Test</b>“, B = mail('b') Mitglied.
+// (Harness: höchstens 3 je Lauf): A = mail('a') Admin von „Küchentisch <b>Test</b>“, C = mail('c') „Tim Echt“
+// Mitglied ohne Admin-Rechte. B = mail('b') taugt nicht als Gegenprobe: etappe1-2 befördert B zum Admin.
 // „Küchentisch“ wird NICHT verändert (setup.e2e.mjs braucht sie): dort nur Knopf sehen, Sheet öffnen, abbrechen.
 // Echtes Löschen (6b) nur an einer eigenen Wegwerf-Gruppe von A — und nur, wenn die Migration
 // delete_playgroup in der Ziel-Datenbank schon steht; sonst sichtbar „übersprungen“ (kein ok()).
@@ -21,16 +22,18 @@ export default async function gruppeLoeschenE2e({ browser, base: BASE }) {
   await P.shot('beitreten-platzhalter');
 
   // ---------------------------------------------------------------- 6a: Mitglied sieht keinen Knopf
-  console.log('\nGruppe löschen: Mitglied B');
-  const B = await ctx(browser, 'GB');
+  console.log('\nGruppe löschen: Mitglied C (kein Admin)');
+  const B = await ctx(browser, 'GC');
   await B.goto(BASE);
   await waitHash(B, '#/login');
-  await login(B, mail('b'));
+  await login(B, mail('c'));
   await waitHash(B, '#/start');
   await B.goto(BASE + '#/gruppen');
   await B.waitForSelector('.list .row');
   await B.waitForTimeout(300);
-  ok('K6a Mitglied B sieht keinen Knopf „Gruppe löschen“', (await B.locator('[data-act="delete-group"]').count()) === 0);
+  const roleC = await B.locator('.list .row', { hasText: 'Tim Echt' }).textContent();
+  ok('K6a C ist in Küchentisch nur Mitglied', /Mitglied/.test(roleC) && !/Admin/.test(roleC), roleC);
+  ok('K6a Mitglied C sieht keinen Knopf „Gruppe löschen“', (await B.locator('[data-act="delete-group"]').count()) === 0);
   await B.shot('gruppen-mitglied');
 
   // ---------------------------------------------------------------- 6a: Admin A sieht ihn, Sheet gesperrt bis Name stimmt
@@ -111,7 +114,7 @@ export default async function gruppeLoeschenE2e({ browser, base: BASE }) {
     await A.shot('nach-gruppe-loeschen');
   }
 
-  for (const [n, p] of [['P', P], ['GB', B], ['GA', A]]) {
+  for (const [n, p] of [['P', P], ['GC', B], ['GA', A]]) {
     ok(`Keine JS-Fehler bei ${n}`, p.errs.length === 0, p.errs.join(' | '));
     const unexpected = p.bad.filter((x) => !(n === 'GA' && expectedBad.has(x)));
     ok(`Keine unerwarteten HTTP-Fehler bei ${n}`, unexpected.length === 0, JSON.stringify(unexpected));
