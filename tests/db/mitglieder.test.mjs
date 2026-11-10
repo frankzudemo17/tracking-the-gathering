@@ -16,7 +16,7 @@ import { freshDb, tools, U, MIGRATIONS } from './harness.mjs';
 
 const FILE = '20261117000000_mitglieder.sql';
 const GEGEN = process.env.GEGENPROBE || '';
-const EXPECTED = 16;
+const EXPECTED = 21;
 let ran = 0;
 let gegenDir = null;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
@@ -262,9 +262,15 @@ check('K6 Rechte je Funktion: ohne Sitzung/anonym, Mitglied, fremder Admin, unbe
       await as(who);
       eq(await rpcErr(fn, ...args(target)), 'not_group_admin', `${fn} ${who}`);
     }
-    for (const [who, target] of [[U.A, mB], [U.A, mA], [SAU, mA]]) {
+    // Konto-Ziel. Basis: alle drei member_has_account (Ausgabe am Basis-Commit 85d2879 aufbewahrt).
+    // Block K (E-K = ja) ersetzt das für Probelauf/Entfernen: sich selbst ⇒ member_is_self, Admin ⇒
+    // member_is_admin (Reihenfolge selbst → Superadmin → Admin); Wiederherstellen bleibt gesperrt (K4).
+    const want = fn === 'restore_member'
+      ? [[U.A, mB, 'member_has_account'], [U.A, mA, 'member_has_account'], [SAU, mA, 'member_has_account']]
+      : [[U.A, mA, 'member_is_self'], [SAU, mA, 'member_is_admin']];
+    for (const [who, target, msg] of want) {
       await as(who);
-      eq(await rpcErr(fn, ...args(target)), 'member_has_account', `${fn} Konto-Ziel`);
+      eq(await rpcErr(fn, ...args(target)), msg, `${fn} Konto-Ziel`);
     }
   }
   eq(await counts(), c0);
@@ -354,10 +360,10 @@ check('K10 Verlassen: Superadmin mit Spielen ⇒ umgewandelt (mark), Gruppe ohne
   await su();
   await CARD(Zs.dS);
   const shown = (await q(`select coalesce(p.display_name, m.display_name) n from members m join profiles p on p.id = m.profile_id where m.id = $1`, [Zs.mS]))[0].n;
-  // Nicht-Superadmin (Basis)
+  // Nicht-Superadmin. Basis: superadmin_only. Block K2: jeder darf, aber A ist einziger Admin von X ⇒ last_admin
   const c0 = await counts();
   await as(U.A);
-  eq(await rpcErr('leave_playgroup', X.id), 'superadmin_only');
+  eq(await rpcErr('leave_playgroup', X.id), 'last_admin');
   eq(await counts(), c0);
   ok((await row(mA)).profile_id === U.A, 'A unverändert');
   // Superadmin, hat gespielt, einziger Admin
@@ -517,6 +523,117 @@ check('K12 Zusammenspiel: playgroup_files/delete_playgroup mit markiertem Platzh
   ok(ry && ry.removed_by === null && ry.removed_at !== null, J(ry));
 });
 
+// ================================================================ Block K (E-K = ja): Mitglieder mit Konto
+const K = {};
+check('K-1 Admin entfernt Mitglied mit Konto und Spielen ⇒ umgewandelt; Konto sieht die Gruppe nicht mehr; sein Deck „Deck nicht verfügbar“; Admin/Superadmin/selbst gesperrt', async () => {
+  // weitere Admins in X: Superadmin betritt X, E (uid 101) wird Admin
+  await as(SAU);
+  K.mS = (await q(`select * from enter_playgroup($1)`, [X.id]))[0].id;
+  K.mE = (await row(ph.s2.id)).id; // E hat s2 übernommen (Krit. 8)
+  await as(SAU);
+  await q(`select * from set_member_role($1, 'admin')`, [K.mE]);
+  await as(U.A);
+  eq(await rpcErr('member_removal_check', K.mS), 'superadmin_only');
+  eq(await rpcErr('remove_member', K.mS, 'mark'), 'superadmin_only');
+  eq(await rpcErr('member_removal_check', K.mE), 'member_is_admin');
+  eq(await rpcErr('remove_member', K.mE, 'mark'), 'member_is_admin');
+  eq(await rpcErr('remove_member', mA, 'mark'), 'member_is_self');
+  await as(SAU);
+  eq(await rpcErr('remove_member', K.mS, 'mark'), 'member_is_self', 'selbst vor Superadmin');
+  // B: Mitglied mit Konto und Spielen
+  const shown = (await q(`select coalesce(p.display_name, m.display_name) n from members m join profiles p on p.id = m.profile_id where m.id = $1`, [mB]))[0].n;
+  const c0 = await counts();
+  await as(U.A);
+  const chk = await rpc('member_removal_check', mB);
+  ok(chk.mode === 'mark' && chk.games >= 3 && chk.live_games === 0 && chk.decks === 0 && J(chk.files) === '[]', J(chk));
+  eq(await rpcErr('remove_member', mB, 'delete'), 'member_state_changed');
+  eq(await rpc('remove_member', mB, 'mark'), { result: 'marked' });
+  eq(await counts(), c0, 'keine Zeile angelegt oder gelöscht');
+  const r = await row(mB);
+  ok(r.profile_id === null && r.former_profile_id === U.B && r.role === 'member' && r.removed_at && r.removed_by === U.A && r.claim_code === null, J(r));
+  eq(r.display_name, shown);
+  eq((await row(ph.f.id)).former_profile_id, null, 'ältere frühere Zeile von B verliert den Kontobezug (eindeutig je Gruppe)');
+  await as(U.B);
+  ok((await q(`select is_group_member($1) x`, [X.id]))[0].x === false);
+  ok(await n(`select count(*)::int n from games where playgroup_id = $1`, [X.id]) === 0, 'Konto sieht die Gruppe nicht mehr');
+  await as(U.A);
+  eq(await err(START, [X.id, J([P(mA, dk.A, 0), P(K.mE, dk.B, 1)])]), 'Deck nicht verfügbar');
+  await as(U.A);
+  eq(await rpc('remove_member', mB, 'mark'), { result: 'already' });
+});
+
+check('K-2 Mitglied verlässt ⇒ wie Krit. 10; letzter Admin (kein Superadmin) ⇒ last_admin, nichts geändert', async () => {
+  await seedUser(uid(102), { email: 'f@x.de' });
+  const Xc = (await (async () => { await su(); return q(`select code from playgroup_invites where playgroup_id = $1`, [X.id]); })())[0].code;
+  await as(uid(102));
+  K.mF = (await q(`select * from join_playgroup($1)`, [Xc]))[0].id;
+  const dF = (await q(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'F1', 'F1') returning id`, [uid(102)]))[0].id;
+  await as(U.A);
+  const [g] = await q(START, [X.id, J([P(mA, dk.A, 0), P(K.mF, dF, 1)])]);
+  await q(`select * from finish_game($1, 'finished', 2, $2::jsonb)`, [g.id, J([R(mA, 1), R(K.mF, 2, mA)])]);
+  await as(uid(102));
+  eq(await rpc('leave_playgroup', X.id), { result: 'left', mode: 'mark', admins_left: 3 });
+  const r = await row(K.mF);
+  ok(r.profile_id === null && r.former_profile_id === uid(102) && r.role === 'member' && r.removed_at && r.removed_by === uid(102), J(r));
+  await as(uid(102));
+  ok(await n(`select count(*)::int n from games where playgroup_id = $1`, [X.id]) === 0);
+  // letzter Admin einer Gruppe (kein Superadmin)
+  const W = await mkGroup(U.A, 'W');
+  const c0 = await counts();
+  await as(U.A);
+  eq(await rpcErr('leave_playgroup', W.id), 'last_admin');
+  eq(await counts(), c0);
+  ok((await q(`select is_group_member($1) x`, [W.id]))[0].x === true);
+  // Mitglied ohne Verweis ⇒ delete
+  await seedUser(uid(103), { email: 'g@x.de' });
+  await as(uid(103));
+  await q(`select * from join_playgroup($1)`, [W.invite_code]);
+  eq(await rpc('leave_playgroup', W.id), { result: 'left', mode: 'delete', admins_left: 1 });
+});
+
+check('K-3 Entferntes Konto tritt mit gültigem Code bei ⇒ dieselbe ID, aktiv; nach renew_invite mit altem Code ⇒ null', async () => {
+  await su();
+  const code = (await q(`select code from playgroup_invites where playgroup_id = $1`, [X.id]))[0].code;
+  await as(U.B);
+  const [j] = await q(`select * from join_playgroup($1)`, [code]);
+  ok(j.id === mB && j.profile_id === U.B && j.role === 'member' && j.removed_at === null && j.former_profile_id === null, J(j));
+  await as(U.A);
+  eq(await rpc('remove_member', mB, 'mark'), { result: 'marked' });
+  const nc = (await q(`select renew_invite($1) c`, [X.id]))[0].c;
+  ok(nc !== code);
+  await as(U.B);
+  eq((await q(`select join_playgroup($1) r`, [code]))[0].r, null);
+  ok((await row(mB)).profile_id === null, 'bleibt draußen');
+});
+
+check('K-4 Entferntes Konto löscht sich ⇒ frühere Zeile „Ehemaliges Mitglied“, keine neue aktive Zeile, Deck an der früheren Zeile', async () => {
+  await su();
+  const active = async () => n(`select count(*)::int n from members where playgroup_id = $1 and removed_at is null`, [X.id]);
+  const a0 = await active();
+  const m0 = await n(`select count(*)::int n from members where playgroup_id = $1`, [X.id]);
+  ok(await n(`select count(*)::int n from game_players where deck_id = $1`, [dk.B]) > 0, 'Deck von B in X gespielt');
+  await as(U.B);
+  await q(`select delete_my_account()`);
+  await su();
+  eq(await active(), a0, 'aktive Mitglieder vor = nach');
+  eq(await n(`select count(*)::int n from members where playgroup_id = $1`, [X.id]), m0, 'keine neue Zeile');
+  const r = await row(mB);
+  ok(r.display_name === 'Ehemaliges Mitglied' && r.former_profile_id === null && r.removed_at !== null && r.profile_id === null, J(r));
+  eq((await q(`select owner_member_id, owner_profile_id from decks where id = $1`, [dk.B]))[0], { owner_member_id: mB, owner_profile_id: null });
+});
+
+check('K-5 Direktes Löschen geschlossen: delete from members als Admin ⇒ 42501; Policy mem_delete fehlt', async () => {
+  await as(U.A);
+  const [p] = await q(`select * from create_placeholder($1, 'Del')`, [X.id]);
+  let codeErr = null;
+  try { await db.query(`delete from members where id = $1`, [p.id]); } catch (e) { codeErr = e.code; }
+  eq(codeErr, '42501');
+  ok((await row(p.id)) !== undefined, 'Zeile da');
+  await su();
+  ok(await n(`select count(*)::int n from pg_policies where tablename = 'members' and policyname = 'mem_delete'`) === 0);
+  ok(await n(`select count(*)::int n from information_schema.role_table_grants where table_name = 'members' and privilege_type = 'DELETE' and grantee in ('anon', 'authenticated')`) === 0);
+});
+
 // ================================================================ Krit. 13: Rechte und Stolperdraht
 check('K13 Stolperdraht: Fremdschlüssel auf members und decks = feste Liste aus B', async () => {
   await su();
@@ -546,7 +663,7 @@ check('K13 Ausführungsrechte: RPCs nur authenticated, interne Hilfen für keine
   const want = {
     'member_removal_check(uuid)': [false, true], 'remove_member(uuid,text)': [false, true], 'restore_member(uuid)': [false, true],
     'leave_playgroup(uuid)': [false, true], 'list_all_playgroups()': [false, true], 'enter_playgroup(uuid)': [false, true], 'join_playgroup(text)': [false, true],
-    '_member_delete(uuid)': [false, false], '_member_deletable(uuid)': [false, false], 'gp_member_active()': [false, false], '_member_detach(uuid)': [false, false],
+    '_member_delete(uuid)': [false, false], '_member_deletable(uuid)': [false, false], 'gp_member_active()': [false, false], '_member_detach(uuid)': [false, false], '_member_account_guard(public.members)': [false, false],
   };
   const got = {};
   for (const sig of Object.keys(want)) {

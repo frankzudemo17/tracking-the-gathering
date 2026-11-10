@@ -53,6 +53,18 @@ begin
   end;
 end $$;
 
+-- Block K (E-K = ja): Ziel mit Konto. Reihenfolge selbst → Superadmin → Admin (ein Admin, der
+-- sich selbst nimmt, hört member_is_self; der Superadmin als Ziel ist immer superadmin_only).
+-- Ohne Konto: nichts. Intern.
+create or replace function public._member_account_guard(m public.members)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if m.profile_id is null then return; end if;
+  if m.profile_id = auth.uid() then raise exception 'member_is_self'; end if;
+  if exists (select 1 from profiles p where p.id = m.profile_id and p.is_superadmin) then raise exception 'superadmin_only'; end if;
+  if m.role = 'admin' then raise exception 'member_is_admin'; end if;
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- E. Entfernen und Wiederherstellen (Gruppen-Admin des Ziels oder Superadmin, auch ohne
 -- Mitgliedschaft). Reihenfolge: Nicht angemeldet · Ziel unbekannt oder nicht berechtigt
@@ -68,7 +80,7 @@ begin
   if m.id is null or not (public.is_group_admin(m.playgroup_id) or public.is_superadmin()) then
     raise exception 'not_group_admin';
   end if;
-  if m.profile_id is not null then raise exception 'member_has_account'; end if;
+  perform public._member_account_guard(m);
   mode := case when m.removed_at is not null then 'already'
                when public._member_deletable(m.id) then 'delete' else 'mark' end;
   return jsonb_build_object(
@@ -77,8 +89,10 @@ begin
     'live_games', (select count(distinct gp.game_id) from game_players gp join games g on g.id = gp.game_id
                    where gp.member_id = m.id and g.status = 'live'),
     'decks', (select count(*) from decks d where d.owner_member_id = m.id),
-    'files', coalesce((select jsonb_agg(o.name order by o.name) from storage.objects o
-                       where o.bucket_id = 'avatars' and o.name like 'members/' || m.id::text || '/%'), '[]'::jsonb));
+    -- Konten: immer leer (das Profilbild gehört dem Konto, nicht der Gruppe)
+    'files', case when m.profile_id is not null then '[]'::jsonb else
+             coalesce((select jsonb_agg(o.name order by o.name) from storage.objects o
+                       where o.bucket_id = 'avatars' and o.name like 'members/' || m.id::text || '/%'), '[]'::jsonb) end);
 end $$;
 
 -- Entfernen. p_expect = Modus, den der Admin bestätigt hat; weicht der ermittelte ab (auch bei
@@ -94,10 +108,15 @@ begin
   if m.id is null or not (public.is_group_admin(m.playgroup_id) or public.is_superadmin()) then
     raise exception 'not_group_admin';
   end if;
-  if m.profile_id is not null then raise exception 'member_has_account'; end if;
+  perform public._member_account_guard(m);
   if m.removed_at is not null then return jsonb_build_object('result', 'already'); end if;
   mode := case when public._member_deletable(m.id) then 'delete' else 'mark' end;
   if p_expect is distinct from mode then raise exception 'member_state_changed'; end if;
+  -- Block K: Mitglied mit Konto wird wie beim Verlassen gelöscht oder umgewandelt (kein Bann)
+  if m.profile_id is not null then
+    perform public._member_detach(m.id);
+    return jsonb_build_object('result', case mode when 'delete' then 'deleted' else 'marked' end);
+  end if;
   if mode = 'delete' then
     if exists (select 1 from storage.objects o
                where o.bucket_id = 'avatars' and o.name like 'members/' || m.id::text || '/%') then
@@ -332,6 +351,7 @@ revoke execute on function public.leave_playgroup(uuid), public.list_all_playgro
 grant execute on function public.leave_playgroup(uuid), public.list_all_playgroups(),
   public.enter_playgroup(uuid) to authenticated;
 revoke execute on function public._member_delete(uuid), public._member_deletable(uuid), public._member_detach(uuid),
+  public._member_account_guard(public.members),
   public.gp_member_active() from public, anon, authenticated;
 
 -- ============================================================================
@@ -359,6 +379,7 @@ revoke execute on function public._member_delete(uuid), public._member_deletable
 -- drop function public.list_all_playgroups();
 -- drop function public.leave_playgroup(uuid);
 -- drop function public._member_detach(uuid);
+-- drop function public._member_account_guard(public.members);
 -- drop trigger ttg_gp_member_active on public.game_players;
 -- drop function public.gp_member_active();
 -- drop function public.restore_member(uuid);
