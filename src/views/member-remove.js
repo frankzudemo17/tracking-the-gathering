@@ -10,6 +10,17 @@ export async function rpcOrUnavailable(client, fn, args) {
   return r.error && isUnavailable(r.error) ? { unavailable: true } : r;
 }
 
+/**
+ * Zeigt die Profilseite den Knopf „Aus Gruppe entfernen“? (Spec P10 H/K7 + Nachtrag B1) Nur für Gruppen-Admins
+ * und den Superadmin; nicht bei entfernten Zeilen, nicht bei sich selbst, nicht bei Admins, nicht beim
+ * Superadmin als Ziel (der Server lehnt mit superadmin_only ab). `m.profiles.is_superadmin` kommt aus dem
+ * Profil-Select der Profilseite (Spalte seit P9 in Prod, für authenticated lesbar); fehlt sie ⇒ false.
+ * @param {{ removed_at?: string|null, role?: string, profiles?: { is_superadmin?: boolean }|null }} m
+ * @param {{ isMe: boolean, isAdmin: boolean, isSuperadmin: boolean }} who
+ */
+export const canRemoveMember = (m, { isMe, isAdmin, isSuperadmin }) =>
+  !m.removed_at && !isMe && m.role !== 'admin' && !m.profiles?.is_superadmin && (isAdmin || isSuperadmin);
+
 const has = (e, word) => new RegExp(word).test(e?.message || '');
 
 /** Ist die Zeile nach Neuladen noch da? (nur id — nie die neuen Spalten in einem select, Übergangsregel H) */

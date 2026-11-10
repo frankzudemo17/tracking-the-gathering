@@ -455,6 +455,12 @@ export default async function zugangE2e({ browser, base }) {
   const A = await page(browser, 'ZA', { allowRenew: live });
   const ovA = { superadmin: false };
   await profileMock(A, ids.a, ovA);
+  // P10 (Übergang): Antworttexte von rpc/list_all_playgroups mit 400 (nach dem db push: superadmin_only)
+  const lap400 = [];
+  A.on('response', async (r) => {
+    if (r.status() !== 400 || r.url().split('?')[0] !== `${SB}/rest/v1/rpc/list_all_playgroups`) return;
+    try { lap400.push(await r.text()); } catch { lap400.push(''); }
+  });
   await A.addInitScript(() => {
     Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t) => { window.__copied = t; } }, configurable: true });
@@ -655,7 +661,11 @@ export default async function zugangE2e({ browser, base }) {
     });
   }
 
-  footer([['ZJ', J], ['ZA', A]], { ZA: [`400 ${SB}/rest/v1/rpc/set_max_accounts`] });
+  // P10 (Übergang): K9 zeigt A mit abgefangenem is_superadmin die Verwaltung ⇒ „Alle Gruppen“ fragt Prod;
+  // vor dem db push 404 (harness.mjs ctx: Übergangsstelle), danach 400 — erlaubt nur, wenn jede dieser Antworten
+  // superadmin_only meldet (A ist kein Superadmin).
+  const lapOk = lap400.length > 0 && lap400.every((b) => /superadmin_only/.test(b));
+  footer([['ZJ', J], ['ZA', A]], { ZA: [`400 ${SB}/rest/v1/rpc/set_max_accounts`, ...(lapOk ? [`400 ${SB}/rest/v1/rpc/list_all_playgroups`] : [])] });
   await decoder.context().close();
   for (const p of [J, A]) await p.context().close();
 }

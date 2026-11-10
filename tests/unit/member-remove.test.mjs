@@ -1,7 +1,7 @@
 // Ablauf „Spieler aus der Gruppe entfernen“ (src/views/member-remove.js) mit Client-Attrappe — Spec P10 G, Krit. 14.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runMemberRemoval, rpcOrUnavailable } from '../../src/views/member-remove.js';
+import { runMemberRemoval, rpcOrUnavailable, canRemoveMember } from '../../src/views/member-remove.js';
 
 const M = { id: 'm-1', playgroup_id: 'g-1' };
 const fail = (message, code) => ({ data: null, error: { message, code } });
@@ -154,4 +154,22 @@ test('PGRST202 (RPC fehlt, Migration nicht gepusht) ⇒ unavailable, kein Abstur
   assert.deepEqual(await rpcOrUnavailable(sb, 'leave_playgroup', { p_group: 'g' }), { data: null, error: null });
   const sb3 = { rpc: async () => fail('x', 'PGRST202') };
   assert.deepEqual(await rpcOrUnavailable(sb3, 'leave_playgroup', { p_group: 'g' }), { unavailable: true });
+});
+
+// Spec P10 K7 + Nachtrag B1: kein Entfernen-Knopf auf dem Profil des Superadmins (Server: superadmin_only)
+test('B1 canRemoveMember: Admin sieht Profil des Superadmins als Mitglied ⇒ kein Knopf; einfaches Mitglied mit Konto ⇒ Knopf', () => {
+  const admin = { isMe: false, isAdmin: true, isSuperadmin: false };
+  const superMember = { removed_at: null, role: 'member', profiles: { display_name: 'S', is_superadmin: true } };
+  const plainMember = { removed_at: null, role: 'member', profiles: { display_name: 'B', is_superadmin: false } };
+  assert.equal(canRemoveMember(superMember, admin), false, 'Superadmin als Mitglied');
+  assert.equal(canRemoveMember(plainMember, admin), true, 'Mitglied mit Konto');
+  assert.equal(canRemoveMember({ removed_at: null, role: 'member', profiles: null }, admin), true, 'Platzhalter');
+  // Superadmin selbst sieht sich nicht mit Knopf; Admin-Ziel, entfernte Zeile, Nicht-Admin ⇒ kein Knopf
+  assert.equal(canRemoveMember(superMember, { isMe: true, isAdmin: true, isSuperadmin: true }), false, 'sich selbst');
+  assert.equal(canRemoveMember({ ...plainMember, role: 'admin' }, admin), false, 'Admin-Ziel');
+  assert.equal(canRemoveMember({ ...plainMember, removed_at: '2026-11-10T10:00:00Z' }, admin), false, 'entfernt');
+  assert.equal(canRemoveMember(plainMember, { isMe: false, isAdmin: false, isSuperadmin: false }), false, 'Mitglied ohne Admin-Recht');
+  assert.equal(canRemoveMember(plainMember, { isMe: false, isAdmin: false, isSuperadmin: true }), true, 'Superadmin ohne Gruppen-Admin');
+  // Übergang: Profil ohne die Spalte (älterer Stand) ⇒ wie bisher
+  assert.equal(canRemoveMember({ removed_at: null, role: 'member', profiles: { display_name: 'B' } }, admin), true, 'Spalte fehlt');
 });

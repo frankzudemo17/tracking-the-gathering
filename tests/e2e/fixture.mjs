@@ -5,6 +5,8 @@
 // Zugangsdaten: Umgebung oder lokale Datei (fixture-core.mjs resolveCreds) — fehlen sie ⇒ Exit 2.
 // Nach dem db push der Zugang-Migration kann --anlegen keine Gruppe und kein Konto ohne Code mehr anlegen
 // ⇒ klare Meldung, was der Superadmin tun muss. Ausgaben nennen die Konten nur A, B, C.
+// --anlegen stellt den Grundzustand wie der E2E-Lauf her (harness.mjs baseState: vor dem db push der
+// P10-Migration REST, danach erst die Mitglieder-Funktionen, PGRST202 ⇒ alter Weg).
 import fs from 'node:fs';
 import { Abort, FIXTURE_NAME, KEYS } from './fixture-core.mjs';
 
@@ -67,7 +69,9 @@ async function main() {
     fs.writeFileSync(f.IDS_FILE, JSON.stringify(ids, null, 2) + '\n');
     console.log(`  fixture-ids.json geschrieben`);
   }
-  if (mode === 'anlegen') await f.baseState({ log: (s) => console.log('  ' + s) });
+  // Grundzustand wie im E2E-Lauf (harness.mjs): nach dem db push der P10-Migration zuerst über die
+  // Mitglieder-Funktionen (direktes delete auf members ist dann zu), sonst/danach der REST-Weg (fixture-api.mjs)
+  if (mode === 'anlegen') await (await import('./harness.mjs')).baseState({ log: (s) => console.log('  ' + s) });
   const snap = await f.snapshot();
   const code = await f.inviteCode(gid);
   console.log(`\nZustand: Mitglieder mit Konto [${snap.members.join(', ')}] · A Admin: ${snap.adminA ? 'ja' : 'NEIN'} · ${snap.placeholders} Platzhalter · ${snap.games} Spiele · Einladungscode für A lesbar: ${code ? 'ja' : 'NEIN'}`);

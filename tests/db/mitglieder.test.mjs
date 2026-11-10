@@ -7,16 +7,19 @@
 //   GEGENPROBE=1        ⇒ alle Migrationen AUSSER dieser ⇒ die Datei muss rot sein
 //   GEGENPROBE=trigger  ⇒ Trigger ttg_gp_member_active im Test abgeschaltet ⇒ Krit. 7 rot
 //                         (zeigt: der Trigger sperrt, nicht start_game)
+//   GEGENPROBE=detach   ⇒ _member_detach mit dem alten Verhalten (ältere frühere Zeile verliert den
+//                         Kontobezug) ⇒ „Frühere Zeilen“ (Spec-Nachtrag B2) rot
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { freshDb, tools, U, MIGRATIONS } from './harness.mjs';
+import { probeMembers, membersCleanup } from '../e2e/fixture-members.mjs';
 
 const FILE = '20261117000000_mitglieder.sql';
 const GEGEN = process.env.GEGENPROBE || '';
-const EXPECTED = 21;
+const EXPECTED = 23;
 let ran = 0;
 let gegenDir = null;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
@@ -100,6 +103,9 @@ check('K1 Bestand: Migration löscht und ändert nichts; neue Spalten leer, vom 
     ok(/members_former_no_account/.test(await err(`update members set former_profile_id = $2 where id = $1`, [mB, U.C]) || ''), 'Check former ⇒ kein Konto');
     // Index für can_see_deck
     ok((await q(`select count(*)::int n from pg_indexes where tablename = 'game_players' and indexdef like '%(deck_id)%'`))[0].n === 1, 'Index game_players(deck_id)');
+    // Spec-Nachtrag „Frühere Zeilen“: (playgroup_id, former_profile_id) mit Index, aber NICHT eindeutig
+    const fi = await q(`select indexname, indexdef from pg_indexes where tablename = 'members' and indexdef like '%former_profile_id%'`);
+    ok(fi.length === 1 && fi[0].indexname === 'members_group_former_profile_idx' && !/UNIQUE/i.test(fi[0].indexdef), J(fi));
   } finally {
     await d.close();
   }
@@ -474,8 +480,14 @@ check('K11 Übersicht und Betreten: list_all_playgroups exakt; enter_playgroup g
     ok(cl.id === pl.id && cl.profile_id === SAU, J(cl));
     eq((await tq(`select leave_playgroup($1) r`, [be.id]))[0].r, { result: 'left', mode: 'mark', admins_left: 0 });
     await t.su();
-    eq(await tq(`select id, former_profile_id is not null f, removed_at is not null r from members where playgroup_id = $1 and id = any($2) order by f`, [be.id, [mSb, pl.id]]),
-      [{ id: mSb, f: false, r: true }, { id: pl.id, f: true, r: true }], 'jüngste Zeile behält den Kontobezug, ältere bleibt entfernt ohne');
+    eq(await tq(`select id, former_profile_id = $3 f, removed_at is not null r from members where playgroup_id = $1 and id = any($2) order by removed_at`, [be.id, [mSb, pl.id], SAU]),
+      [{ id: mSb, f: true, r: true }, { id: pl.id, f: true, r: true }], 'beide früheren Zeilen behalten den Kontobezug (Spec-Nachtrag „Frühere Zeilen“)');
+    // Betreten ⇒ genau die zuletzt entfernte (pl) kommt zurück, die ältere bleibt entfernt mit Kontobezug
+    await t.as(SAU);
+    eq((await tq(`select * from enter_playgroup($1)`, [be.id]))[0].id, pl.id);
+    await t.su();
+    eq(await tq(`select id, profile_id, former_profile_id, removed_at is not null r from members where playgroup_id = $1 and id = any($2) order by removed_at nulls last`, [be.id, [mSb, pl.id]]),
+      [{ id: mSb, profile_id: null, former_profile_id: SAU, r: true }, { id: pl.id, profile_id: SAU, former_profile_id: null, r: false }]);
   } finally {
     await d.close();
   }
@@ -552,7 +564,7 @@ check('K-1 Admin entfernt Mitglied mit Konto und Spielen ⇒ umgewandelt; Konto 
   const r = await row(mB);
   ok(r.profile_id === null && r.former_profile_id === U.B && r.role === 'member' && r.removed_at && r.removed_by === U.A && r.claim_code === null, J(r));
   eq(r.display_name, shown);
-  eq((await row(ph.f.id)).former_profile_id, null, 'ältere frühere Zeile von B verliert den Kontobezug (eindeutig je Gruppe)');
+  eq((await row(ph.f.id)).former_profile_id, U.B, 'ältere frühere Zeile von B behält den Kontobezug (Spec-Nachtrag „Frühere Zeilen“)');
   await as(U.B);
   ok((await q(`select is_group_member($1) x`, [X.id]))[0].x === false);
   ok(await n(`select count(*)::int n from games where playgroup_id = $1`, [X.id]) === 0, 'Konto sieht die Gruppe nicht mehr');
@@ -620,6 +632,245 @@ check('K-4 Entferntes Konto löscht sich ⇒ frühere Zeile „Ehemaliges Mitgli
   const r = await row(mB);
   ok(r.display_name === 'Ehemaliges Mitglied' && r.former_profile_id === null && r.removed_at !== null && r.profile_id === null, J(r));
   eq((await q(`select owner_member_id, owner_profile_id from decks where id = $1`, [dk.B]))[0], { owner_member_id: mB, owner_profile_id: null });
+  // Spec-Nachtrag „Frühere Zeilen“: auch die ältere frühere Zeile (f) heißt neutral; das Deck übernimmt die zuletzt entfernte (mB)
+  eq((await row(ph.f.id)).display_name, 'Ehemaliges Mitglied');
+});
+
+// ================================================================ Spec-Nachtrag „Frühere Zeilen“ (Befund B2, eigene Datenbank)
+// Altes Verhalten von _member_detach (vor dem Nachtrag): nimmt älteren früheren Zeilen den Kontobezug. Nur Gegenprobe.
+const OLD_DETACH = `create or replace function public._member_detach(p_member uuid)
+returns text language plpgsql security definer set search_path = public as $$
+declare m members; nm text;
+begin
+  select * into m from members where id = p_member for update;
+  if public._member_deletable(m.id) then
+    perform public._member_delete(m.id);
+    return 'delete';
+  end if;
+  select left(coalesce(nullif(p.display_name, ''), m.display_name), 40) into nm from profiles p where p.id = m.profile_id;
+  update members set former_profile_id = null
+  where playgroup_id = m.playgroup_id and former_profile_id = m.profile_id;
+  update members set former_profile_id = m.profile_id, profile_id = null, display_name = coalesce(nm, m.display_name),
+    role = 'member', removed_at = now(), removed_by = auth.uid(), claim_code = null
+  where id = m.id;
+  return 'mark';
+end $$;`;
+check('Frühere Zeilen (B2): verlassen → Platzhalter übernehmen → verlassen ⇒ beide behalten den Kontobezug; Code bringt genau die jüngere zurück; Konto löschen benennt beide neutral', async () => {
+  const d = await freshDb({ migrations: migrations() });
+  const t = tools(d);
+  const tq = t.q, terr = t.err;
+  const tn = async (sql, p) => (await tq(sql, p))[0].n;
+  try {
+    if (GEGEN === 'detach') await d.exec(OLD_DETACH);
+    for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de']]) await t.seedUser(id, { email });
+    await t.su();
+    await tq(`update profiles set display_name = 'Bea Echtname' where id = $1`, [U.B]);
+    const Xg = await t.mkGroup(U.A, 'X');
+    await t.as(U.A);
+    const a = (await tq(`select my_member_id($1) id`, [Xg.id]))[0].id;
+    const dA = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'A1', 'A1') returning id`, [U.A]))[0].id;
+    const [pl] = await tq(`select * from create_placeholder($1, 'Pit')`, [Xg.id]);
+    const dP = (await tq(`insert into decks (owner_member_id, commander_name, short_name) values ($1, 'P1', 'P1') returning id`, [pl.id]))[0].id;
+    // B tritt bei, spielt mit eigenem Deck, verlässt ⇒ R1 (frühere Zeile)
+    await t.as(U.B);
+    const r1 = (await tq(`select * from join_playgroup($1)`, [Xg.invite_code]))[0].id;
+    const dB = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'B1', 'B1') returning id`, [U.B]))[0].id;
+    await t.as(U.A);
+    const [g1] = await tq(START, [Xg.id, J([P(a, dA, 0), P(r1, dB, 1)])]);
+    await tq(`select * from finish_game($1, 'finished', 2, $2::jsonb)`, [g1.id, J([R(a, 1), R(r1, 2, a)])]);
+    const [g2] = await tq(START, [Xg.id, J([P(a, dA, 0), P(pl.id, dP, 1)])]);
+    await tq(`select * from finish_game($1, 'finished', 2, $2::jsonb)`, [g2.id, J([R(a, 1), R(pl.id, 2, a)])]);
+    await t.as(U.B);
+    eq((await tq(`select leave_playgroup($1) r`, [Xg.id]))[0].r, { result: 'left', mode: 'mark', admins_left: 1 });
+    // B übernimmt den Platzhalter Pit (R2) und verlässt wieder
+    const [cl] = await tq(`select * from claim_member($1)`, [pl.claim_code]);
+    ok(cl.id === pl.id && cl.profile_id === U.B, J(cl));
+    eq((await tq(`select leave_playgroup($1) r`, [Xg.id]))[0].r, { result: 'left', mode: 'mark', admins_left: 1 });
+    await t.su();
+    const rows = async () => tq(`select id, profile_id, former_profile_id, removed_at, display_name, claim_code from members where id = any($1) order by removed_at`, [[r1, pl.id]]);
+    // (a) beide Zeilen tragen former_profile_id
+    const s0 = await rows();
+    eq(s0.map((r) => [r.id, r.profile_id, r.former_profile_id, !!r.removed_at]), [[r1, null, U.B, true], [pl.id, null, U.B, true]], '(a) beide frühere Zeilen von B');
+    // (b) restore_member auf beide ⇒ member_has_account, nichts geändert
+    await t.as(U.A);
+    for (const id of [r1, pl.id]) ok(/member_has_account/.test(await terr(`select * from restore_member($1)`, [id]) || ''), `(b) ${id}`);
+    await t.su();
+    eq(await rows(), s0, '(b) nichts geändert');
+    // (c) Wiederbeitritt per Code ⇒ genau die jüngere Zeile (R2 = Pit) aktiv, gleiche ID; ältere unverändert entfernt
+    await t.as(U.B);
+    const [j] = await tq(`select * from join_playgroup($1)`, [Xg.invite_code]);
+    ok(j.id === pl.id && j.profile_id === U.B && j.role === 'member' && j.removed_at === null && j.former_profile_id === null, J(j));
+    await t.su();
+    eq((await rows())[0], s0[0], '(c) ältere Zeile R1 unverändert');
+    eq(await tn(`select count(*)::int n from members where playgroup_id = $1 and profile_id = $2`, [Xg.id, U.B]), 1, '(c) genau eine aktive Zeile');
+    // erneuter Code-Aufruf ⇒ dieselbe aktive Zeile, keine zweite
+    await t.as(U.B);
+    eq((await tq(`select * from join_playgroup($1)`, [Xg.invite_code]))[0].id, pl.id);
+    // (d) erneut verlassen, dann Konto löschen
+    eq((await tq(`select leave_playgroup($1) r`, [Xg.id]))[0].r.mode, 'mark');
+    await t.su();
+    const HIST = ['games', 'game_players', 'game_events', 'player_ratings', 'deck_salt_ratings', 'potg_votes'];
+    const hist = async () => { const o = {}; for (const tb of HIST) o[tb] = await tn(`select count(*)::int n from public.${tb}`); return o; };
+    const h0 = await hist();
+    const m0 = await tn(`select count(*)::int n from members where playgroup_id = $1`, [Xg.id]);
+    await t.as(U.B);
+    eq(await terr(`select delete_my_account()`), null);
+    await t.su();
+    eq(await tn(`select count(*)::int n from members where display_name = 'Bea Echtname'`), 0, '(d) keine Zeile trägt den Profilnamen');
+    eq((await rows()).map((r) => [r.id, r.display_name, r.profile_id, !!r.removed_at]),
+      [[r1, 'Ehemaliges Mitglied', null, true], [pl.id, 'Ehemaliges Mitglied', null, true]], '(d) beide neutral, beide entfernt');
+    eq(await hist(), h0, '(d) Historie zeilengleich');
+    eq(await tn(`select count(*)::int n from members where playgroup_id = $1`, [Xg.id]), m0, '(d) keine neue Zeile');
+    // Deck-Übernahme in c) fest bestimmt: die zuletzt entfernte frühere Zeile (Pit) übernimmt Bs gespieltes Deck
+    eq((await tq(`select owner_member_id, owner_profile_id from decks where id = $1`, [dB]))[0], { owner_member_id: pl.id, owner_profile_id: null });
+  } finally {
+    await d.close();
+  }
+});
+
+// ================================================================ Übergang 2: E2E-Grundzustand (tests/e2e/fixture-members.mjs)
+// Gleiche Aufruffolge wie harness.mjs baseState, hier gegen PGlite mit RLS als A (B/C nur beim Beitritt per Code).
+// io wie in Prod: members = select als A, deleteGames = delete games als A (Kaskade), rejoin = join_playgroup(Code)
+// als B/C, rpc = Funktionsaufruf als A (fehlt die Funktion ⇒ code PGRST202 wie PostgREST), removeFiles = delete
+// storage.objects als A. Danach die Teile von fixture-api.mjs baseState/snapshot, die members betreffen.
+const rpc2 = async (t, fn, ...args) => (await t.q(`select ${fn}(${args.map((_, i) => `$${i + 1}`).join(', ')}) r`, args))[0].r;
+const n2 = async (t, sql, p) => (await t.q(sql, p))[0].n;
+function pgliteIo(t, fx) {
+  const log = [];
+  const callAs = async (uid, fn, args) => {
+    await t.as(uid);
+    const ks = Object.keys(args);
+    try {
+      return (await t.q(`select public.${fn}(${ks.map((k, i) => `${k} => $${i + 1}`).join(', ')}) r`, ks.map((k) => args[k])))[0].r;
+    } catch (e) {
+      if (e.code === '42883') { const x = new Error(`PGRST202 ${fn}`); /** @type {any} */ (x).code = 'PGRST202'; throw x; }
+      throw e;
+    }
+  };
+  return {
+    log,
+    io: {
+      members: async () => { log.push('members'); await t.as(fx.a); return t.q(`select * from members where playgroup_id = $1`, [fx.group]); },
+      deleteGames: async () => { log.push('deleteGames'); await t.as(fx.a); return (await t.q(`delete from games where playgroup_id = $1 returning id`, [fx.group])).length; },
+      rejoin: async (k) => {
+        log.push(`rejoin:${k}`);
+        await t.as(fx[k]);
+        const have = await t.q(`select id from members where playgroup_id = $1 and profile_id = $2`, [fx.group, fx[k]]);
+        if (have.length) return have[0].id;
+        await t.as(fx.a);
+        const code = (await t.q(`select code from playgroup_invites where playgroup_id = $1`, [fx.group]))[0].code;
+        await t.as(fx[k]);
+        return (await t.q(`select * from join_playgroup($1)`, [code]))[0].id;
+      },
+      rpc: (fn, args) => { log.push(fn); return callAs(fx.a, fn, args); },
+      removeFiles: async (names) => { log.push('removeFiles'); await t.as(fx.a); return (await t.q(`delete from storage.objects where bucket_id = 'avatars' and name = any($1) returning name`, [names])).length; },
+    },
+  };
+}
+check('Übergang 2: Grundzustand über die P10-Funktionen ⇒ Mitglieder [A], 0 Platzhalter, 0 Spiele, keine Zeile mit removed_at; vor der Migration PGRST202 ⇒ alter Weg', async () => {
+  // (1) vor dem db push: Probe meldet „fehlt“, der alte REST-Weg (delete members als A) geht
+  {
+    const d = await freshDb({ migrations: migrations(), until: FILE });
+    const t = tools(d);
+    try {
+      for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de']]) await t.seedUser(id, { email });
+      const G = await t.mkGroup(U.A, 'TTG-E2E-Fixture');
+      const { io } = pgliteIo(t, { group: G.id, a: U.A, b: U.B, c: U.C });
+      eq(await probeMembers(io.rpc), false, 'Probe vor der Migration ⇒ alter Weg');
+      await t.as(U.A);
+      const [ph0] = await t.q(`select * from create_placeholder($1, 'Alt')`, [G.id]);
+      eq((await t.q(`delete from members where id = $1 returning id`, [ph0.id])).length, 1, 'alter Weg: delete members als A');
+    } finally { await d.close(); }
+  }
+  if (GEGEN === '1') return; // Gegenprobe (a): ohne die Migration gibt es den neuen Weg nicht (die übrigen Fälle sind rot)
+  // (2) nach dem db push: Zustände, die die E2E-Dateien (auch abgebrochen) hinterlassen
+  const d = await freshDb({ migrations: migrations() });
+  const t = tools(d);
+  try {
+    for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de'], [U.C, 'c@x.de']]) await t.seedUser(id, { email });
+    const G = await t.mkGroup(U.A, 'TTG-E2E-Fixture');
+    const fx = { group: G.id, a: U.A, b: U.B, c: U.C };
+    const { io, log } = pgliteIo(t, fx);
+    await t.as(U.A);
+    const aRow = (await t.q(`select my_member_id($1) id`, [G.id]))[0].id;
+    const dA = (await t.q(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'A1', 'A1') returning id`, [U.A]))[0].id;
+    const play = async (mid, deck) => {
+      await t.as(U.A);
+      const [g] = await t.q(START, [G.id, J([P(aRow, dA, 0), P(mid, deck, 1)])]);
+      await t.q(`select * from finish_game($1, 'finished', 2, $2::jsonb)`, [g.id, J([R(aRow, 1), R(mid, 2, aRow)])]);
+    };
+    const mkPh = async (name) => { await t.as(U.A); return (await t.q(`select * from create_placeholder($1, $2)`, [G.id, name]))[0]; };
+    const mkPhDeck = async (ph, name) => { await t.as(U.A); return (await t.q(`insert into decks (owner_member_id, commander_name, short_name) values ($1, $2, $2) returning id`, [ph.id, name]))[0].id; };
+    // K17 echt (mitglieder.e2e.mjs): „Weg Test“ gelöscht; „Mo Test“ mit Spiel ⇒ markiert ⇒ wiederhergestellt
+    const weg = await mkPh('Weg Test');
+    eq(await rpc2(t, 'remove_member', weg.id, 'delete'), { result: 'deleted' });
+    const mo = await mkPh('Mo Test');
+    await play(mo.id, await mkPhDeck(mo, 'Krenko'));
+    eq(await rpc2(t, 'remove_member', mo.id, 'mark'), { result: 'marked' });
+    await t.q(`select * from restore_member($1)`, [mo.id]);
+    // abgebrochen nach dem Markieren (nicht wiederhergestellt), mit Bild
+    const ab = await mkPh('Abbruch');
+    await play(ab.id, await mkPhDeck(ab, 'Kinnan'));
+    await t.q(`insert into storage.objects (bucket_id, name) values ('avatars', $1)`, [`members/${ab.id}/avatar.jpg`]);
+    await t.q(`update members set avatar_path = $2 where id = $1`, [ab.id, `members/${ab.id}/avatar.jpg`]);
+    eq(await rpc2(t, 'remove_member', ab.id, 'mark'), { result: 'marked' });
+    // B: verlässt → übernimmt einen Platzhalter → verlässt wieder (zwei frühere Zeilen, Spec-Nachtrag B2)
+    const code = (await t.q(`select code from playgroup_invites where playgroup_id = $1`, [G.id]))[0].code;
+    await t.as(U.B);
+    const b1 = (await t.q(`select * from join_playgroup($1)`, [code]))[0].id;
+    const dB = (await t.q(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'B1', 'B1') returning id`, [U.B]))[0].id;
+    await play(b1, dB);
+    await t.as(U.B);
+    eq((await t.q(`select leave_playgroup($1) r`, [G.id]))[0].r.mode, 'mark');
+    const pit = await mkPh('Pit');
+    await play(pit.id, await mkPhDeck(pit, 'Pit1'));
+    await t.as(U.B);
+    await t.q(`select * from claim_member($1)`, [pit.claim_code]);
+    eq((await t.q(`select leave_playgroup($1) r`, [G.id]))[0].r.mode, 'mark');
+    // C: Mitglied mit Spiel, von A entfernt ⇒ frühere Zeile
+    await t.as(U.C);
+    const c1 = (await t.q(`select * from join_playgroup($1)`, [code]))[0].id;
+    const dC = (await t.q(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'C1', 'C1') returning id`, [U.C]))[0].id;
+    await play(c1, dC);
+    eq(await rpc2(t, 'remove_member', c1, 'mark'), { result: 'marked' });
+    // dazu ein aktiver Platzhalter und B wieder aktiv (der Code holt die zuletzt entfernte Zeile: Pit)
+    await mkPh('Frisch');
+    await t.as(U.B);
+    const b3 = (await t.q(`select * from join_playgroup($1)`, [code]))[0].id;
+    ok(b3 === pit.id, 'Code holt die zuletzt entfernte Zeile von B (Pit)');
+    await t.su();
+    const before = (await t.q(`select count(*) filter (where removed_at is not null)::int r, count(*) filter (where former_profile_id is not null)::int f from members where playgroup_id = $1`, [G.id]))[0];
+    eq(before, { r: 3, f: 2 }, 'vorher: Abbruch markiert, b1 frühere Zeile von B, c1 frühere Zeile von C');
+
+    eq(await probeMembers(io.rpc), true, 'Probe nach der Migration ⇒ neuer Weg');
+    const n1 = await membersCleanup(io, fx);
+    ok(n1.games === 5 && n1.files === 1 && n1.restored === 1 && n1.rejoined === 2, J(n1));
+    // Teile von fixture-api.mjs baseState, die members betreffen: nichts mehr per REST zu löschen
+    await t.as(U.A);
+    const ms = await t.q(`select * from members where playgroup_id = $1`, [G.id]);
+    eq(ms.filter((m) => !m.profile_id).length, 0, 'baseState: keine Zeile ohne Konto ⇒ kein REST-delete auf members');
+    eq(ms.filter((m) => m.profile_id && m.profile_id !== U.A).length, 0, 'baseState: kein B/C ⇒ kein REST-delete auf members');
+    // snapshot (fixture.mjs --pruefen): Mitglieder [A], A Admin, 0 Platzhalter, 0 Spiele
+    eq(ms.map((m) => [m.profile_id, m.role]), [[U.A, 'admin']]);
+    await t.su();
+    eq(await n2(t, `select count(*)::int n from members where playgroup_id = $1 and removed_at is not null`, [G.id]), 0, 'keine Zeile mit removed_at');
+    eq(await n2(t, `select count(*)::int n from games where playgroup_id = $1`, [G.id]), 0, '0 Spiele');
+    eq(await n2(t, `select count(*)::int n from storage.objects where bucket_id = 'avatars' and name like 'members/%'`), 0, 'keine Platzhalter-Bilder');
+    // ein späterer Lauf: nichts mehr zu tun, scheitert nicht
+    log.length = 0;
+    eq(await membersCleanup(io, fx), { games: 0, rejoined: 0, restored: 0, deleted: 0, files: 0, rounds: 0 });
+    eq(log, ['deleteGames', 'members']);
+    // nächste E2E-Datei: B tritt wieder bei (neue Zeile), spielt; Grundzustand ⇒ wieder nur A
+    await t.as(U.B);
+    const b4 = (await t.q(`select * from join_playgroup($1)`, [code]))[0].id;
+    ok(![b1, pit.id].includes(b4), 'neue Zeile, keine frühere mehr da');
+    await play(b4, dB);
+    await membersCleanup(io, fx);
+    await t.su();
+    eq(await n2(t, `select count(*)::int n from members where playgroup_id = $1`, [G.id]), 1);
+  } finally {
+    await d.close();
+  }
 });
 
 check('K-5 Direktes Löschen geschlossen: delete from members als Admin ⇒ 42501; Policy mem_delete fehlt', async () => {

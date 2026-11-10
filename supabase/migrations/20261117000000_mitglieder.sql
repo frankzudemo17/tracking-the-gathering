@@ -50,7 +50,9 @@ alter table public.members
 alter table public.members
   add constraint members_removed_no_account check (removed_at is null or profile_id is null),
   add constraint members_former_no_account check (former_profile_id is null or profile_id is null);
-create unique index members_group_former_profile_key on public.members (playgroup_id, former_profile_id)
+-- Nicht eindeutig (Spec-Nachtrag „Frühere Zeilen“): ein Konto kann in einer Gruppe mehrere frühere Zeilen
+-- haben (verlassen → Platzhalter übernehmen → wieder verlassen); jede behält former_profile_id.
+create index members_group_former_profile_idx on public.members (playgroup_id, former_profile_id)
   where former_profile_id is not null;
 create index game_players_deck_id_idx on public.game_players (deck_id);
 
@@ -270,9 +272,9 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Eigene Zeile mit Konto löschen (kein Verweis) oder in eine entfernte Zeile ohne Konto umwandeln
 -- (former_profile_id merkt sich das Konto, Name bleibt der zuletzt angezeigte). Intern.
--- Hat das Konto in der Gruppe schon eine ältere frühere Zeile (Platzhalter übernommen, nachdem
--- es gegangen war), verliert die ältere den Kontobezug und bleibt entfernt: die eindeutige
--- (playgroup_id, former_profile_id) lässt nur eine zu, die jüngste kommt über Code/Betreten zurück.
+-- Hat das Konto in der Gruppe schon ältere frühere Zeilen (Platzhalter übernommen, nachdem es
+-- gegangen war), behalten sie ihren Kontobezug (Spec-Nachtrag „Frühere Zeilen“): keine wird je zu
+-- einem Platzhalter, den jemand anderes übernehmen kann. Zurück kommt nur die zuletzt entfernte.
 create or replace function public._member_detach(p_member uuid)
 returns text language plpgsql security definer set search_path = public as $$
 declare m members; nm text;
@@ -283,8 +285,6 @@ begin
     return 'delete';
   end if;
   select left(coalesce(nullif(p.display_name, ''), m.display_name), 40) into nm from profiles p where p.id = m.profile_id;
-  update members set former_profile_id = null
-  where playgroup_id = m.playgroup_id and former_profile_id = m.profile_id;
   update members set former_profile_id = m.profile_id, profile_id = null, display_name = coalesce(nm, m.display_name),
     role = 'member', removed_at = now(), removed_by = auth.uid(), claim_code = null
   where id = m.id;
@@ -328,7 +328,8 @@ begin
 end $$;
 
 -- Betreten (nur Superadmin): aktive Zeile unverändert · frühere Zeile reaktiviert (gleiche ID,
--- Rolle admin) · sonst neue Admin-Zeile (Name wie join_playgroup)
+-- Rolle admin; bei mehreren genau die zuletzt entfernte: removed_at absteigend, bei Gleichstand id,
+-- die übrigen bleiben entfernt und behalten former_profile_id) · sonst neue Admin-Zeile (Name wie join_playgroup)
 create or replace function public.enter_playgroup(p_group uuid)
 returns public.members language plpgsql security definer set search_path = public as $$
 declare m members; dn text;
@@ -341,7 +342,9 @@ begin
   if m.id is not null then return m; end if;
   update members set profile_id = auth.uid(), former_profile_id = null, removed_at = null, removed_by = null,
     role = 'admin', claim_code = null
-  where playgroup_id = p_group and former_profile_id = auth.uid() returning * into m;
+  where id = (select x.id from members x where x.playgroup_id = p_group and x.former_profile_id = auth.uid()
+              order by x.removed_at desc nulls last, x.id limit 1 for update)
+  returning * into m;
   if m.id is not null then return m; end if;
   select display_name into dn from profiles where id = auth.uid();
   insert into members (playgroup_id, profile_id, display_name, role, created_by)
@@ -350,7 +353,8 @@ begin
 end $$;
 
 -- join_playgroup (jüngste Definition 20261116000000_zugang.sql:176–193; Signatur, Rückgabe,
--- Normalisierung, Drossel unverändert): nach „schon Mitglied“ frühere Zeile reaktivieren (member)
+-- Normalisierung, Drossel unverändert): nach „schon Mitglied“ frühere Zeile reaktivieren (member;
+-- bei mehreren genau die zuletzt entfernte, Reihenfolge wie enter_playgroup)
 create or replace function public.join_playgroup(p_code text)
 returns public.members language plpgsql security definer set search_path = public as $$
 declare gid uuid; m members; dn text;
@@ -366,7 +370,9 @@ begin
   if m.id is not null then return m; end if;
   update members set profile_id = auth.uid(), former_profile_id = null, removed_at = null, removed_by = null,
     role = 'member', claim_code = null
-  where playgroup_id = gid and former_profile_id = auth.uid() returning * into m;
+  where id = (select x.id from members x where x.playgroup_id = gid and x.former_profile_id = auth.uid()
+              order by x.removed_at desc nulls last, x.id limit 1 for update)
+  returning * into m;
   if m.id is not null then return m; end if;
   select display_name into dn from profiles where id = auth.uid();
   insert into members (playgroup_id, profile_id, display_name, created_by)
@@ -376,7 +382,8 @@ end $$;
 
 -- ---------------------------------------------------------------------------
 -- Block K5: delete_my_account (jüngste Definition 20261112000000_konto.sql:89–194) bekommt
--- EINEN Block vor Schritt a); sonst wortgleich.
+-- EINEN Block vor Schritt a) und in c) eine feste Reihenfolge bei der Wahl der Zeile, die ein Deck
+-- übernimmt (eine Gruppe kann mehrere Zeilen in former[] haben); sonst wortgleich.
 -- ---------------------------------------------------------------------------
 create or replace function public.delete_my_account()
 returns void language plpgsql security definer set search_path = public as $$
@@ -398,8 +405,8 @@ begin
   if not found then raise exception 'Konto nicht gefunden'; end if;
 
   -- P10 Block K5 (20261117000000_mitglieder.sql): frühere Mitgliedschaften (verlassen/entfernt,
-  -- former_profile_id) heißen danach neutral und nehmen in c) die Decks auf, statt dass dort eine
-  -- neue aktive Zeile entsteht. Sonst unverändert gegenüber 20261112000000_konto.sql.
+  -- former_profile_id, alle — auch mehrere je Gruppe) heißen danach neutral und nehmen in c) die
+  -- Decks auf, statt dass dort eine neue aktive Zeile entsteht. Dazu in c) eine feste Reihenfolge.
   update members set display_name = 'Ehemaliges Mitglied' where former_profile_id = me;
   former := former || array(select x.id from members x where x.former_profile_id = me order by x.created_at, x.id);
 
@@ -449,7 +456,10 @@ begin
       order by min(g.started_at), g.playgroup_id
     loop
       ph := null;
-      select x.id into ph from members x where x.id = any(former) and x.playgroup_id = gid;
+      -- P10: mehrere Zeilen der Gruppe in former[] (frühere + in a) umgewandelte) ⇒ fest bestimmt:
+      -- zuerst die bis eben aktive aus a) (removed_at leer), dann die zuletzt entfernte; bei Gleichstand id
+      select x.id into ph from members x where x.id = any(former) and x.playgroup_id = gid
+      order by x.removed_at desc nulls first, x.id limit 1;
       if ph is null then
         insert into members (playgroup_id, display_name) values (gid, 'Ehemaliges Mitglied') returning id into ph;
         former := former || ph;
@@ -505,11 +515,11 @@ revoke execute on function public.member_removal_check(uuid), public.remove_memb
   public.restore_member(uuid) from public, anon;
 grant execute on function public.member_removal_check(uuid), public.remove_member(uuid, text),
   public.restore_member(uuid) to authenticated;
--- interne Hilfen: für keine Client-Rolle
 revoke execute on function public.leave_playgroup(uuid), public.list_all_playgroups(),
   public.enter_playgroup(uuid) from public, anon;
 grant execute on function public.leave_playgroup(uuid), public.list_all_playgroups(),
   public.enter_playgroup(uuid) to authenticated;
+-- interne Hilfen: für keine Client-Rolle
 revoke execute on function public._member_delete(uuid), public._member_deletable(uuid), public._member_detach(uuid),
   public._member_account_guard(public.members),
   public.gp_member_active() from public, anon, authenticated;
@@ -686,7 +696,7 @@ revoke execute on function public._member_delete(uuid), public._member_deletable
 --   public.is_group_admin(playgroup_id) or (profile_id is null and public.is_group_member(playgroup_id)) or profile_id = auth.uid()
 -- );
 -- drop index public.game_players_deck_id_idx;
--- drop index public.members_group_former_profile_key;
+-- drop index public.members_group_former_profile_idx;
 -- alter table public.members drop constraint members_former_no_account, drop constraint members_removed_no_account;
 -- alter table public.members drop column former_profile_id, drop column removed_by, drop column removed_at;
 -- RÜCKWÄRTS-ENDE

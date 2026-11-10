@@ -9,22 +9,23 @@ import { sheet, toast, errText, copyText, openPhoto } from '../lib/ui.js';
 import { setAvatar, removeAvatar } from '../lib/avatar.js';
 import { t, fmtDate, getLang } from '../i18n/index.js';
 import { go } from '../router.js';
-import { MEMBER_SELECT } from './groups.js';
 import { groupData } from '../lib/data.js';
 import { memberProfile, deckProfile } from '../lib/stats.js';
 import { fmtAvg, fmtPct, fmtMmss } from '../lib/format.js';
-import { runMemberRemoval } from './member-remove.js';
+import { runMemberRemoval, canRemoveMember } from './member-remove.js';
 import { kpis, section, moodRows, saltBars, pointsLine, highlight, deckThumb, iconDisc } from './stats-ui.js';
 
 // Decks auf- oder zugeklappt: pro Gerät gemerkt (reine Ansichtssache)
 const DECKS_KEY = 'ttg.decksOpen';
 const decksOpenPref = () => { try { return localStorage.getItem(DECKS_KEY) !== '0'; } catch { return true; } };
 const setDecksOpenPref = (v) => { try { localStorage.setItem(DECKS_KEY, v ? '1' : '0'); } catch { /* egal */ } };
+// Wie MEMBER_SELECT (groups.js) + is_superadmin des Zielprofils: kein Entfernen-Knopf beim Superadmin (P10 B1)
+const PROFILE_MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path, is_superadmin)';
 
 export default async function profile(el, { params, isStale }) {
   const mineId = currentMembership()?.id;
   const memberId = params.memberId || mineId;
-  const m = await sb.from('members').select(MEMBER_SELECT).eq('id', memberId).maybeSingle().then(must);
+  const m = await sb.from('members').select(PROFILE_MEMBER_SELECT).eq('id', memberId).maybeSingle().then(must);
   if (isStale()) return;
   if (!m) { mount(el, html`${backHead(t('nav.me'), '#/gruppen')}${empty('user', t('profile.notFound'), '')}`); return; }
 
@@ -40,8 +41,8 @@ export default async function profile(el, { params, isStale }) {
   const isGuest = !m.profile_id;
   const removed = !!m.removed_at; // P10: entfernte Zeile ist eingefroren (kein Umbenennen, kein Bild, kein Code)
   const canEdit = !removed && (isMe || isGuest); // Bild und Name: eigenes Profil und Spieler ohne Konto
-  // P10 H/K7: Entfernen-Knopf für Gruppen-Admins (und Superadmin), nicht bei Admins, nicht bei sich selbst
-  const canRemove = !removed && !isMe && m.role !== 'admin' && (isAdmin() || isSuperadmin());
+  // P10 H/K7: Entfernen-Knopf für Gruppen-Admins (und Superadmin), nicht bei Admins, nicht beim Superadmin, nicht bei sich selbst
+  const canRemove = canRemoveMember(m, { isMe: !!isMe, isAdmin: isAdmin(), isSuperadmin: isSuperadmin() });
   const name = isMe ? state.profile.display_name : memberName(m);
   const avPath = isMe ? state.profile.avatar_path : memberAvatarPath(m);
   const lang = getLang();
