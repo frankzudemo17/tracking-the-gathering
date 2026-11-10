@@ -15,6 +15,13 @@ route('/passwort-vergessen', v('forgot'), { public: true });
 route('/passwort-neu', v('newpass'));
 route('/code/:code', v('code'), { public: true });
 route('/willkommen', v('welcome'));
+// Spielende, Historie, Statistik (Etappe 4/5, Naht P13). Der Router nimmt den ersten Treffer: dieser Block
+// überschattet `/historie`/`/rangliste` weiter unten; P20 entfernt die alten Zeilen nach dem P8-Merge.
+route('/historie', v('history'), { nav: 'history', group: true, arg: 'history' });
+route('/rangliste', v('board'), { nav: 'board', group: true, arg: 'board' });
+route('/partie/:id', v('game-detail'), { nav: 'history', group: true, arg: 'history' });
+route('/abend/:id', v('recap'), { nav: 'history', group: true, arg: 'history' });
+route('/spiel/:id/ende', v('result'), { group: true, arg: 'history' });
 route('/start', v('start'), { nav: 'start', group: true });
 route('/spielen', v('soon'), { nav: 'play', group: true, arg: 'play' });
 route('/historie', v('soon'), { nav: 'history', group: true, arg: 'history' });

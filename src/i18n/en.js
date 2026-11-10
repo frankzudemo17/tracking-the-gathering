@@ -54,6 +54,7 @@ export default {
     history: { title: 'History coming soon', sub: 'Saved games grouped by game night arrive in stage 4.' },
     board: { title: 'Rankings coming soon', sub: 'Points, decks and salt rankings arrive in stage 5.' },
   },
+  result, history, board, recap, stats, // Etappe 4/5 (Naht P13)
 
   groups: {
     title: 'Playgroups', newGroup: 'New playgroup', groupName: 'Playgroup name', groupNamePh: 'e.g. Kitchen table',
@@ -174,3 +175,10 @@ export default {
 
   setup, life, dice, attack, ko,
 };
+
+// Namensräume Etappe 4/5 (Naht P13): je Paket eine eigene Datei, oben im Objekt nach `soon` eingebunden (Imports sind gehoben).
+import result from './en-result.js';
+import history from './en-history.js';
+import board from './en-board.js';
+import recap from './en-recap.js';
+import stats from './en-stats.js';

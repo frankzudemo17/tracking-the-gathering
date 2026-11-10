@@ -54,6 +54,7 @@ export default {
     history: { title: 'Historie kommt bald', sub: 'Gespeicherte Spiele nach Spieleabenden gibt es ab Etappe 4.' },
     board: { title: 'Rangliste kommt bald', sub: 'Punkte, Decks und Salt-Rangliste kommen in Etappe 5.' },
   },
+  result, history, board, recap, stats, // Etappe 4/5 (Naht P13)
 
   groups: {
     title: 'Playgroups', newGroup: 'Neue Playgroup', groupName: 'Name der Playgroup', groupNamePh: 'z. B. Küchentisch',
@@ -174,3 +175,10 @@ export default {
 
   setup, life, dice, attack, ko,
 };
+
+// Namensräume Etappe 4/5 (Naht P13): je Paket eine eigene Datei, oben im Objekt nach `soon` eingebunden (Imports sind gehoben).
+import result from './de-result.js';
+import history from './de-history.js';
+import board from './de-board.js';
+import recap from './de-recap.js';
+import stats from './de-stats.js';
