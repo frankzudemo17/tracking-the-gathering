@@ -3,12 +3,15 @@
 // gemeinsam; gedrückt halten schüttelt. Höchster Wurf beginnt, bei Gleichstand werfen nur die
 // Gleichstehenden nochmal. Während des Flugs wird nicht neu gerendert (WAAPI auf festen Elementen).
 // Ergebnis steht vor der Bahn fest: randInt(6, appRand) + 1. Zufall nur über appRand.
+// Endlage (Review B1): kein Würfel auf einem anderen, Schilder frei und im Tisch — gerechnet in
+// src/game/dice.js (settleLayout/gridLayout/placeTags), mit Flug und bei reduzierter Bewegung.
 import { html, mount, $, $$ } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { appRand } from '../lib/rand.js';
 import { randInt } from '../game/rng.js';
 import {
   simDice, throwVelocity, spreadVelocities, faceRotation, holdOffset, startRow, clampToTray, startResult,
+  placeTags, gridLayout, settleLayout, blendPaths,
 } from '../game/dice.js';
 import { t } from '../i18n/index.js';
 
@@ -17,6 +20,7 @@ const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6,
 const FACE_POS = { 1: 'rotateY(0deg)', 2: 'rotateY(90deg)', 3: 'rotateX(90deg)', 4: 'rotateX(-90deg)', 5: 'rotateY(-90deg)', 6: 'rotateY(180deg)' };
 const TILT = [-8, 6, -12, 10, -4, 12]; // leichte Schräglage in Ruhe (fest, kein Zufall)
 const INSET = { x: 44, y: 46 };         // Mittelpunkt-Abstand zum Filzrand (Main.dc.html diceTray)
+const TAG_INSET = 12;                   // Namensschilder bleiben so weit im Filz (7 px Rand + Luft)
 
 const reduced = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const vibrate = (p) => { try { if (navigator.vibrate) navigator.vibrate(p); } catch { /* iOS: nicht vorhanden */ } };
@@ -41,7 +45,7 @@ export function openDiceTable(host, { players, onAccept }) {
     phase: 'ready', // ready · hold · fly · done
   };
   const pos = []; const rot = [];
-  let tray = null, timers = [], anims = [], shakeT = null, gesture = null, closed = false;
+  let tray = null, box = null, timers = [], anims = [], shakeT = null, gesture = null, closed = false;
 
   const root = document.createElement('div');
   root.className = 'dt';
@@ -71,17 +75,46 @@ export function openDiceTable(host, { players, onAccept }) {
     tray = { x0: f.left - r.left + INSET.x, x1: f.right - r.left - INSET.x, y0: f.top - r.top + INSET.y, y1: f.bottom - r.top - INSET.y };
     if (tray.x1 < tray.x0) tray.x0 = tray.x1 = (tray.x0 + tray.x1) / 2;
     if (tray.y1 < tray.y0) tray.y0 = tray.y1 = (tray.y0 + tray.y1) / 2;
+    box = { x0: f.left - r.left + TAG_INSET, x1: f.right - r.left - TAG_INSET, y0: f.top - r.top + TAG_INSET, y1: f.bottom - r.top - TAG_INSET };
   }
   function place(i, p, scale = 1) { el[i].outer.style.transform = outerTf(p, scale); }
   function turn(i) { el[i].inner.style.transform = innerTf(rot[i]); }
+  /**
+   * Startreihe + Schildbreite. Enge Startreihe: Namensschilder abwechselnd hoch/tief (lesbar statt
+   * überlappend). Breite zusätzlich so begrenzt, dass in der Endlage 2 (bis 4 Spieler) bzw. 3 Schilder
+   * nebeneinander in den Tisch passen ⇒ die Reihen-Lage (gridLayout) geht immer auf.
+   */
+  function fitTags() {
+    const row = startRow(n, tray);
+    const gap = n > 1 ? row[1].x - row[0].x : 999;
+    const cap = Math.floor((box.x1 - box.x0) / (n <= 2 ? Math.max(1, n) : n <= 4 ? 2 : 3)) - 4;
+    root.classList.toggle('crowd', gap < 100);
+    root.style.setProperty('--dt-tagw', `${Math.round(Math.max(52, Math.min(140, (gap < 100 ? 2 * gap : gap) - 6, cap)))}px`);
+    return row;
+  }
+  const tagText = (i, v) => (v == null ? players[i].name : `${players[i].name} · ${v}`);
+  /** Maße des Schilds von Würfel i mit dem Text für Wert v (am echten Element gemessen, ohne Skalierung). */
+  function tagSize(i, v) {
+    const tag = el[i].tag, old = tag.textContent;
+    tag.textContent = tagText(i, v);
+    const size = { w: tag.offsetWidth + 1, h: tag.offsetHeight }; // + 1: offsetWidth rundet
+    tag.textContent = old;
+    return size;
+  }
+  /** Schiebt die Schilder für die Endlage end waagrecht in den Tisch (--dt-tx); move legt auch die Würfel dorthin. */
+  function lay(end, sizes, move = true) {
+    const tags = placeTags(end, sizes, box, HALF);
+    end.forEach((p, i) => {
+      el[i].outer.style.setProperty('--dt-tx', `${tags[i].dx.toFixed(1)}px`);
+      if (!move) return;
+      pos[i] = { x: p.x, y: p.y };
+      el[i].outer.style.transition = 'none';
+      place(i, pos[i]);
+    });
+  }
 
   measure();
-  const row = startRow(n, tray);
-  // Enge Startreihe: Namensschilder abwechselnd hoch/tief (lesbar statt überlappend), Breite begrenzt
-  const gap = n > 1 ? row[1].x - row[0].x : 999;
-  root.classList.toggle('crowd', gap < 100);
-  root.style.setProperty('--dt-tagw', `${Math.round(Math.max(52, Math.min(140, (gap < 100 ? 2 * gap : gap) - 6)))}px`);
-  row.forEach((p, i) => {
+  fitTags().forEach((p, i) => {
     pos[i] = p;
     rot[i] = { rz: TILT[i % TILT.length], rx: 0, ry: 0 };
     const [rx, ry] = faceRotation((i % 6) + 1); rot[i].rx = rx; rot[i].ry = ry;
@@ -93,7 +126,7 @@ export function openDiceTable(host, { players, onAccept }) {
     const done = st.winner != null;
     players.forEach((p, i) => {
       const v = st.values[i];
-      el[i].tag.textContent = v == null ? p.name : `${p.name} · ${v}`;
+      el[i].tag.textContent = tagText(i, v);
       el[i].outer.classList.toggle('idle', !done && !st.active.includes(i));
       el[i].outer.classList.toggle('win', done && st.winner === i);
     });
@@ -179,19 +212,33 @@ export function openDiceTable(host, { players, onAccept }) {
   function throwNow(samples) {
     const act = st.active.slice();
     const vals = act.map(() => randInt(6, appRand) + 1); // Ergebnis zuerst, dann die Bahn
-    if (!samples || reduced()) { settle(act, vals, null); return; }
+    const next = st.values.slice(); act.forEach((i, k) => { next[i] = vals[k]; });
+    const sizes = players.map((_, i) => tagSize(i, next[i])); // Schilder mit dem Ergebnistext
+    const geo = { sizes, tray, box, half: HALF };
+    if (!samples || reduced()) {
+      // ohne Flug: Erstwurf ⇒ Reihen in Sitzreihenfolge; Nachwurf ⇒ die Würfel liegen schon frei und bleiben
+      const first = st.values.every((v) => v == null);
+      settle(act, vals, first ? gridLayout(n, sizes, tray, box, HALF) : settleLayout({ points: pos, movable: act, prev: pos, ...geo }), sizes, null);
+      return;
+    }
     st.phase = 'fly'; root.dataset.phase = 'fly';
     const base = throwVelocity(samples, appRand);
     const vels = spreadVelocities(base, act.length, appRand);
     const rel = clampToTray(samples[samples.length - 1], tray);
     const starts = act.map((_, k) => { const o = holdOffset(k, act.length); return clampToTray({ x: rel.x + o.x, y: rel.y + o.y }, tray); });
-    const sim = simDice(starts, vels, tray);
+    // Liegende Würfel (Nachwurf) sind Hindernisse; danach die Endlage entzerren und in die Bahn einrechnen
+    const sim = simDice(starts, vels, tray, pos.filter((_, i) => !act.includes(i)));
+    const want = pos.map((p) => ({ x: p.x, y: p.y }));
+    act.forEach((i, k) => { const e = sim.path[k][sim.path[k].length - 1]; want[i] = { x: e.x, y: e.y }; });
+    const end = settleLayout({ points: want, movable: act, prev: pos, ...geo });
+    const paths = blendPaths(sim.path, act.map((i) => end[i]), sim.dur, tray);
+    lay(end, sizes, false); // Schilder gleiten schon im Flug an ihren Platz
     const ease = (p) => 1 - Math.pow(1 - p, 2.2);
     const T1 = Math.min(520, sim.dur * 0.45);
     const lift = (tt) => (tt < T1 ? Math.sin(Math.PI * tt / T1) * 0.38 : (tt < T1 * 1.55 ? Math.sin(Math.PI * (tt - T1) / (T1 * 0.55)) * 0.12 : 0));
-    const ends = [];
+    const rots = [];
     act.forEach((i, k) => {
-      const path = sim.path[k]; const total = Math.max(1, sim.dist[k]);
+      const path = paths[k]; const total = Math.max(1, sim.dist[k]);
       const spin = 360 + total * 1.15;
       const r0 = rot[i];
       const [tx, ty] = faceRotation(vals[k]);
@@ -210,21 +257,21 @@ export function openDiceTable(host, { players, onAccept }) {
         anims.push(el[i].outer.animate(kfO, { duration: sim.dur, easing: 'linear', fill: 'forwards' }));
         anims.push(el[i].inner.animate(kfI, { duration: sim.dur, easing: 'linear', fill: 'forwards' }));
       }
-      const e = path[path.length - 1];
-      ends[k] = { pos: { x: e.x, y: e.y }, rot: { rz: ((rzF % 360) + 360) % 360, rx: tx, ry: ty } };
+      rots[k] = { rz: ((rzF % 360) + 360) % 360, rx: tx, ry: ty };
     });
     [...new Set(sim.bounces.map((b) => Math.round(b / 60) * 60))].slice(0, 6).forEach((b) => timers.push(setTimeout(() => vibrate(12), b)));
-    timers.push(setTimeout(() => { vibrate([20, 40, 30]); settle(act, vals, ends); }, sim.dur + 40));
+    timers.push(setTimeout(() => { vibrate([20, 40, 30]); settle(act, vals, end, sizes, rots); }, sim.dur + 40));
   }
 
   /** Endzustand setzen, Animationen abbrechen, dann Zustand aktualisieren (HANDOFF 5.4b). */
-  function settle(act, vals, ends) {
+  function settle(act, vals, end, sizes, rots) {
     if (closed) return;
+    lay(end, sizes); // letzter Bahnpunkt = Endlage ⇒ kein Sprung
     act.forEach((i, k) => {
-      if (ends) { pos[i] = ends[k].pos; rot[i] = ends[k].rot; }
+      if (rots) rot[i] = rots[k];
       else { const [rx, ry] = faceRotation(vals[k]); rot[i] = { rz: TILT[i % TILT.length], rx, ry }; }
-      el[i].outer.style.transition = 'none'; el[i].inner.style.transition = 'none';
-      place(i, pos[i]); turn(i);
+      el[i].inner.style.transition = 'none';
+      turn(i);
       st.values[i] = vals[k];
     });
     anims.forEach((a) => { try { a.cancel(); } catch { /* schon weg */ } });
@@ -249,6 +296,13 @@ export function openDiceTable(host, { players, onAccept }) {
     root.remove();
     if (opener && opener.isConnected && opener.focus) opener.focus({ preventScroll: true });
   }
+  /** Nach „übernehmen“ rendert das Setup neu: der Auslöser ist ersetzt ⇒ Fokus auf sein Gegenstück (gleiche id/data-*). */
+  function refocus() {
+    if (!(opener instanceof HTMLElement) || opener.isConnected) return;
+    const marks = [...opener.attributes].filter((a) => a.name === 'id' || a.name.startsWith('data-'));
+    const twin = marks.length ? document.querySelector(opener.localName + marks.map((a) => `[${a.name}="${CSS.escape(a.value)}"]`).join('')) : null;
+    if (twin instanceof HTMLElement && !twin.hasAttribute('disabled')) twin.focus();
+  }
   function onKey(e) {
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
     if (e.key === 'Tab') { // Fokus bleibt im Dialog
@@ -266,8 +320,11 @@ export function openDiceTable(host, { players, onAccept }) {
   }
   function onResize() {
     if (st.phase === 'fly' || st.phase === 'hold') return;
-    measure();
-    pos.forEach((p, i) => { pos[i] = clampToTray(p, tray); place(i, pos[i]); });
+    measure(); fitTags();
+    const sizes = players.map((_, i) => tagSize(i, st.values[i]));
+    const at = pos.map((p) => clampToTray(p, tray));
+    // vor dem ersten Wurf nur in den Tisch klemmen; danach die Endlage für den neuen Tisch neu entzerren
+    lay(st.values.every((v) => v == null) ? at : settleLayout({ points: at, movable: players.map((_, i) => i), sizes, tray, box, half: HALF }), sizes);
   }
 
   root.addEventListener('pointerdown', (e) => { if (e.target.closest('[data-dice="felt"]')) onDown(e); });
@@ -281,6 +338,7 @@ export function openDiceTable(host, { players, onAccept }) {
       const r = { winnerSeat: players[st.winner].seat, values };
       close();
       onAccept?.(r);
+      refocus();
     }
   });
   window.addEventListener('resize', onResize);

@@ -30,7 +30,7 @@ function readDraft(gid) {
   try { const raw = sessionStorage.getItem(draftKey(gid)); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 function writeDraft(gid, s) {
-  try { sessionStorage.setItem(draftKey(gid), JSON.stringify({ sel: s.sel, deck: s.deck, layout: s.layout, life: s.life, start: s.start })); } catch { /* Privatmodus */ }
+  try { sessionStorage.setItem(draftKey(gid), JSON.stringify({ sel: s.sel, deck: s.deck, layout: s.layout, life: s.life, start: s.start, roll: s.roll })); } catch { /* Privatmodus */ }
 }
 function clearDraft(gid) { try { sessionStorage.removeItem(draftKey(gid)); } catch { /* egal */ } }
 
@@ -57,7 +57,8 @@ export default async function setup(el, { isStale }) {
   const name = (mid) => memberName(byId.get(mid) || {}) || '?';
 
   // ---------- Zustand (Entwurf wiederherstellen, Rückkehr vom Umweg einarbeiten)
-  const s = { sel: [], deck: {}, layout: 'seiten', life: 40, start: null, swap: null, starting: false, error: '' };
+  // roll = letzter übernommener Startwurf (P9) { key: Sitzbelegung, startRoll } ⇒ roll-Ereignis beim Start
+  const s = { sel: [], deck: {}, layout: 'seiten', life: 40, start: null, roll: null, swap: null, starting: false, error: '' };
   const draft = readDraft(gid);
   if (draft) {
     s.sel = (Array.isArray(draft.sel) ? draft.sel : []).filter((id, i, a) => byId.has(id) && a.indexOf(id) === i).slice(0, MAX);
@@ -65,6 +66,10 @@ export default async function setup(el, { isStale }) {
     if (LAYOUTS.includes(draft.layout)) s.layout = draft.layout;
     s.life = Number.isInteger(draft.life) && draft.life >= 5 && draft.life <= 99 ? draft.life : 40; // ungültig ⇒ Standard
     s.start = Number.isInteger(draft.start) && draft.start < s.sel.length ? draft.start : null;
+    // Wurf übersteht Umweg und Neuladen, aber nur passend zu Sitzbelegung und Startspieler (sonst verfallen)
+    const r = draft.roll, v = r?.startRoll?.values;
+    if (r && r.key === s.sel.join() && r.startRoll.winnerSeat === s.start && Array.isArray(v) && v.length === s.sel.length
+      && v.every((x) => Number.isInteger(x) && x >= 1 && x <= 6)) s.roll = { key: r.key, startRoll: { values: v, winnerSeat: s.start } };
   }
   if (!s.sel.length && me && byId.has(me)) { // kein oder abgelaufener Entwurf ⇒ eigenes Mitglied vorausgewählt
     s.sel = [me];
@@ -190,7 +195,6 @@ export default async function setup(el, { isStale }) {
   }
 
   const render = () => { if (el.isConnected) mount(el, view()); };
-  let rolled = null; // letzter übernommener Startwurf (P9) ⇒ roll-Ereignis beim Start
 
   // ---------- Aktionen
   on(el, 'click', '[data-act]', async (e, b) => {
@@ -220,7 +224,7 @@ export default async function setup(el, { isStale }) {
       const sel = s.sel.slice(); // Würfeltisch (P9); Schließen ohne Übernehmen ändert nichts
       openDiceTable(document.body, { players: sel.map((id, seat) => ({ seat, name: name(id) })), onAccept: ({ winnerSeat, values }) => {
         if (!el.isConnected || s.sel.join() !== sel.join()) return;
-        s.start = winnerSeat; rolled = { key: sel.join(), startRoll: { values, winnerSeat } };
+        s.start = winnerSeat; s.roll = { key: sel.join(), startRoll: { values, winnerSeat } };
         s.error = ''; save(); render();
       } });
       return;
@@ -240,7 +244,7 @@ export default async function setup(el, { isStale }) {
         layout: layoutFor(n, s.layout).layout,
         startingLife: s.life,
         firstSeat: firstSeat(),
-        startRoll: rolled && rolled.key === s.sel.join() && rolled.startRoll.winnerSeat === s.start ? rolled.startRoll : null,
+        startRoll: s.roll && s.roll.key === s.sel.join() && s.roll.startRoll.winnerSeat === s.start ? s.roll.startRoll : null,
         players: s.sel.map((id, seat) => ({ memberId: id, deckId: s.deck[id], seat })),
       });
       clearDraft(gid);
