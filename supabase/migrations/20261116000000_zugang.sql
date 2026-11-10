@@ -29,6 +29,11 @@
 --    fehlender Code in raw_user_meta_data ->> 'invite_code' (signup_code_required),
 --    unbekannter Code (signup_code_invalid) und voller Deckel (signup_full). Nur der
 --    Gruppen-Einladungscode öffnet die Registrierung, Übernahme-Codes nicht.
+--    Umwandlung: ein bestehendes anonymes Konto wird nicht zum festen Konto (GoTrue
+--    updateUser({ email }) bzw. linkIdentity setzen is_anonymous true → false, ein update,
+--    kein insert): Trigger ttg_anonymous_convert before update of is_anonymous on auth.users
+--    (Funktion anonymous_convert_guard) wirft signup_anonymous_disabled. Bestehende anonyme
+--    Zeilen bleiben (kein Aufräumen); andere Updates an ihnen laufen wie bisher.
 --    handle_new_user() legt danach im selben Vorgang die Mitgliedschaft (member) in der
 --    Gruppe des Codes an. check_invite(p_code) (auch ohne Anmeldung): ok/invalid/full.
 --    Gleichzeitige Registrierungen: pg_advisory_xact_lock erst nach der Code-Prüfung, vor
@@ -48,6 +53,7 @@
 --  - Tor abschalten, z. B. um ein Konto im Dashboard anzulegen („Add user“ scheitert ohne
 --    Code, gewollt):      alter table auth.users disable trigger ttg_signup_gate;
 --    danach wieder an:    alter table auth.users enable trigger ttg_signup_gate;
+--    (Umwandlung anonym → fest entsprechend: trigger ttg_anonymous_convert)
 --    Meldet das „must be owner of table users“ (auth.users gehört supabase_auth_admin):
 --    signup_gate() mit „begin return new; end“ ersetzen (gehört postgres) und danach die
 --    Fassung aus dieser Datei wieder einspielen.
@@ -231,6 +237,18 @@ create trigger ttg_signup_gate
   before insert on auth.users
   for each row execute function public.signup_gate();
 
+-- Umwandlung anonym → fest (Spec-Nachtrag Krit. 16): sonst ohne Code und am Deckel vorbei.
+create or replace function public.anonymous_convert_guard()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  raise exception 'signup_anonymous_disabled';
+end $$;
+
+create trigger ttg_anonymous_convert
+  before update of is_anonymous on auth.users
+  for each row when (old.is_anonymous and not new.is_anonymous)
+  execute function public.anonymous_convert_guard();
+
 -- Profil wie bisher; danach Beitritt zur Gruppe des Codes im selben Vorgang (Rolle member).
 -- Unbestätigte Konten stehen damit schon als Mitglied in der Gruppe (gewollt).
 create or replace function public.handle_new_user()
@@ -306,12 +324,14 @@ revoke execute on function public.check_invite(text) from public;
 grant execute on function public.check_invite(text) to anon, authenticated;
 -- Trigger-Funktionen: für keine Client-Rolle (handle_new_user hatte noch authenticated)
 revoke execute on function public.superadmin_delete_guard(), public.playgroup_invite_create(),
-  public.signup_gate(), public.handle_new_user() from public, anon, authenticated;
+  public.signup_gate(), public.anonymous_convert_guard(), public.handle_new_user() from public, anon, authenticated;
 
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen; Einladungscodes wandern zurück nach playgroups,
 -- Konten, Gruppen und Mitgliedschaften bleiben; Deckel-Einstellung geht verloren):
 -- RÜCKWÄRTS-BEGINN
+-- drop trigger ttg_anonymous_convert on auth.users;
+-- drop function public.anonymous_convert_guard();
 -- drop trigger ttg_signup_gate on auth.users;
 -- drop function public.signup_gate();
 -- drop function public.access_overview();

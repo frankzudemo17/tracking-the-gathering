@@ -6,7 +6,8 @@
 // Gegenproben (Spec „Spec-Tests“):
 //   TTG_GEGENPROBE=ohne  ⇒ alle Datenbanken OHNE 20261116000000_zugang.sql  (Datei muss rot sein)
 //   TTG_GEGENPROBE=tor   ⇒ Tor im Test abgeschaltet (alter table auth.users disable trigger
-//                          ttg_signup_gate) ⇒ die Prüfungen aus Krit. 7–9 müssen rot sein
+//                          ttg_signup_gate und ttg_anonymous_convert) ⇒ die Prüfungen aus
+//                          Krit. 7–9 und 16 müssen rot sein
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,7 +20,7 @@ const GEGEN = process.env.TTG_GEGENPROBE || '';
 const SA = 'cd49f5b1-0272-474d-88ab-13e16ac02a3d';
 const CODE_RE = /^TTG-[A-HJ-NP-Z2-9]{6}$/;
 
-const EXPECTED = 39;
+const EXPECTED = 40;
 let db, as, su, q, err, seedUser, mkGroup;
 let ran = 0;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
@@ -32,7 +33,7 @@ const uid = (i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
 
 async function open(opts = {}) {
   const d = await freshDb(GEGEN === 'ohne' ? { until: FILE, ...opts } : opts);
-  if (GEGEN === 'tor') await d.exec('alter table auth.users disable trigger ttg_signup_gate;');
+  if (GEGEN === 'tor') await d.exec('alter table auth.users disable trigger ttg_signup_gate; alter table auth.users disable trigger ttg_anonymous_convert;');
   return d;
 }
 
@@ -499,6 +500,27 @@ check('K9 access_overview ⇒ exakt {"accounts":21,"unconfirmed":3,"max_accounts
   ok(/permission denied/.test(await cap.err(`select access_overview()`) || ''), 'anon');
   ok(/permission denied/.test(await cap.err(`select set_max_accounts(30)`) || ''), 'anon');
 });
+check('K16 anonymes Konto ⇒ festes Konto (update is_anonymous = false, email) ⇒ signup_anonymous_disabled, Zeile und access_overview unverändert', async () => {
+  await cap.as(SA);
+  const ov0 = (await cap.q(`select access_overview() r`))[0].r;
+  await cap.su();
+  const row = () => cap.q(`select is_anonymous, email, raw_user_meta_data from auth.users where id = $1`, [CU(92)]);
+  const r0 = await row();
+  eq(r0.map((r) => [r.is_anonymous, r.email]), [[true, null]]);
+  const e = await cap.err(`update auth.users set is_anonymous = false, email = 'conv@example.test' where id = $1`, [CU(92)]);
+  ok(e && /signup_anonymous_disabled/.test(e), e);
+  eq(await row(), r0, 'Zeile unverändert');
+  await cap.as(SA);
+  eq((await cap.q(`select access_overview() r`))[0].r, ov0, 'access_overview unverändert');
+  // andere Updates an anonymen Zeilen (z. B. updateUser({ data })) laufen weiter, ebenso fest bleibt fest
+  await cap.su();
+  ok(await cap.err(`update auth.users set raw_user_meta_data = '{"x":1}', is_anonymous = true where id = $1`, [CU(92)]) === null, 'anonym bleibt anonym');
+  ok(await cap.err(`update auth.users set is_anonymous = false where id = $1`, [CU(5)]) === null, 'fest bleibt fest');
+  const def = (await cap.q(`select pg_get_triggerdef(oid) d from pg_trigger where tgname = 'ttg_anonymous_convert' and tgrelid = 'auth.users'::regclass`))[0]?.d || '';
+  ok(/BEFORE UPDATE OF is_anonymous ON auth\.users FOR EACH ROW WHEN \(\(old\.is_anonymous AND \(NOT new\.is_anonymous\)\)\)/.test(def), def);
+  ok((await cap.q(`select prosecdef s, proconfig c from pg_proc where oid = 'public.anonymous_convert_guard'::regproc`))
+    .every((r) => r.s === true && String(r.c) === 'search_path=public'), 'security definer, fester search_path');
+});
 check('K11 check_invite (anon): voll ⇒ {"status":"full"} ohne Namen; ungültig bei vollem Deckel ⇒ invalid', async () => {
   await cap.as(null);
   eq((await cap.q(`select check_invite($1) r`, [cap.X.invite_code]))[0].r, { status: 'full' });
@@ -578,6 +600,7 @@ check('K13 has_function_privilege je Funktion und Rolle', async () => {
     'set_member_role(uuid,member_role)': [false, true], 'join_playgroup(text)': [false, true],
     'signup_gate()': [false, false], 'handle_new_user()': [false, false],
     'superadmin_delete_guard()': [false, false], 'playgroup_invite_create()': [false, false],
+    'anonymous_convert_guard()': [false, false],
   };
   const got = {};
   for (const sig of Object.keys(want)) {
@@ -588,8 +611,8 @@ check('K13 has_function_privilege je Funktion und Rolle', async () => {
   eq(got, want);
   // Trigger-Funktionen der Migration vollständig erfasst
   eq((await q(`select p.proname from pg_trigger t join pg_proc p on p.oid = t.tgfoid
-               where not t.tgisinternal and t.tgname in ('ttg_signup_gate', 'ttg_superadmin_no_delete', 'ttg_playgroup_invite') order by 1`)).map((r) => r.proname),
-  ['playgroup_invite_create', 'signup_gate', 'superadmin_delete_guard']);
+               where not t.tgisinternal and t.tgname in ('ttg_signup_gate', 'ttg_anonymous_convert', 'ttg_superadmin_no_delete', 'ttg_playgroup_invite') order by 1`)).map((r) => r.proname),
+  ['anonymous_convert_guard', 'playgroup_invite_create', 'signup_gate', 'superadmin_delete_guard']);
 });
 
 // ---------------------------------------------------------------- Rückwärts-Block (Schema-Gleichheit prüft spielen.test.mjs X2)
@@ -607,5 +630,6 @@ check('Rückwärts: Block (Marker, jede Zeile „-- “) läuft auf dem Bestand;
   eq(await bq(`select id, invite_code from playgroups order by id`), codes);
   eq(await bq(`select (select count(*) from auth.users)::int u, (select count(*) from playgroups)::int g, (select count(*) from members)::int m`), c0);
   eq(await bq(`select to_regclass('public.playgroup_invites') a, to_regclass('public.app_settings') b,
-                      (select count(*)::int from pg_trigger where tgname = 'ttg_signup_gate') t`), [{ a: null, b: null, t: 0 }]);
+                      (select count(*)::int from pg_trigger where tgname in ('ttg_signup_gate', 'ttg_anonymous_convert')) t,
+                      to_regprocedure('public.anonymous_convert_guard()') f`), [{ a: null, b: null, t: 0, f: null }]);
 });
