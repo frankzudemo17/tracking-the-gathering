@@ -207,6 +207,7 @@ export default async function angriffE2e({ browser, base: BASE }) {
   await closeSheet();
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
   await P.setViewportSize({ width: 390, height: 844 });
+  await pause(); // der Tipp auf die Mitte zählt erst 400 ms nach dem Touch-Ziehen (TAP_BLOCK_MS)
   await menu('log');
   const logScroll = await P.$eval('.lc-log', (e) => getComputedStyle(e).overflowY);
   ok('Verlauf (.lc-log) bleibt scrollbar', ['auto', 'scroll'].includes(logScroll), logScroll);
