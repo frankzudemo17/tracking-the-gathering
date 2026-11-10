@@ -4,6 +4,8 @@
 // abfängt und NIE an Prod weiterreicht — ein abgefangenes is_superadmin darf nichts Echtes auslösen.
 // Echt (Prod, nur Fixture): B tritt über den Fixture-Link bei, C übernimmt einen Platzhalter, A sieht die Karte.
 // Tor-Fälle (Krit. 13) nur bei zugangLive() — sonst je Fall sichtbar übersprungen (Dirigent nach dem db push).
+// Ausnahme vom Schreibschutz (Spec H): mit TTG_E2E_SIGNUP=1 UND zugangLive() registriert signupPart ein echtes
+// Wegwerf-Konto (Plus-Adresse von A) über das Formular und löscht es über „Konto löschen“ in der App wieder.
 // Der Teil ohne Anmeldung (anonPart) braucht nur { browser, base } und läuft auch offline (alle Supabase-Anfragen
 // abgefangen) — so fährt die Gegenprobe gegen den Start-main ohne zusätzlichen Lauf gegen Prod.
 import fs from 'node:fs';
@@ -11,7 +13,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import jsQR from 'jsqr';
 import {
-  ok, skip, ctx, waitHash, login, ensureMember, ensurePlaceholder, zugangLive, inviteCode, fixtureIds, get, rpc,
+  ok, skip, ctx, waitHash, tally, login, ensureMember, ensurePlaceholder, zugangLive, inviteCode, fixtureIds, get, rpc,
   TARGET, ROOT, FIXTURE_NAME, RUN,
 } from './harness.mjs';
 import { email, password } from './fixture-api.mjs';
@@ -243,7 +245,8 @@ export async function anonPart({ browser, base, offline = false }) {
 
 // ---------------------------------------------------------------- Echte Registrierung (Spec H, Opt-in TTG_E2E_SIGNUP=1)
 export const SIGNUP_CASE = 'Echte Registrierung über das Formular (Wegwerf-Konto)';
-const GONE = (s) => s.status === 400 && s.code === 'invalid_credentials';
+/** Anmeldung scheitert, weil es das Konto nicht (mehr) gibt: GoTrue 400 invalid_credentials („Invalid login credentials“). */
+const GONE = (s) => s.status === 400 && (s.code === 'invalid_credentials' || s.msg === 'Invalid login credentials');
 
 /** Konto-ID aus der Sitzung der App (storageKey ttg-auth, src/supabase.js) — die Adresse wird nicht gelesen. */
 const sessionUid = (p) => p.evaluate(() => { try { return JSON.parse(localStorage.getItem('ttg-auth') || 'null')?.user?.id ?? null; } catch { return null; } });
@@ -265,7 +268,7 @@ async function signInProbe(mail, pass) {
     body: JSON.stringify({ email: mail, password: pass }), signal: AbortSignal.timeout(20000),
   });
   let d = {}; try { d = await r.json(); } catch { /* leer */ }
-  return { status: r.status, code: d?.error_code ?? null, uid: d?.user?.id ?? null };
+  return { status: r.status, code: d?.error_code ?? null, msg: String(d?.msg ?? d?.error_description ?? ''), uid: d?.user?.id ?? null };
 }
 
 /**
@@ -273,7 +276,7 @@ async function signInProbe(mail, pass) {
  * die Oberfläche; bleibt es, wird die Konto-ID des Rests gemeldet (rot), nie die Adresse.
  */
 async function signupCleanup({ browser, base, mail, pass, probe, prep, uid }) {
-  let s = await probe.signIn(mail, pass).catch(() => ({ status: 0, code: 'netz', uid: null }));
+  let s = await probe.signIn(mail, pass).catch(() => ({ status: 0, code: 'netz', msg: '', uid: null }));
   if (GONE(s)) { console.log('  Aufräumen: kein Wegwerf-Konto vorhanden (Anmeldung scheitert)'); return; }
   const rest = s.uid ?? uid;
   const X = await page(browser, 'ZR2');
@@ -288,7 +291,8 @@ async function signupCleanup({ browser, base, mail, pass, probe, prep, uid }) {
     await deleteViaUi(X, base);
   } catch (e) { console.log(`  Aufräumen: zweiter Löschversuch scheiterte (${String(e?.message || e).split('\n')[0].slice(0, 160)})`); }
   await X.context().close();
-  s = await probe.signIn(mail, pass).catch(() => ({ status: 0, code: 'netz', uid: null }));
+  s = await probe.signIn(mail, pass).catch(() => ({ status: 0, code: 'netz', msg: '', uid: null }));
+  if (GONE(s)) tally.throwawayDeleted++;
   ok(GONE(s) ? 'H Aufräumen: Wegwerf-Konto im zweiten Versuch über „Konto löschen“ entfernt'
     : `H Aufräumen: REST — Wegwerf-Konto ${rest ?? '(ID unbekannt)'} besteht noch (Anmeldung ${s.status} ${s.code ?? ''}) ⇒ von Hand löschen`, GONE(s));
 }
@@ -299,7 +303,7 @@ async function signupCleanup({ browser, base, mail, pass, probe, prep, uid }) {
  * der Adresse scheitert (400 invalid_credentials) und 0 Mitgliedschaften. Rot ⇒ Aufräumen (signupCleanup).
  * Die Adresse steht nur im (maskierten) Feld, nie in Ausgaben.
  * @param {{ browser: any, base: string, code: string, mail: string, pass: string,
- *   probe: { members: (uid: string) => Promise<number>, signIn: (mail: string, pass: string) => Promise<{ status: number, code: string|null, uid: string|null }> },
+ *   probe: { members: (uid: string) => Promise<number>, signIn: (mail: string, pass: string) => Promise<{ status: number, code: string|null, msg: string, uid: string|null }> },
  *   prep?: (p: any) => Promise<void> }} o — prep: Seite vorbereiten (Offline-Beleg: abgefangene Antworten)
  */
 export async function signupPart({ browser, base, code, mail, pass, probe, prep = async () => {} }) {
@@ -333,7 +337,7 @@ export async function signupPart({ browser, base, code, mail, pass, probe, prep 
     ok('H nach „Konto löschen“ in der App ⇒ Anmeldung mit der Adresse scheitert (400 invalid_credentials)', gone, `${s.status} ${s.code ?? ''}`);
     const n2 = uid ? await probe.members(uid) : -1;
     ok('H nach dem Löschen ⇒ 0 Mitgliedschaften des Kontos in der Fixture', n2 === 0, String(n2));
-    if (gone) console.log(`  Wegwerf-Konto ${uid} über die App gelöscht (keins von A, B, C)`);
+    if (gone) { tally.throwawayDeleted++; console.log(`  Wegwerf-Konto ${uid} über die App gelöscht (keins von A, B, C)`); }
   } catch (e) {
     ok(`${SIGNUP_CASE}: lief durch`, false, String(e?.message || e).split('\n')[0].slice(0, 240));
     await R.shot('fehler-wegwerf').catch(() => {});

@@ -3,7 +3,8 @@
 // Exit 0 = alle Prüfungen grün · 1 = mindestens eine Prüfung rot · 2 = Abbruch aus Umgebungsgründen
 // (Browser fehlt, Rate-Limit, Scryfall, Zugangsdaten fehlen, Wächter, Sperre) — nie „grün“.
 // Ziel (E1 = A, WELLE.md): Prod-Supabase aus src/config.js; feste Testkonten A, B, C in TTG-E2E-Fixture (Spec P9b H).
-// Der Lauf löscht nie ein Konto und nie eine Gruppe. Ein Lauf zur Zeit (Sperrdatei im Temp-Ordner).
+// Der Lauf löscht nie ein Konto und nie eine Gruppe (Ausnahme: Wegwerf-Konto des Opt-ins TTG_E2E_SIGNUP=1, löscht sich
+// selbst über die App). Ein Lauf zur Zeit (Sperrdatei im Temp-Ordner).
 //   npm run e2e
 //   npm run e2e -- --nur tisch,zugang      nur diese Dateien (Teilname genügt; Grundzustand trotzdem davor/danach)
 import fs from 'node:fs';
@@ -84,7 +85,7 @@ async function main() {
   if (after) {
     const same = before?.group === after.group;
     console.log(`Fixture nachher: Gruppe ${after.group} (${same ? 'gleiche ID wie vorher' : 'ANDERE ID'}) · Mitglieder [${after.members.join(', ')}] · ${after.placeholders} Platzhalter · ${after.games} Spiele`);
-    console.log(`Gelöschte Gruppen: ${h.tally.groupsDeleted} · gelöschte Konten: ${h.tally.accountsDeleted}${endBase?.leftovers?.length ? ` · Reste: ${endBase.leftovers.length}` : ''}`);
+    console.log(`Gelöschte Gruppen: ${h.tally.groupsDeleted} · gelöschte Konten: ${h.tally.accountsDeleted}${h.tally.throwawayDeleted ? ` (dazu ${h.tally.throwawayDeleted} Wegwerf-Konto, über die App gelöscht)` : ''}${endBase?.leftovers?.length ? ` · Reste: ${endBase.leftovers.length}` : ''}`);
   }
   if (abort) { console.log(`\nABBRUCH (${abort.reason}): ${abort.message} — Lauf gilt NICHT als grün`); return 2; }
   const baseOk = after && after.members.join() === 'A' && after.adminA && after.placeholders === 0 && after.games === 0 && before?.group === after.group;

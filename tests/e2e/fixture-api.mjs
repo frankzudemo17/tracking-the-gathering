@@ -29,7 +29,7 @@ export function fixtureIds() {
 
 // ---------------------------------------------------------------- REST
 /** Zähler für den Lauf-Nachweis (Krit. 11): gelöschte Gruppen und Konten müssen 0 bleiben. */
-export const tally = { groupsDeleted: 0, accountsDeleted: 0 };
+export const tally = { groupsDeleted: 0, accountsDeleted: 0, throwawayDeleted: 0 }; // throwawayDeleted: Wegwerf-Konto (Opt-in TTG_E2E_SIGNUP), von der App selbst gelöscht
 
 export async function api(method, url, { token, body, prefer, ok404 = false } = {}) {
   // Harte Sperre: dieser Harness löscht nie eine Gruppe und nie ein Konto

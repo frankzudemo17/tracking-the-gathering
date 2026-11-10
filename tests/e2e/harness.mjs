@@ -2,7 +2,9 @@
 // A, B, C (Zugangsdaten nur aus Umgebung/lokaler Datei, nie im Repo), Prüfzähler. Ziel laut E1 = A (WELLE.md):
 // die Prod-Supabase aus src/config.js, ausschließlich in der festen Gruppe TTG-E2E-Fixture.
 // Grundzustand, Wächter und Aufbau je Testdatei: fixture-api.mjs (run.mjs ruft baseState vor jeder Datei).
-// Der Lauf löscht nie ein Konto und nie eine Gruppe. Adressen erscheinen nie in Ausgaben oder Bildschirmfotos.
+// Der Lauf löscht nie ein Konto und nie eine Gruppe — einzige Ausnahme: das Wegwerf-Konto des Opt-ins
+// TTG_E2E_SIGNUP=1 (zugang.e2e.mjs, Spec H) löscht sich selbst über die App. Adressen erscheinen nie in Ausgaben
+// oder Bildschirmfotos.
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';

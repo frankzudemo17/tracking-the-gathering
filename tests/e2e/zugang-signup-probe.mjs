@@ -6,6 +6,10 @@
 //   node tests/e2e/zugang-signup-probe.mjs                     ⇒ grün erwartet (Exit 0)
 //   node tests/e2e/zugang-signup-probe.mjs --falsch=loeschen   delete_my_account antwortet 200, löscht aber nicht ⇒ rot, Rest-Meldung mit Konto-ID (Exit 1)
 //   node tests/e2e/zugang-signup-probe.mjs --falsch=beitritt   Registrierung ohne Mitgliedschaft ⇒ rot (Exit 1)
+//   node tests/e2e/zugang-signup-probe.mjs --falsch=doppelt    join_playgroup legt eine zweite Mitgliedschaft an ⇒ Zählung 2 ⇒ rot (Exit 1)
+// Attrappe nach supabase/migrations (feat/zugang 20261116000000_zugang.sql: handle_new_user tritt mit dem
+// invite_code bei, join_playgroup gibt die bestehende Mitgliedschaft zurück; 20261112000000_konto.sql:
+// delete_my_account macht die Mitgliedschaft zum Platzhalter „Ehemaliges Mitglied“ ohne profile_id).
 import { randomUUID } from 'node:crypto';
 import { serve } from '../../tools/serve.mjs';
 import { launch, counts, TARGET, FIXTURE_NAME } from './harness.mjs';
@@ -13,7 +17,7 @@ import { signupPart } from './zugang.e2e.mjs';
 
 const SB = TARGET.url;
 const falsch = (process.argv.find((a) => a.startsWith('--falsch=')) ?? '').split('=')[1] ?? '';
-if (falsch && !['loeschen', 'beitritt'].includes(falsch)) { console.error(`--falsch=${falsch}: erlaubt sind loeschen, beitritt`); process.exit(2); }
+if (falsch && !['loeschen', 'beitritt', 'doppelt'].includes(falsch)) { console.error(`--falsch=${falsch}: erlaubt sind loeschen, beitritt, doppelt`); process.exit(2); }
 
 const G = '00000000-0000-4000-8000-0000000000f1';
 const CODE = 'TTG-PROBE2';
@@ -32,8 +36,8 @@ const session = (u) => {
 };
 const userOut = (u) => ({ id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, user_metadata: { display_name: u.name }, app_metadata: { provider: 'email' }, identities: [], created_at: '2026-11-10T00:00:00Z' });
 const memberRow = (m) => ({ ...m, playgroups: { id: G, name: FIXTURE_NAME, created_by: null, created_at: '2026-11-10T00:00:00Z' } });
-const join = (uid, name) => {
-  if (db.members.some((m) => m.profile_id === uid)) return db.members.find((m) => m.profile_id === uid);
+const join = (uid, name, again = false) => {
+  if (!again && db.members.some((m) => m.profile_id === uid)) return db.members.find((m) => m.profile_id === uid);
   const m = { id: randomUUID(), playgroup_id: G, profile_id: uid, role: 'member', display_name: name, claim_code: null, avatar_path: null, created_at: new Date().toISOString() };
   db.members.push(m);
   return m;
@@ -78,6 +82,7 @@ async function backend(route) {
     if (fn === 'join_playgroup') {
       // neue DB: schon Mitglied ⇒ diese Mitgliedschaft; falsch=beitritt ⇒ nichts (wie ein Tor, das nicht beitritt)
       const mine = db.members.find((x) => x.profile_id === uid);
+      if (falsch === 'doppelt' && mine && me) return route.fulfill(json(200, join(uid, me.name, true)));
       return route.fulfill(json(200, mine ?? null));
     }
     if (fn === 'claim_member') return route.fulfill(json(200, null));
@@ -86,7 +91,7 @@ async function backend(route) {
     if (fn === 'delete_my_account') {
       if (falsch !== 'loeschen') {
         db.users = db.users.filter((x) => x.id !== uid);
-        db.members = db.members.filter((x) => x.profile_id !== uid);
+        for (const x of db.members) if (x.profile_id === uid) Object.assign(x, { profile_id: null, display_name: 'Ehemaliges Mitglied', role: 'member' });
       }
       return route.fulfill(json(200, null));
     }
@@ -117,7 +122,7 @@ const probe = {
   members: async (id) => db.members.filter((x) => x.profile_id === id && x.playgroup_id === G).length,
   signIn: async (mail, pass) => {
     const x = db.users.find((y) => y.email === mail && y.pass === pass);
-    return x ? { status: 200, code: null, uid: x.id } : { status: 400, code: 'invalid_credentials', uid: null };
+    return x ? { status: 200, code: null, msg: '', uid: x.id } : { status: 400, code: 'invalid_credentials', msg: 'Invalid login credentials', uid: null };
   },
 };
 
@@ -130,6 +135,6 @@ try {
   await browser.close().catch(() => {});
   await server.close();
 }
-console.log(`\n${counts.pass} bestanden, ${counts.fail} fehlgeschlagen · Attrappe am Ende: ${db.users.length} Konto/Konten, ${db.members.length} Mitgliedschaft(en)`);
+console.log(`\n${counts.pass} bestanden, ${counts.fail} fehlgeschlagen · Attrappe am Ende: ${db.users.length} Konto/Konten, ${db.members.filter((x) => x.profile_id).length} Mitgliedschaft(en) mit Konto, ${db.members.filter((x) => !x.profile_id).length} Platzhalter`);
 if (unknown.size) console.log(`Attrappe ohne eigene Antwort (Standard [] / null / 204): ${[...unknown].join(' · ')}`);
 process.exit(counts.fail ? 1 : 0);
