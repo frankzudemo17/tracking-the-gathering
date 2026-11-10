@@ -19,8 +19,10 @@ const GEGEN = process.env.TTG_GEGENPROBE || '';
 const SA = 'cd49f5b1-0272-474d-88ab-13e16ac02a3d';
 const CODE_RE = /^TTG-[A-HJ-NP-Z2-9]{6}$/;
 
+const EXPECTED = 39;
 let db, as, su, q, err, seedUser, mkGroup;
-const check = (name, fn) => test(name, fn);
+let ran = 0;
+const check = (name, fn) => test(name, async () => { ran++; await fn(); });
 const ok = (cond, info = '') => assert.ok(cond, info === '' ? undefined : String(info));
 const eq = (a, b, info) => assert.deepEqual(a, b, info);
 const n = async (sql, params) => (await q(sql, params))[0].n;
@@ -38,7 +40,11 @@ before(async () => {
   db = await open();
   ({ as, su, q, err, seedUser, mkGroup } = tools(db));
 });
-after(async () => { await db?.close(); });
+after(async () => {
+  await db?.close();
+  // Schutz: bricht das Szenario still ab, darf die Zahl nicht schrumpfen und trotzdem grün sein.
+  assert.equal(ran, EXPECTED, `erwartet ${EXPECTED} Prüfungen, gelaufen ${ran}`);
+});
 
 // geteilter Zustand
 let X, SG, mB, mC, tim;
@@ -335,4 +341,271 @@ check('Bestand: Migration auf alten Stand (2 Gruppen, 25 Konten, 1 anonyme Zeile
   await bas(uid(520));
   ok((await bq(`select * from join_playgroup($1)`, [G2.invite_code]))[0]?.playgroup_id === G2.id, 'alter Link gilt weiter');
   bestand.G1 = G1;
+});
+
+// ---------------------------------------------------------------- Registrierung wie GoTrue (direkter Insert, nie seedUser)
+/** Fehlertext oder null. confirmed: email_confirmed_at beim Insert gesetzt (Autoconfirm). */
+async function regOn(t, id, meta, { anonymous = false, confirmed = false, email } = {}) {
+  await t.su();
+  return t.err(`insert into auth.users (id, email, raw_user_meta_data, is_anonymous, email_confirmed_at)
+                values ($1, $2, $3::jsonb, $4, case when $5 then now() end)`,
+  [id, anonymous ? null : (email ?? `${id.slice(-4)}@example.test`), meta === undefined ? null : JSON.stringify(meta), anonymous, confirmed]);
+}
+const reg = (id, meta, o) => regOn({ su, err }, id, meta, o);
+const rows3 = async () => { await su(); return (await q(`select (select count(*) from auth.users)::int u, (select count(*) from profiles)::int p, (select count(*) from members)::int m`))[0]; };
+
+// ---------------------------------------------------------------- Krit. 7: Tor
+let delCode;
+check('K7 Tor lehnt ab: ohne Code / leer / OTP ohne Metadaten ⇒ signup_code_required; Tippfehler, gelöschte Gruppe, erneuerter alter Code, JSON-Objekt, 10 000 Zeichen ⇒ signup_code_invalid; je 0 neue Zeilen', async () => {
+  await as(SA);
+  const [del] = await q(`select * from create_playgroup('Del')`);
+  await su(); delCode = (await q(`select code from playgroup_invites where playgroup_id = $1`, [del.id]))[0].code;
+  await as(SA); await q(`select delete_playgroup($1, 'Del')`, [del.id]);
+  const c0 = await rows3();
+  const cases = [
+    [{}, /signup_code_required/, 'ohne Code'],
+    [undefined, /signup_code_required/, 'OTP: raw_user_meta_data null'],
+    [{ invite_code: '   ' }, /signup_code_required/, 'nur Leerzeichen'],
+    [{ invite_code: 'TTG-ZZZZZZ' }, /signup_code_invalid/, 'Tippfehler'],
+    [{ invite_code: delCode }, /signup_code_invalid/, 'gelöschte Gruppe'],
+    [{ invite_code: oldX }, /signup_code_invalid/, 'erneuerter alter Code'],
+    [{ invite_code: { code: X.invite_code } }, /signup_code_invalid/, 'JSON-Objekt'],
+    [{ invite_code: 'A'.repeat(10000) }, /signup_code_invalid/, '10 000 Zeichen'],
+  ];
+  let i = 0;
+  for (const [meta, re, info] of cases) {
+    const e = await reg(uid(700 + i++), meta);
+    ok(e && re.test(e), `${info}: ${e}`);
+  }
+  eq(await rows3(), c0);
+});
+check('K7 gültiger Code (klein, mit Leerzeichen) ⇒ 1 Konto, 1 Profil, genau 1 Mitgliedschaft (member, richtige Gruppe, Name aus display_name)', async () => {
+  const c0 = await rows3();
+  const N = uid(720);
+  ok(await reg(N, { invite_code: `  ${X.invite_code.toLowerCase()} `, display_name: 'Neue' }) === null);
+  const c1 = await rows3();
+  eq(c1, { u: c0.u + 1, p: c0.p + 1, m: c0.m + 1 });
+  eq(await q(`select playgroup_id, role::text, display_name from members where profile_id = $1`, [N]),
+    [{ playgroup_id: X.id, role: 'member', display_name: 'Neue' }]);
+  ok((await q(`select display_name from profiles where id = $1`, [N]))[0].display_name === 'Neue');
+  // neues Konto arbeitet normal und sieht die Gruppe, aber nicht den Code
+  await as(N);
+  ok(await n(`select count(*)::int n from playgroups where id = $1`, [X.id]) === 1);
+  ok(await n(`select count(*)::int n from playgroup_invites`) === 0);
+});
+check('K1 Registrierung mit Metadaten {"is_superadmin":true,"role":"admin"} ⇒ Flag false, Rolle member', async () => {
+  const N = uid(721);
+  ok(await reg(N, { invite_code: X.invite_code, is_superadmin: true, role: 'admin' }) === null);
+  ok((await q(`select is_superadmin x from profiles where id = $1`, [N]))[0].x === false);
+  eq(await q(`select role::text from members where profile_id = $1`, [N]), [{ role: 'member' }]);
+});
+
+// ---------------------------------------------------------------- Krit. 8: anonym
+check('K8 is_anonymous = true (auch mit gültigem Code) ⇒ signup_anonymous_disabled, 0 Zeilen', async () => {
+  const c0 = await rows3();
+  for (const [i, meta] of [[730, { invite_code: X.invite_code }], [731, {}], [732, undefined]]) {
+    const e = await reg(uid(i), meta, { anonymous: true });
+    ok(e && /signup_anonymous_disabled/.test(e), e);
+  }
+  eq(await rows3(), c0);
+});
+
+// ---------------------------------------------------------------- Negativraum Tor/Beitritt
+check('Negativraum: Metadaten nachträglich ändern (invite_code) ⇒ keine Wirkung', async () => {
+  await su();
+  const sgCode = (await q(`select code from playgroup_invites where playgroup_id = $1`, [SG.id]))[0].code;
+  const m0 = await n(`select count(*)::int n from members where profile_id = $1`, [U.D]);
+  await q(`update auth.users set raw_user_meta_data = $2::jsonb where id = $1`, [U.D, JSON.stringify({ invite_code: sgCode })]);
+  ok(await n(`select count(*)::int n from members where profile_id = $1`, [U.D]) === m0);
+  await as(U.D);
+  eq(await code(`update profiles set invite_code = 'x' where id = $1`, [U.D]), '42703');
+});
+check('Negativraum: Gruppe zwischen Tor und Beitritt gelöscht ⇒ Konto ohne Gruppe, kein Fehler, kein verwaister Verweis', async () => {
+  await as(SA);
+  const [t] = await q(`select * from create_playgroup('Kurz')`);
+  await su();
+  const c = (await q(`select code from playgroup_invites where playgroup_id = $1`, [t.id]))[0].code;
+  // läuft nach ttg_signup_gate (Trigger feuern in Namensreihenfolge), vor handle_new_user (after insert)
+  await db.exec(`create function public.zz_drop_group() returns trigger language plpgsql as $$
+    begin delete from public.playgroups where id = '${t.id}'; return new; end $$;
+    create trigger zz_drop_group before insert on auth.users for each row execute function public.zz_drop_group();`);
+  const N = uid(740);
+  try {
+    ok(await reg(N, { invite_code: c }) === null);
+  } finally {
+    await db.exec(`drop trigger zz_drop_group on auth.users; drop function public.zz_drop_group();`);
+  }
+  ok(await n(`select count(*)::int n from profiles where id = $1`, [N]) === 1);
+  ok(await n(`select count(*)::int n from members where profile_id = $1`, [N]) === 0);
+  ok(await n(`select count(*)::int n from playgroup_invites where playgroup_id = $1`, [t.id]) === 0);
+});
+check('K5 check_invite: erneuerter alter Code ⇒ invalid', async () => {
+  await as(null);
+  eq((await q(`select check_invite($1) r`, [oldX]))[0].r, { status: 'invalid' });
+});
+
+// ---------------------------------------------------------------- Krit. 9–11: Deckel, eigene Datenbank
+let cap;
+after(async () => { await cap?.db.close(); });
+const CU = (i) => `cccc0000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+check('K9 Deckel: Standard 20; Bestand 19 (3 unbestätigt) + 2 anonym ⇒ Nr. 20 gelingt, Nr. 21 ⇒ signup_full', async () => {
+  const c = await open();
+  cap = { db: c, ...tools(c) };
+  await cap.seedUser(SA, { email: 's@example.test' });
+  for (let i = 1; i <= 18; i++) await cap.seedUser(CU(i), { email: `c${i}@example.test`, confirmed: i > 3 });
+  for (let i = 91; i <= 92; i++) await cap.seedUser(CU(i), { anonymous: true, confirmed: false });
+  await cap.su();
+  await cap.q(`update profiles set is_superadmin = true where id = $1`, [SA]);
+  cap.X = await cap.mkGroup(SA, 'X');
+  eq(await cap.q(`select max_accounts from app_settings`), [{ max_accounts: 20 }]);
+  eq(await cap.q(`select (count(*) filter (where not is_anonymous))::int a, (count(*) filter (where not is_anonymous and email_confirmed_at is null))::int u,
+                         (count(*) filter (where is_anonymous))::int z from auth.users`), [{ a: 19, u: 3, z: 2 }]);
+  ok(await regOn(cap, CU(20), { invite_code: cap.X.invite_code }, { confirmed: true }) === null, 'Nr. 20');
+  const e = await regOn(cap, CU(21), { invite_code: cap.X.invite_code }, { confirmed: true });
+  ok(e && /signup_full/.test(e), e);
+  ok((await cap.q(`select count(*)::int n from auth.users where id = $1`, [CU(21)]))[0].n === 0);
+});
+check('K9 set_max_accounts: 21 ⇒ Nr. 21 gelingt; 5 bei Bestand 21 ⇒ erlaubt, niemand entfernt, nächste ⇒ signup_full; Bereich/Rechte', async () => {
+  await cap.as(SA);
+  eq(await cap.q(`select set_max_accounts(21) r`), [{ r: 21 }]);
+  ok(await regOn(cap, CU(21), { invite_code: cap.X.invite_code }, { confirmed: true }) === null, 'Nr. 21');
+  await cap.as(SA);
+  eq(await cap.q(`select set_max_accounts(5) r`), [{ r: 5 }]);
+  await cap.su();
+  ok((await cap.q(`select count(*)::int n from auth.users where not is_anonymous`))[0].n === 21, 'niemand entfernt');
+  const e = await regOn(cap, CU(22), { invite_code: cap.X.invite_code }, { confirmed: true });
+  ok(e && /signup_full/.test(e), e);
+  await cap.as(SA);
+  for (const v of ['0', '-1', '1001', 'null']) ok(/max_accounts_range/.test(await cap.err(`select set_max_accounts(${v}::int)`) || ''), v);
+  eq(await cap.q(`select updated_by from app_settings`).catch(() => null), null, 'app_settings für den Superadmin nicht direkt lesbar');
+  await cap.as(CU(5));
+  ok(/superadmin_only/.test(await cap.err(`select set_max_accounts(30)`) || ''), 'Nicht-Superadmin');
+  await cap.su();
+  eq(await cap.q(`select max_accounts, updated_by from app_settings`), [{ max_accounts: 5, updated_by: SA }]);
+});
+check('K9 access_overview ⇒ exakt {"accounts":21,"unconfirmed":3,"max_accounts":5}; Nicht-Superadmin ⇒ superadmin_only; app_settings direkt ⇒ 42501', async () => {
+  await cap.as(SA);
+  eq((await cap.q(`select access_overview() r`))[0].r, { accounts: 21, unconfirmed: 3, max_accounts: 5 });
+  await cap.as(CU(5));
+  ok(/superadmin_only/.test(await cap.err(`select access_overview()`) || ''));
+  const sqlstate = async (sql) => { try { await cap.db.query(sql); return null; } catch (x) { return x.code; } };
+  for (const [who, o] of [[SA, {}], [CU(5), {}], [CU(91), { anonymous: true }], [null, {}]]) {
+    await cap.as(who, o);
+    for (const sql of [`select * from app_settings`, `update app_settings set max_accounts = 999`, `insert into app_settings (id) values (true)`, `delete from app_settings`]) {
+      eq(await sqlstate(sql), '42501', `${who}: ${sql}`);
+    }
+  }
+  await cap.as(null);
+  ok(/permission denied/.test(await cap.err(`select access_overview()`) || ''), 'anon');
+  ok(/permission denied/.test(await cap.err(`select set_max_accounts(30)`) || ''), 'anon');
+});
+check('K11 check_invite (anon): voll ⇒ {"status":"full"} ohne Namen; ungültig bei vollem Deckel ⇒ invalid', async () => {
+  await cap.as(null);
+  eq((await cap.q(`select check_invite($1) r`, [cap.X.invite_code]))[0].r, { status: 'full' });
+  eq((await cap.q(`select check_invite('TTG-ZZZZZZ') r`))[0].r, { status: 'invalid' });
+});
+check('K10a letzter Platz: Bestand = Deckel − 1, zwei Registrierungen ⇒ genau eine gelingt', async () => {
+  await cap.as(SA);
+  await cap.q(`select set_max_accounts(22)`);
+  const r = [await regOn(cap, CU(30), { invite_code: cap.X.invite_code }, { confirmed: true }),
+    await regOn(cap, CU(31), { invite_code: cap.X.invite_code }, { confirmed: true })];
+  ok(r[0] === null && /signup_full/.test(r[1] || ''), JSON.stringify(r));
+  await cap.su();
+  ok((await cap.q(`select count(*)::int n from auth.users where id in ($1, $2)`, [CU(30), CU(31)]))[0].n === 1);
+});
+check('K11 check_invite (anon und authenticated): gültig ⇒ {"status":"ok","group_name":"X"}; Tippfehler/leer/null ⇒ {"status":"invalid"}', async () => {
+  await cap.as(SA);
+  await cap.q(`select set_max_accounts(30)`);
+  for (const [who, o] of [[null, {}], [CU(5), {}]]) {
+    await cap.as(who, o);
+    eq((await cap.q(`select check_invite($1) r`, [` ${cap.X.invite_code.toLowerCase()} `]))[0].r, { status: 'ok', group_name: 'X' });
+    for (const bad of ['TTG-ZZZZZZ', '', null]) eq((await cap.q(`select check_invite($1) r`, [bad]))[0].r, { status: 'invalid' }, String(bad));
+  }
+});
+check('K10b signup_gate: pg_advisory_xact_lock steht nach der Code-Prüfung und vor der Zählung', async () => {
+  await cap.su();
+  const def = (await cap.q(`select pg_get_functiondef('public.signup_gate'::regproc) d`))[0].d;
+  const at = (s) => def.indexOf(s);
+  ok(def.split('pg_advisory_xact_lock').length === 2, 'genau eine Sperre');
+  ok(at('signup_code_required') > 0 && at('signup_code_required') < at('signup_code_invalid'), 'Reihenfolge der Code-Prüfung');
+  ok(at('signup_code_invalid') < at('pg_advisory_xact_lock'), 'Sperre nach der Code-Prüfung');
+  ok(at('pg_advisory_xact_lock') < at('from auth.users'), 'Sperre vor der Zählung');
+  ok(at('from auth.users') < at('signup_full'), 'Zählung vor signup_full');
+  ok(at('signup_anonymous_disabled') < at('signup_code_required'), 'anonym zuerst');
+  ok((await cap.q(`select provolatile v from pg_proc where oid = 'public.signup_gate'::regproc`))[0].v === 'v', 'volatile: jede Abfrage nimmt einen neuen Snapshot');
+  ok((await cap.q(`select count(*)::int n from pg_trigger where tgname = 'ttg_signup_gate' and tgrelid = 'auth.users'::regclass
+                   and tgtype & 2 = 2 and tgtype & 4 = 4`))[0].n === 1, 'before insert');
+});
+
+// ---------------------------------------------------------------- Krit. 12: Bestand über dem Deckel
+check('K12 Bestand über dem Deckel (25 Konten): Bestandskonto arbeitet normal, neue Registrierung ⇒ signup_full', async () => {
+  const { q: bq, as: bas } = bestand;
+  await bas(uid(501));
+  const [ph] = await bq(`select * from create_placeholder($1, 'Pia')`, [bestand.G1.id]);
+  ok(ph?.id, 'RPC als Bestandskonto');
+  const e = await regOn(bestand, uid(598), { invite_code: bestand.G1.invite_code }, { confirmed: true });
+  ok(e && /signup_full/.test(e), e);
+  await bas(null);
+  eq((await bq(`select check_invite($1) r`, [bestand.G1.invite_code]))[0].r, { status: 'full' });
+});
+
+// ---------------------------------------------------------------- Negativraum: Konten mit Verweisen löschen sich
+check('Negativraum: Konto, das einen Link erneuert bzw. den Deckel gesetzt hat, löscht sich ⇒ delete_my_account läuft durch', async () => {
+  await as(U.A);
+  await q(`select renew_invite($1)`, [X.id]);
+  ok(await err(`select delete_my_account()`) === null, 'A');
+  await su();
+  ok((await q(`select renewed_by from playgroup_invites where playgroup_id = $1`, [X.id]))[0].renewed_by === null);
+  await q(`update profiles set is_superadmin = true where id = $1`, [U.D]);
+  await as(U.D);
+  await q(`select set_max_accounts(20)`);
+  await su();
+  ok((await q(`select updated_by from app_settings`))[0].updated_by === U.D);
+  await q(`update profiles set is_superadmin = false where id = $1`, [U.D]);
+  await as(U.D);
+  ok(await err(`select delete_my_account()`) === null, 'D');
+  await su();
+  eq(await q(`select max_accounts, updated_by from app_settings`), [{ max_accounts: 20, updated_by: null }]);
+});
+
+// ---------------------------------------------------------------- Krit. 13: Ausführungsrechte
+check('K13 has_function_privilege je Funktion und Rolle', async () => {
+  await su();
+  const want = {
+    'check_invite(text)': [true, true],
+    'is_superadmin()': [false, true], 'renew_invite(uuid)': [false, true], 'set_max_accounts(integer)': [false, true],
+    'access_overview()': [false, true], 'create_playgroup(text)': [false, true],
+    'set_member_role(uuid,member_role)': [false, true], 'join_playgroup(text)': [false, true],
+    'signup_gate()': [false, false], 'handle_new_user()': [false, false],
+    'superadmin_delete_guard()': [false, false], 'playgroup_invite_create()': [false, false],
+  };
+  const got = {};
+  for (const sig of Object.keys(want)) {
+    const [r] = await q(`select has_function_privilege('anon', $1, 'execute') a, has_function_privilege('authenticated', $1, 'execute') u`,
+      ['public.' + sig.replace(',member_role)', ',public.member_role)')]);
+    got[sig] = [r.a, r.u];
+  }
+  eq(got, want);
+  // Trigger-Funktionen der Migration vollständig erfasst
+  eq((await q(`select p.proname from pg_trigger t join pg_proc p on p.oid = t.tgfoid
+               where not t.tgisinternal and t.tgname in ('ttg_signup_gate', 'ttg_superadmin_no_delete', 'ttg_playgroup_invite') order by 1`)).map((r) => r.proname),
+  ['playgroup_invite_create', 'signup_gate', 'superadmin_delete_guard']);
+});
+
+// ---------------------------------------------------------------- Rückwärts-Block (Schema-Gleichheit prüft spielen.test.mjs X2)
+check('Rückwärts: Block (Marker, jede Zeile „-- “) läuft auf dem Bestand; Codes wandern zurück, Konten/Gruppen bleiben, Tor weg', async () => {
+  const sql = fs.readFileSync(path.join(MIGRATIONS, FILE), 'utf8');
+  const m = sql.match(/-- RÜCKWÄRTS-BEGINN\r?\n([\s\S]*?)-- RÜCKWÄRTS-ENDE/);
+  ok(m, 'Rückwärts-Block nicht gefunden');
+  const lines = m[1].split(/\r?\n/).filter((l) => l !== '');
+  ok(lines.every((l) => l.startsWith('-- ')), 'jede Zeile beginnt mit „-- “');
+  const { db: b, q: bq, su: bsu } = bestand;
+  await bsu();
+  const codes = await bq(`select playgroup_id id, code invite_code from playgroup_invites order by playgroup_id`);
+  const c0 = await bq(`select (select count(*) from auth.users)::int u, (select count(*) from playgroups)::int g, (select count(*) from members)::int m`);
+  await b.exec(lines.map((l) => l.slice(3)).join('\n'));
+  eq(await bq(`select id, invite_code from playgroups order by id`), codes);
+  eq(await bq(`select (select count(*) from auth.users)::int u, (select count(*) from playgroups)::int g, (select count(*) from members)::int m`), c0);
+  eq(await bq(`select to_regclass('public.playgroup_invites') a, to_regclass('public.app_settings') b,
+                      (select count(*)::int from pg_trigger where tgname = 'ttg_signup_gate') t`), [{ a: null, b: null, t: 0 }]);
 });
