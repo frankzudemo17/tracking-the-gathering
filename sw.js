@@ -21,6 +21,21 @@ const SHELL = [
   './src/game/engine.js', './src/game/layouts.js', './src/game/rng.js', './src/game/ko.js', './src/game/dice.js',
   './assets/icons/logo-light.png', './assets/icons/logo-dark.png', './assets/icons/favicon.png', './assets/icons/icon-192.png',
   './src/styles/result.css', './src/styles/history.css', './src/styles/board.css', './src/styles/recap.css', './src/styles/stats.css', './src/i18n/de-result.js', './src/i18n/en-result.js', './src/i18n/de-history.js', './src/i18n/en-history.js', './src/i18n/de-board.js', './src/i18n/en-board.js', './src/i18n/de-recap.js', './src/i18n/en-recap.js', './src/i18n/de-stats.js', './src/i18n/en-stats.js', './src/lib/stats.js', './src/lib/history-data.js', './src/lib/data.js', './src/lib/format.js',
+  // P11 Tempo: Gate B4 verlangt jede Datei unter src/**, jeden Verweis aus index.html und jede url() aus den Stylesheets
+  './assets/icons/apple-touch-icon.png',
+  './src/views/add-deck.js', './src/views/add-player.js', './src/views/attack-ui.js', './src/views/attack.js', './src/views/board-ui.js', './src/views/board.js',
+  './src/views/bracket-hint.js', './src/views/code.js', './src/views/deck-list.js', './src/views/deck.js', './src/views/dice.js', './src/views/forgot.js',
+  './src/views/game-detail.js', './src/views/group-delete.js', './src/views/groups.js', './src/views/history-ui.js', './src/views/history.js', './src/views/join.js',
+  './src/views/ko-art.js', './src/views/ko.js', './src/views/legal.js', './src/views/life-ui.js', './src/views/life.js', './src/views/login.js',
+  './src/views/newpass.js', './src/views/profile.js', './src/views/recap-card.js', './src/views/recap.js', './src/views/register.js', './src/views/result-ui.js',
+  './src/views/result.js', './src/views/settings-account.js', './src/views/settings-rules.js', './src/views/settings-table.js', './src/views/settings.js', './src/views/setup.js',
+  './src/views/soon.js', './src/views/start.js', './src/views/stats-ui.js', './src/views/welcome.js',
+  './src/decks/bracket.js', './src/decks/cards.js', './src/decks/manabox.js', './src/decks/spellbook.js',
+  './assets/fonts/ko/bangers/bangers-latin-400-normal.woff2', './assets/fonts/ko/bangers/bangers-latin-ext-400-normal.woff2',
+  './assets/fonts/ko/cinzel/cinzel-latin-400-normal.woff2', './assets/fonts/ko/cinzel/cinzel-latin-700-normal.woff2',
+  './assets/fonts/ko/cinzel/cinzel-latin-ext-400-normal.woff2', './assets/fonts/ko/cinzel/cinzel-latin-ext-700-normal.woff2',
+  './assets/fonts/ko/noto-sans-jp/noto-sans-jp-118-900-normal.woff2', './assets/fonts/ko/noto-sans-jp/noto-sans-jp-119-900-normal.woff2',
+  './assets/fonts/ko/press-start-2p/press-start-2p-latin-400-normal.woff2', './assets/fonts/ko/press-start-2p/press-start-2p-latin-ext-400-normal.woff2',
 ];
 
 self.addEventListener('install', (e) => {
