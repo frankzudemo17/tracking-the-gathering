@@ -477,7 +477,7 @@ check('K9 set_max_accounts: 21 ⇒ Nr. 21 gelingt; 5 bei Bestand 21 ⇒ erlaubt,
   ok(e && /signup_full/.test(e), e);
   await cap.as(SA);
   for (const v of ['0', '-1', '1001', 'null']) ok(/max_accounts_range/.test(await cap.err(`select set_max_accounts(${v}::int)`) || ''), v);
-  eq(await cap.q(`select updated_by from app_settings`).catch(() => null), null, 'app_settings für den Superadmin nicht direkt lesbar');
+  ok(/permission denied/.test(await cap.err(`select updated_by from app_settings`) || ''), 'app_settings für den Superadmin nicht direkt lesbar');
   await cap.as(CU(5));
   ok(/superadmin_only/.test(await cap.err(`select set_max_accounts(30)`) || ''), 'Nicht-Superadmin');
   await cap.su();
