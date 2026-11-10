@@ -1,5 +1,6 @@
 // DB-Fälle P3 „Gruppe löschen“ (Migration 20261115010000_gruppe_loeschen.sql) — spec-p3-gruppe.md,
-// Abnahmekriterien 1–5 plus Negativraum (Name NULL/leer, Rechte der Hilfsfunktionen, Versionsverweis
+// Abnahmekriterien 1–5 plus Nacharbeit B1 (Probelauf: Verweise aus Spielen anderer Gruppen auf
+// Mitglieder von X ⇒ member_used_elsewhere vor jedem Storage-Schritt; Deck mit deck_cards) plus Negativraum (Name NULL/leer, Rechte der Hilfsfunktionen, Versionsverweis
 // auf ein Platzhalter-Deck, created_by bleibt, Rückwärts-Block). EIN Szenario auf EINER Datenbank,
 // Fälle laufen in Reihenfolge: erst alles, was NICHTS löschen darf, dann das Löschen, dann der
 // Doppelklick.
@@ -21,7 +22,7 @@ import path from 'node:path';
 import { freshDb, tools, U, MIGRATIONS } from './harness.mjs';
 
 const FILE = '20261115010000_gruppe_loeschen.sql';
-const EXPECTED = 18;
+const EXPECTED = 24;
 let db, as, su, q, err;
 let ran = 0;
 let gegenDir = null;
@@ -89,9 +90,13 @@ async function snap(gid) {
     pg: await rows(`select * from playgroups where id = $1`),
     members: await rows(`select id, profile_id, display_name, role, claim_code, avatar_path from members where playgroup_id = $1 order by id`),
     games: await rows(`select id, status, session_id, created_by from games where playgroup_id = $1 order by id`),
-    gp: await rows(`select gp.game_id, gp.member_id, gp.deck_id, gp.seat, gp.place from game_players gp join games g on g.id = gp.game_id where g.playgroup_id = $1 order by 1, 4`),
-    ev: await rows(`select e.id, e.type, e.amount from game_events e join games g on g.id = e.game_id where g.playgroup_id = $1 order by e.id`),
+    gp: await rows(`select gp.game_id, gp.member_id, gp.deck_id, gp.seat, gp.place, gp.eliminated_by from game_players gp join games g on g.id = gp.game_id where g.playgroup_id = $1 order by 1, 4`),
+    ev: await rows(`select e.id, e.type, e.amount, e.actor, e.source, e.target from game_events e join games g on g.id = e.game_id where g.playgroup_id = $1 order by e.id`),
+    pr: await rows(`select r.* from player_ratings r join games g on g.id = r.game_id where g.playgroup_id = $1 order by 1, 2`),
+    dsr: await rows(`select r.* from deck_salt_ratings r join games g on g.id = r.game_id where g.playgroup_id = $1 order by 1, 2, 3`),
+    potg: await rows(`select v.* from potg_votes v join games g on g.id = v.game_id where g.playgroup_id = $1 order by 1, 2`),
     decks: await rows(`select d.id, d.version_of, d.archived from decks d join members m on m.id = d.owner_member_id where m.playgroup_id = $1 order by d.id`),
+    cards: await rows(`select c.deck_id, c.section, c.name, c.qty from deck_cards c join decks d on d.id = c.deck_id join members m on m.id = d.owner_member_id where m.playgroup_id = $1 order by c.id`),
   });
 }
 let before_X, before_Y, countsY;
@@ -148,6 +153,12 @@ check('Aufbau: Gruppen X (A Admin, B, Tim) und Y (C Admin, B, Ole), Spiele, Erei
     ('avatars', $1), ('avatars', $2), ('avatars', $3), ('avatars', $4), ('game-photos', $5), ('game-photos', $6), ('game-photos', $7)`,
   [`profiles/${U.A}/avatar.jpg`, `profiles/${U.B}/avatar.jpg`, PATHS.timAvatar, PATHS.oleAvatar, PATHS.xPhoto1, PATHS.xPhoto2, PATHS.yPhoto]);
   await q(`update members set avatar_path = $2 where id = $1`, [tim.id, PATHS.timAvatar]);
+  // Decklisten (20261115000000_deckliste.sql, Kaskade auf decks): Tims T1 und As A1
+  const card = (deck_id, section, name, i) => q(`insert into deck_cards (deck_id, section, qty, name, scryfall_id) values ($1, $2, 1, $3, $4)`,
+    [deck_id, section, name, `00000000-0000-4000-8000-00000000c${String(i).padStart(3, '0')}`]);
+  await card(D.T1, 'commander', 'Tims Commander', 1);
+  await card(D.T1, 'main', 'Sol Ring', 2);
+  await card(D.A1, 'commander', 'As Commander', 3);
   before_X = await snap(x.id);
   before_Y = await snap(y.id);
   countsY = await counts(y.id);
@@ -235,6 +246,60 @@ check('K3 Konto-Deck von B in X UND Y ⇒ kein Leihdeck-Fall (gehört keinem Spi
   ok((await err(...FILES(x.id))) === null, 'playgroup_files läuft');
 });
 
+// ---------------------------------------------------------------- Nacharbeit B1: Probelauf in playgroup_files
+// Je Fremdschlüssel-Klasse auf members ein Verweis aus dem Y-Spiel G.y1 auf ein Mitglied von X. Herstellbar
+// heute über die direkten Schreibrechte pr_all/potg_all (bis 20261113000000_ende.sql) bzw. Altdaten ⇒ hier
+// als Superuser angelegt. Erwartet: playgroup_files(X) wirft member_used_elsewhere (vor jedem Storage-Schritt),
+// delete_playgroup ebenso, X und Y Zeile für Zeile unverändert; danach wird der Verweis zurückgenommen.
+const elsewhere = [
+  ['player_ratings.member_id', () => [`insert into player_ratings (game_id, member_id, salt) values ($1, $2, 3)`, [G.y1.id, tim.id]],
+    () => [`delete from player_ratings where game_id = $1 and member_id = $2`, [G.y1.id, tim.id]]],
+  ['potg_votes.voted_for', () => [`insert into potg_votes (game_id, voter_id, voted_for) values ($1, $2, $3)`, [G.y1.id, mC, mA]],
+    () => [`delete from potg_votes where game_id = $1 and voter_id = $2`, [G.y1.id, mC]]],
+  ['game_events.target', () => [`insert into game_events (game_id, round, type, actor, source, target, amount, seq) values ($1, 1, 'damage', $2, $2, $3, 5, 99)`, [G.y1.id, mC, mB]],
+    () => [`delete from game_events where game_id = $1 and seq = 99`, [G.y1.id]]],
+  ['game_players.eliminated_by', () => [`update game_players set eliminated_by = $3 where game_id = $1 and member_id = $2`, [G.y1.id, ole.id, tim.id]],
+    () => [`update game_players set eliminated_by = $3 where game_id = $1 and member_id = $2`, [G.y1.id, ole.id, mBY]]],
+];
+for (const [cls, make, undo] of elsewhere) {
+  check(`B1 Verweis aus einem Spiel von Y auf ein Mitglied von X (${cls}) ⇒ playgroup_files wirft member_used_elsewhere, X und Y unverändert`, async () => {
+    await su();
+    await q(...make());
+    try {
+      const yWith = await snap(y.id);
+      ok(yWith !== before_Y, 'Verweis angelegt');
+      await as(U.A);
+      const ef = await err(...FILES(x.id));
+      ok(/member_used_elsewhere/.test(ef || ''), `files ⇒ ${ef}`);
+      ok(!/foreign key/.test(ef || ''), 'kein roher FK-Text');
+      ok(await snap(x.id) === before_X, 'X nach playgroup_files Zeile für Zeile gleich');
+      ok(await snap(y.id) === yWith, 'Y nach playgroup_files Zeile für Zeile gleich');
+      await as(U.A);
+      const ed = await err(...DEL(x.id, 'X-Name'));
+      ok(/member_used_elsewhere/.test(ed || ''), `delete ⇒ ${ed}`);
+      ok(await snap(x.id) === before_X, 'X nach delete_playgroup erhalten');
+      ok(await snap(y.id) === yWith, 'Y nach delete_playgroup gleich');
+    } finally { // auch wenn ein Fall rot ist: Verweis zurücknehmen, damit die Folgefälle nicht mitkippen
+      await su();
+      await q(...undo());
+    }
+    ok(await snap(y.id) === before_Y, 'Y zurückgesetzt');
+  });
+}
+check('B1 Probelauf ohne Fremdverweis: playgroup_files läuft und hinterlässt keine Änderung (X, Y, Gesamtzahlen)', async () => {
+  await su();
+  const total = async () => J(await q(`select (select count(*) from games)::int g, (select count(*) from members)::int m, (select count(*) from decks)::int d,
+    (select count(*) from deck_cards)::int c, (select count(*) from game_players)::int gp, (select count(*) from game_events)::int e, (select count(*) from playgroups)::int pg`));
+  const t0 = await total();
+  await as(U.A);
+  ok((await err(...FILES(x.id))) === null, 'playgroup_files läuft');
+  ok((await err(...FILES(x.id))) === null, 'zweimal hintereinander');
+  ok(await snap(x.id) === before_X, 'X gleich');
+  ok(await snap(y.id) === before_Y, 'Y gleich');
+  await su();
+  ok(await total() === t0, 'Gesamtzahlen gleich');
+});
+
 // ---------------------------------------------------------------- Kriterium 5: Dateiliste
 check('K5 playgroup_files(X) als Admin: Tims Bild + Spielfotos von X, nichts aus Y, keine Profilbilder', async () => {
   await as(U.A);
@@ -271,6 +336,12 @@ check('K1 Decks: Tims Deck weg; Konto-Decks von A und B bleiben; Versionsverweis
   ok(kept.every((d) => d.archived === false), 'nicht archiviert');
   ok(kept.find((d) => d.id === D.A2).version_of === null, 'A2.version_of geleert');
   ok(kept.find((d) => d.id === D.A1).owner_profile_id === U.A && kept.find((d) => d.id === D.B1).owner_profile_id === U.B, 'Besitzer unverändert');
+});
+check('B1 Deck mit deck_cards: Tims Deckliste mit dem Deck weg (keine Reste), As Deckliste bleibt', async () => {
+  await su();
+  ok(await n(`select count(*)::int n from deck_cards where deck_id = $1`, [D.T1]) === 0, 'T1-Karten weg');
+  ok(await n(`select count(*)::int n from deck_cards c where not exists (select 1 from decks d where d.id = c.deck_id)`) === 0, 'keine verwaisten Karten');
+  ok(await n(`select count(*)::int n from deck_cards where deck_id = $1`, [D.A1]) === 1, 'A1-Karte bleibt');
 });
 check('K2 Y unverändert (Zeilenzahlen und Inhalt), Konten und Profile bleiben, created_by von Y unberührt', async () => {
   ok(J(await counts(y.id)) === J(countsY), J(await counts(y.id)));

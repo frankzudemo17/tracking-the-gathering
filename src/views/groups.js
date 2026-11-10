@@ -6,55 +6,19 @@ import { icon } from '../lib/icons.js';
 import { avatar, backHead, roleChip, memberName, memberAvatarPath } from '../lib/parts.js';
 import { copyText, sheet, toast, errText } from '../lib/ui.js';
 import { openNewGroup, openEnterCode } from '../lib/group-actions.js';
-import { filesByBucket } from './settings-rules.js';
+import { groupNameMatches, runGroupDeletion } from './group-delete.js';
 import { t } from '../i18n/index.js';
 import { go } from '../router.js';
 
 export const MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path)';
 
 // ---------------------------------------------------------------- Gruppe löschen (Spec P3 Block A)
-/** Name zum Bestätigen: Rand und Groß-/Kleinschreibung egal, leer nie (wie delete_playgroup auf dem Server). */
-export function groupNameMatches(input, name) {
-  const a = String(input ?? '').trim().toLocaleLowerCase('de');
-  return a !== '' && a === String(name ?? '').trim().toLocaleLowerCase('de');
-}
-
-/** „Gruppe nicht gefunden“: ein früherer Aufruf (Doppelklick, anderer Admin) hat schon gelöscht. */
-const groupGone = (e) => /Gruppe nicht gefunden/.test(e?.message || '');
-
-/**
- * Gruppe löschen, Ablauf ohne DOM (Muster runAccountDeletion, E3-P12):
- *   1. playgroup_files(): Vorprüfung auf dem Server (Admin, Leihdeck ⇒ deck_used_elsewhere) und Dateiliste.
- *      Wirft sie, endet der Ablauf, BEVOR eine Datei gelöscht ist (0 Storage-Aufrufe).
- *   2. Storage-remove der Bilder der Spieler ohne Konto und der Spielfotos. Nur jetzt möglich: nach dem
- *      Löschen gibt es die Mitgliedschaft nicht mehr, die Storage-Policies erlauben dann nichts, und SQL
- *      darf storage.objects nicht löschen. Fehler oder weniger gelöscht als verlangt ⇒ Abbruch vor der RPC.
- *   3. delete_playgroup(): die eigentliche Löschung (eine Transaktion, purge_playgroup).
- * Rückgabe 'deleted' oder 'already' (schon gelöscht). Wirft bei jedem anderen Fehler.
- */
-export async function runGroupDeletion(client, gid, name) {
-  const list = await client.rpc('playgroup_files', { p_group: gid });
-  if (list.error) {
-    if (groupGone(list.error)) return 'already';
-    throw list.error;
-  }
-  for (const [bucket, paths] of Object.entries(filesByBucket(list.data))) {
-    for (let i = 0; i < paths.length; i += 100) {
-      const part = paths.slice(i, i + 100);
-      const { data, error } = await client.storage.from(bucket).remove(part);
-      if (error) throw error;
-      // Storage meldet verweigerte Löschungen nicht als Fehler, sondern liefert sie nur nicht zurück
-      if (Array.isArray(data) && data.length < part.length) throw new Error(`Storage: ${part.length - data.length} Datei(en) in ${bucket} nicht gelöscht`);
-    }
-  }
-  const { error } = await client.rpc('delete_playgroup', { p_group: gid, p_name: name });
-  if (error && !groupGone(error)) throw error;
-  return error ? 'already' : 'deleted';
-}
+// Ablauf ohne DOM in group-delete.js (Unit-Test); hier nur das Sheet.
 
 const deleteErrText = (e) => {
   const m = e?.message || '';
   if (/deck_used_elsewhere/.test(m)) return t('groups.deleteDeckElsewhere');
+  if (/member_used_elsewhere/.test(m)) return t('groups.deleteMemberElsewhere');
   if (/Name stimmt nicht/.test(m)) return t('groups.deleteNameWrong');
   return errText(e);
 };
@@ -94,7 +58,7 @@ function openDeleteGroup(g, { games, members, guests }) {
       showErr('');
       sh.setAttribute('aria-busy', 'true');
       try {
-        await busy(yes, () => runGroupDeletion(sb, g.id, input.value));
+        await busy(yes, () => runGroupDeletion(sb, g, input.value));
         await loadMe();
         setGroup(state.groupId); // Merker in localStorage nie auf der gelöschten Gruppe lassen
         close();

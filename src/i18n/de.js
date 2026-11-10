@@ -87,6 +87,7 @@ export default {
     deleteType: 'Zum Bestätigen den Namen der Gruppe eingeben', deleteYes: 'Endgültig löschen', deleted: '„{name}“ wurde gelöscht.',
     deleteNameWrong: 'Der Name stimmt nicht.',
     deleteDeckElsewhere: 'Löschen geht nicht: Ein Deck eines Spielers ohne Konto aus dieser Gruppe kommt in Spielen einer anderen Playgroup vor. Deren Historie bleibt geschützt.',
+    deleteMemberElsewhere: 'Löschen geht nicht: Spiele einer anderen Playgroup verweisen auf Mitglieder dieser Gruppe. Deren Historie bleibt geschützt.',
     joinLiveSoon: 'Live-Beitritt kommt gleich', joinLiveSoonSub: 'Bald trittst du hier mit Code oder Link einem laufenden Spiel bei.',
   },
 

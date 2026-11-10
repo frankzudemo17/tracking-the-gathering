@@ -87,6 +87,7 @@ export default {
     deleteType: 'Type the name of the group to confirm', deleteYes: 'Delete for good', deleted: '“{name}” was deleted.',
     deleteNameWrong: 'The name does not match.',
     deleteDeckElsewhere: 'Cannot delete: a deck of a player without an account from this group appears in games of another playgroup. Its history stays protected.',
+    deleteMemberElsewhere: 'Cannot delete: games of another playgroup refer to members of this group. Their history stays protected.',
     joinLiveSoon: 'Joining live is coming soon', joinLiveSoonSub: 'Soon you will join a running game here with a code or link.',
   },
 
