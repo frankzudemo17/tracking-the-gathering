@@ -1,0 +1,282 @@
+{
+ "commanders": [
+  {
+   "card": "Light-Paws, Emperor's Voice",
+   "quantity": 1
+  }
+ ],
+ "main": [
+  {
+   "card": "Ajani's Chosen",
+   "quantity": 1
+  },
+  {
+   "card": "All That Glitters",
+   "quantity": 1
+  },
+  {
+   "card": "Angelic Destiny",
+   "quantity": 1
+  },
+  {
+   "card": "Angelic Gift",
+   "quantity": 1
+  },
+  {
+   "card": "Archangel Elspeth",
+   "quantity": 1
+  },
+  {
+   "card": "Archon of Sun's Grace",
+   "quantity": 1
+  },
+  {
+   "card": "Armored Ascension",
+   "quantity": 1
+  },
+  {
+   "card": "Auramancer",
+   "quantity": 1
+  },
+  {
+   "card": "Battle Mastery",
+   "quantity": 1
+  },
+  {
+   "card": "Cartouche of Solidarity",
+   "quantity": 1
+  },
+  {
+   "card": "Celestial Mantle",
+   "quantity": 1
+  },
+  {
+   "card": "Chains of Custody",
+   "quantity": 1
+  },
+  {
+   "card": "Cosmic Intervention",
+   "quantity": 1
+  },
+  {
+   "card": "Danitha Capashen, Paragon",
+   "quantity": 1
+  },
+  {
+   "card": "Darksteel Mutation",
+   "quantity": 1
+  },
+  {
+   "card": "Daybreak Coronet",
+   "quantity": 1
+  },
+  {
+   "card": "Devoted Caretaker",
+   "quantity": 1
+  },
+  {
+   "card": "Eidolon of Countless Battles",
+   "quantity": 1
+  },
+  {
+   "card": "Eiganjo, Seat of the Empire",
+   "quantity": 1
+  },
+  {
+   "card": "Eland Umbra",
+   "quantity": 1
+  },
+  {
+   "card": "Elspeth Resplendent",
+   "quantity": 1
+  },
+  {
+   "card": "Elspeth, Sun's Champion",
+   "quantity": 1
+  },
+  {
+   "card": "Emergence Zone",
+   "quantity": 1
+  },
+  {
+   "card": "Esper Sentinel",
+   "quantity": 1
+  },
+  {
+   "card": "Ethereal Armor",
+   "quantity": 1
+  },
+  {
+   "card": "Fateful Absence",
+   "quantity": 1
+  },
+  {
+   "card": "Flawless Maneuver",
+   "quantity": 1
+  },
+  {
+   "card": "Flickering Ward",
+   "quantity": 1
+  },
+  {
+   "card": "Gift of Immortality",
+   "quantity": 1
+  },
+  {
+   "card": "Giver of Runes",
+   "quantity": 1
+  },
+  {
+   "card": "Hall of Heliod's Generosity",
+   "quantity": 1
+  },
+  {
+   "card": "Heliod's Pilgrim",
+   "quantity": 1
+  },
+  {
+   "card": "Hero of Iroas",
+   "quantity": 1
+  },
+  {
+   "card": "Holy Mantle",
+   "quantity": 1
+  },
+  {
+   "card": "Hyena Umbra",
+   "quantity": 1
+  },
+  {
+   "card": "Idolized",
+   "quantity": 1
+  },
+  {
+   "card": "Kor Spiritdancer",
+   "quantity": 1
+  },
+  {
+   "card": "Loran's Escape",
+   "quantity": 1
+  },
+  {
+   "card": "Mantle of the Ancients",
+   "quantity": 1
+  },
+  {
+   "card": "Mesa Enchantress",
+   "quantity": 1
+  },
+  {
+   "card": "Michiko's Reign of Truth",
+   "quantity": 1
+  },
+  {
+   "card": "On Serra's Wings",
+   "quantity": 1
+  },
+  {
+   "card": "Ossification",
+   "quantity": 1
+  },
+  {
+   "card": "Pearl-Ear, Imperial Advisor",
+   "quantity": 1
+  },
+  {
+   "card": "Plains",
+   "quantity": 32
+  },
+  {
+   "card": "Sage's Reverie",
+   "quantity": 1
+  },
+  {
+   "card": "Sejiri Shelter",
+   "quantity": 1
+  },
+  {
+   "card": "Sentinel's Eyes",
+   "quantity": 1
+  },
+  {
+   "card": "Sevinne's Reclamation",
+   "quantity": 1
+  },
+  {
+   "card": "Sheltered by Ghosts",
+   "quantity": 1
+  },
+  {
+   "card": "Shielded by Faith",
+   "quantity": 1
+  },
+  {
+   "card": "Sigil of the Empty Throne",
+   "quantity": 1
+  },
+  {
+   "card": "Sol Ring",
+   "quantity": 1
+  },
+  {
+   "card": "Solitude",
+   "quantity": 1
+  },
+  {
+   "card": "Spirit Mantle",
+   "quantity": 1
+  },
+  {
+   "card": "Sram, Senior Edificer",
+   "quantity": 1
+  },
+  {
+   "card": "Starfield Mystic",
+   "quantity": 1
+  },
+  {
+   "card": "Starnheim Courser",
+   "quantity": 1
+  },
+  {
+   "card": "Steelshaper's Gift",
+   "quantity": 1
+  },
+  {
+   "card": "Tempest Technique",
+   "quantity": 1
+  },
+  {
+   "card": "Timely Ward",
+   "quantity": 1
+  },
+  {
+   "card": "Tocasia's Welcome",
+   "quantity": 1
+  },
+  {
+   "card": "Transcendent Envoy",
+   "quantity": 1
+  },
+  {
+   "card": "Twinblade Blessing",
+   "quantity": 1
+  },
+  {
+   "card": "Umbra Mystic",
+   "quantity": 1
+  },
+  {
+   "card": "Unbreakable Formation",
+   "quantity": 1
+  },
+  {
+   "card": "Unquestioned Authority",
+   "quantity": 1
+  },
+  {
+   "card": "Vanquish the Horde",
+   "quantity": 1
+  }
+ ]
+}
