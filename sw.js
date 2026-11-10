@@ -37,7 +37,7 @@ const SHELL = [
   './src/views/add-deck.js', './src/views/add-player.js', './src/views/attack-ui.js', './src/views/attack.js', './src/views/board-ui.js', './src/views/board.js',
   './src/views/bracket-hint.js', './src/views/deck-list.js', './src/views/deck.js', './src/views/dice.js', './src/views/forgot.js',
   './src/views/game-detail.js', './src/views/group-delete.js', './src/views/groups.js', './src/views/history-ui.js', './src/views/history.js', './src/views/join.js',
-  './src/views/ko-art.js', './src/views/ko.js', './src/views/legal.js', './src/views/life-ui.js', './src/views/life.js', './src/views/login.js',
+  './src/views/ko-art.js', './src/views/ko.js', './src/views/legal.js', './src/views/life-ui.js', './src/views/life.js', './src/views/login.js', './src/views/member-remove.js',
   './src/views/newpass.js', './src/views/profile.js', './src/views/recap-card.js', './src/views/recap.js', './src/views/register.js', './src/views/result-ui.js',
   './src/views/result.js', './src/views/settings-account.js', './src/views/settings-rules.js', './src/views/settings-table.js', './src/views/settings.js', './src/views/setup.js',
   './src/views/soon.js', './src/views/start.js', './src/views/stats-ui.js', './src/views/welcome.js',
