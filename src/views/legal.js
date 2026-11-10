@@ -7,10 +7,11 @@ import { backHead } from '../lib/parts.js';
 import { t } from '../i18n/index.js';
 import { APP_VERSION } from '../version.js';
 
-// Platzhalter bis Franco die Angaben liefert (WELLE E5). Solange der Wert mit {{ beginnt,
+// Angaben von Franco (WELLE E5, 10.11.2026). Solange ein Wert mit {{ beginnt,
 // zeigt die App sichtbar „Angaben folgen“ statt erfundener Daten.
-const VERANTWORTLICHER = '{{VERANTWORTLICHER}}';
-const IMPRESSUM = '{{IMPRESSUM}}';
+const ANGABEN = '{{entfernt}}';
+const VERANTWORTLICHER = ANGABEN;
+const IMPRESSUM = ANGABEN;
 const filled = (v) => !/^\{\{.*\}\}$/.test(v);
 const pendingOr = (v) => (filled(v) ? html`<p class="pre">${v}</p>` : html`<p class="pending" data-pending>${icon('warn', 16)}${t('legal.pending')}</p>`);
 
