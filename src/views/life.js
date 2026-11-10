@@ -280,7 +280,11 @@ export default async function life(el, { params, isStale }) {
     s = r.state;
     rec.push(r.events);
     store.publish(id, s);
-    if (action.type === 'life') bumpDelta(action.target, action.d);
+    // Jede Lebensänderung zeigt ihre Plakette – Tippen, Angriff (ein Ziel oder alle), Lifelink (wie von fern)
+    if (action.type !== 'undo') for (const p of s.players) {
+      const q = prev.players.find((x) => x.id === p.id);
+      if (q && q.life !== p.life) bumpDelta(p.id, p.life - q.life);
+    }
     if (action.type === 'undo') { for (const dl of deltas.values()) clearTimeout(dl.timer); deltas.clear(); }
     paint();
     showHits(hitDiff(prev, s, 'local'), prev, s, 'local');

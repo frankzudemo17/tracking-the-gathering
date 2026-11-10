@@ -103,9 +103,11 @@ export default async function angriffE2e({ browser, base: BASE }) {
   ok('Fenster: „5 Schaden eintragen“', (await P.textContent('[data-a="apply"]')).trim() === '5 Schaden eintragen', await P.textContent('[data-a="apply"]'));
   await P.click('[data-sheet="attack"] [data-a="apply"]');
   await sheetGone();
+  ok('Angriff zeigt −5 am Feld des Ziels (Plakette)', (await P.textContent(`${field(B)} .lc-delta`)).trim() === '−5');
   ok('K4 Vorschau = Feldwert (B 35)', pv6.length === 1 && pv6[0][0] === B && pv6[0][1] === (await lifeOf(B)) && pv6[0][1] === 35, JSON.stringify(pv6));
 
   // ---------------------------------------------------------------- Kriterium 3 + 4: ALLE + Lifelink, Rückgängig
+  await P.waitForFunction(() => !document.querySelector('.lc-delta')); // Plaketten summieren im Fenster von 1,8 s ⇒ erst leer
   const before3 = await lives();
   await openAttack(A, '.lc-hub', async () => {
     ok('Ziehen auf den Mittelknopf ⇒ „ALLE“ rot', (await P.locator('.lc-hub.atk-drag.atk-over .atk-alle').isVisible()) && (await P.textContent('.lc-hub .atk-alle')).includes('ALLE'));
@@ -122,6 +124,7 @@ export default async function angriffE2e({ browser, base: BASE }) {
   await P.shot('p10-04-fenster-alle-lifelink');
   await P.click('[data-sheet="attack"] [data-a="apply"]');
   await sheetGone();
+  ok('ALLE: Plakette −3 an jedem Gegner, +9 beim Angreifer', (await P.textContent(`${field(B)} .lc-delta`)).trim() === '−3' && (await P.textContent(`${field(C)} .lc-delta`)).trim() === '−3' && (await P.textContent(`${field(J)} .lc-delta`)).trim() === '−3' && (await P.textContent(`${field(A)} .lc-delta`)).trim() === '+9');
   const after3 = await lives();
   ok('K3 jeder Gegner −3, A + 3 × 3', after3[B] === before3[B] - 3 && after3[C] === before3[C] - 3 && after3[J] === before3[J] - 3 && after3[A] === before3[A] + 9,
     JSON.stringify([before3, after3]));

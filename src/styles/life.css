@@ -216,9 +216,19 @@ html:has(.lc-screen), html:has(.lc-screen) body { overflow: hidden; overscroll-b
 .lc-field.hit-big::before { animation: lc-hit-big .55s ease-out 1;
   box-shadow: inset 0 0 4cqmin 3.5cqmin color-mix(in srgb, var(--danger) 82%, black), inset 0 0 20cqmin 6cqmin color-mix(in srgb, var(--danger) 60%, black); }
 @keyframes lc-hit { from { opacity: 1; } to { opacity: 0; } }
+/* Die Zahl reagiert mit (Franco 10.11.): bei Schaden rot und kurz „nach hinten“, groß mit Ruck; bei Gewinn kurz nach vorn.
+   Ohne Endfarbe im Keyframe läuft sie auf die eigene Farbe zurück (auch .low). Dauer ≤ Puls, die Klasse geht danach weg. */
+.lc-field.hit-dmg .lc-big { animation: lc-num-dmg .32s ease-out 1; }
+.lc-field.hit-big .lc-big { animation: lc-num-big .55s ease-out 1; }
+.lc-field.hit-gain .lc-big { animation: lc-num-gain .3s ease-out 1; }
+@keyframes lc-num-dmg { 0% { transform: scale(1); color: #FF5A50; } 30% { transform: scale(.82); color: #FF5A50; } 100% { transform: scale(1); } }
+@keyframes lc-num-big { 0% { transform: scale(1); color: #FF5A50; } 14% { transform: scale(.74) translateX(-9%); color: #FF5A50; }
+  30% { transform: scale(.78) translateX(9%); color: #FF5A50; } 46% { transform: scale(.84) translateX(-5%); color: #FF5A50; } 100% { transform: scale(1); } }
+@keyframes lc-num-gain { 0% { transform: scale(1); } 35% { transform: scale(1.08); } 100% { transform: scale(1); } }
 @keyframes lc-hit-big { 0%, 22% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .lc-field.hit-dmg::before, .lc-field.hit-gain::before, .lc-field.hit-big::before { content: none; animation: none; }
+  .lc-field.hit-dmg .lc-big, .lc-field.hit-gain .lc-big, .lc-field.hit-big .lc-big { animation: none; }
 }
 html[data-motion="reduce"] .lc-field.hit-dmg::before, html[data-motion="reduce"] .lc-field.hit-gain::before,
 html[data-motion="reduce"] .lc-field.hit-big::before { content: none; animation: none; }
