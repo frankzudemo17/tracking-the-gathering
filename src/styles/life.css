@@ -4,7 +4,7 @@
 
 /* ---------- Brett */
 .screen.lc-screen { padding: 0; gap: 0; }
-.lc { height: 100dvh; display: flex; background: #0A0E16; }
+.lc { height: 100dvh; display: flex; background: var(--bg); }
 .lc-board { position: relative; flex: 1; display: grid; gap: 8px; padding: calc(8px + var(--safe-t)) 8px calc(8px + var(--safe-b)); min-height: 0; }
 
 .lc-field { position: relative; container-type: size; min-width: 0; min-height: 0; border-radius: 24px; overflow: hidden;
@@ -82,7 +82,7 @@
 
 /* Mittelknopf (F4 a: rund, zeigt die Runde) */
 .lc-hub { position: absolute; left: 50%; transform: translate(-50%, -50%); z-index: 9; width: 68px; height: 68px; border-radius: 50%;
-  border: 3px solid #0A0E16; background: var(--sf); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 3px solid var(--bg); background: var(--sf); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center;
   cursor: pointer; box-shadow: 0 6px 22px rgba(0,0,0,.4); }
 .lc-hub small { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mu); }
 .lc-hub b { font-family: var(--f-display); font-size: 24px; line-height: 1; }
