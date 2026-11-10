@@ -179,6 +179,17 @@ export default async function spielEndeE2e({ browser, base: BASE }) {
   await Q.waitForSelector('.home-top-row', { timeout: 10000 }).catch(() => {}); // P12: Rangliste-Teil füllt nach den Leuten
   ok('Startseite (B): Spiel unter „Zuletzt gespielt“ + Rangliste', (await Q.locator(`[data-recent="${g}"]`).count()) === 1 && (await Q.locator('.home-top-row').count()) >= 1);
   await Q.shot('p20-07-startseite');
+
+  // ---------------------------------------------------------------- P12 S6: ohne Neuladen zeigen Rangliste und Historie das Spiel
+  await Q.evaluate(() => { window.__p12NoReload = 1; });
+  await Q.click('nav.nav a[href="#/rangliste"]');
+  await waitHash(Q, '#/rangliste');
+  await Q.waitForSelector('#view .brd-body > *', { timeout: 10000 }).catch(() => {});
+  ok('P12 S6 Rangliste ohne Neuladen: eine Zeile mit Punkten', /\d+\s*(P\.|Punkte)/.test(await Q.textContent('#view .brd-body').catch(() => '')));
+  await Q.click('nav.nav a[href="#/historie"]');
+  await waitHash(Q, '#/historie');
+  await Q.waitForSelector(`#view a[href="#/partie/${g}"]`, { timeout: 10000 }).catch(() => {});
+  ok('P12 S6 Historie ohne Neuladen: Link auf das Spiel', (await Q.locator(`#view a[href="#/partie/${g}"]`).count()) >= 1 && (await Q.evaluate(() => window.__p12NoReload === 1)));
   ok('Keine JS-Fehler (B)', Q.errs.length === 0, Q.errs.join(' | '));
   console.log('    HTTP-Fehler F', JSON.stringify(Q.bad));
   ok('Keine HTTP-Fehler (B)', Q.bad.length === 0, JSON.stringify(Q.bad));
