@@ -4,6 +4,10 @@ import life from './en-life.js';
 import dice from './en-dice.js';
 import attack from './en-attack.js';
 import ko from './en-ko.js';
+// Namespaces of the wave ttg-live-feinschliff-decks (seam from P3): decklist = P5, live = P6, table = P7.
+import decklist from './en-decklist.js';
+import live from './en-live.js';
+import table from './en-table.js';
 
 export default {
   app: 'Tracking the Gathering',
@@ -21,6 +25,11 @@ export default {
     sendLink: 'Send link', linkSent: 'If an account with this address exists, the link is on its way.',
     newPwTitle: 'New password', newPwSave: 'Save password', newPwDone: 'Password changed.',
     checkMail: 'Almost there: please confirm your email address using the link we sent you.',
+    confirmTitle: 'Confirm your email',
+    confirmText: 'We sent an email to {email}. Open the link in it to confirm your account.',
+    confirmHint: 'No email? Check your spam folder too. If you already have an account, just sign in.',
+    resend: 'Send email again', resendLogin: 'Resend confirmation email', resendWait: 'Send again in {s} s',
+    resendSent: 'If this address is waiting for confirmation, a new email is on its way.', toLogin: 'Go to sign in',
     pendingCode: 'After signing in, code {code} will be redeemed.',
     errors: {
       'Invalid login credentials': 'Email or password is wrong.',
@@ -69,6 +78,17 @@ export default {
     membersCount: '{n} members', membersCountOne: '1 member', membersCountGuests: '{n} members · {g} without account',
     joined: 'Welcome to “{name}”.', claimed: 'Profile taken over. Your games are yours now.',
     codeWrong: 'We do not know this code. Please check it again.',
+    dangerTitle: 'Delete group', dangerSub: 'Admins only. Deletes the playgroup for all members.', deleteGroup: 'Delete group',
+    deleteTitle: 'Delete “{name}”?',
+    deleteWarn: 'Deletes {games}, {members}, {guests} including decks and pictures. This cannot be undone.',
+    deleteGames: '{n} games', deleteGamesOne: '1 game', deleteMembers: '{n} memberships', deleteMembersOne: '1 membership',
+    deleteGuests: '{n} players without an account', deleteGuestsOne: '1 player without an account',
+    deleteKept: 'Kept: the members’ accounts, their own decks and their other playgroups.',
+    deleteType: 'Type the name of the group to confirm', deleteYes: 'Delete for good', deleted: '“{name}” was deleted.',
+    deleteNameWrong: 'The name does not match.',
+    deleteDeckElsewhere: 'Cannot delete: a deck of a player without an account from this group appears in games of another playgroup. Its history stays protected.',
+    deleteMemberElsewhere: 'Cannot delete: games of another playgroup refer to members of this group. Their history stays protected.',
+    joinLiveSoon: 'Joining live is coming soon', joinLiveSoonSub: 'Soon you will join a running game here with a code or link.',
   },
 
   addPlayer: {
@@ -171,9 +191,10 @@ export default {
     ],
   },
 
-  common: { back: 'Back', close: 'Close', cancel: 'Cancel', loading: 'Loading …', error: 'Something went wrong.' },
+  common: { back: 'Back', close: 'Close', cancel: 'Cancel', loading: 'Loading …', error: 'Something went wrong.', reload: 'Reload' },
 
   setup, life, dice, attack, ko,
+  decklist, live, table, // seam P3 (wave ttg-live-feinschliff-decks)
 };
 
 // Namensräume Etappe 4/5 (Naht P13): je Paket eine eigene Datei, oben im Objekt nach `soon` eingebunden (Imports sind gehoben).

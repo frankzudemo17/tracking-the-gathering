@@ -40,6 +40,8 @@ route('/deck/:id', v('deck'), { nav: 'me', group: true });
 // Spielen (Etappe 3, P8 schaltet frei): /spielen (Nav) und /spiel-neu zeigen das Setup, /spiel/:id den Lifecounter.
 route('/spiel-neu', v('setup'), { group: true });
 route('/spiel/:id', v('life'), { group: true });
+route('/beitreten', v('join'), { public: true }); // Naht P3: Platzhalter, P6 ersetzt join.js (Live-Beitritt)
+route('/beitreten/:code', v('join'), { public: true });
 
 const NAV = [
   ['start', '#/start', 'home'], ['play', '#/spielen', 'play'], ['history', '#/historie', 'history'],
@@ -57,6 +59,18 @@ function navHtml(active) {
     html`<a href="${href}" ${active === k ? html`aria-current="page"` : ''}>${icon(active === k ? ic + 'Fill' : ic, 23)}<span>${t(`nav.${k}`)}</span></a>`)}</nav>`;
 }
 
+// Ein View-Modul ließ sich nicht laden (Netz kurz weg oder neue Version mitten im Betrieb):
+// einmal von selbst neu laden; passiert es binnen 30 s wieder, den Fehler zeigen (keine Schleife).
+function reloadOnce() {
+  try {
+    const last = Number(sessionStorage.getItem('ttg.reload') || 0);
+    if (Date.now() - last < 30000) return false;
+    sessionStorage.setItem('ttg.reload', String(Date.now()));
+  } catch { return false; }
+  location.reload();
+  return true;
+}
+
 export async function render() {
   const token = ++renderToken;
   const r = current();
@@ -69,14 +83,19 @@ export async function render() {
 
   mount(app, html`<main id="view" class="screen ${r.opts.nav ? 'with-nav' : ''}">${loading()}</main>${r.opts.nav ? navHtml(r.opts.nav) : ''}`);
   try {
-    const mod = await r.load();
+    let mod;
+    try { mod = await r.load(); } catch (e) { if (reloadOnce()) return; throw e; }
     if (token !== renderToken) return;
     const view = $('#view');
     await mod.default(view, { params: r.params, arg: r.opts.arg, isStale: () => token !== renderToken });
     if (token === renderToken) { view.focus?.({ preventScroll: true }); window.scrollTo(0, 0); }
   } catch (e) {
     console.error(e);
-    if (token === renderToken) mount($('#view'), html`<div class="empty"><b>${t('common.error')}</b><span class="small">${e.message || ''}</span></div>`);
+    if (token === renderToken) {
+      mount($('#view'), html`<div class="empty"><b>${t('common.error')}</b><span class="small">${e.message || ''}</span>
+        <button class="btn outline" type="button" data-reload>${t('common.reload')}</button></div>`);
+      $('#view [data-reload]')?.addEventListener('click', () => location.reload());
+    }
   }
 }
 

@@ -143,8 +143,12 @@ export default async function setupE2e({ browser, base: BASE }) {
   await S.click('[data-act="swap"][data-i="1"]');
   const order = await S.$$eval('.su-row', (rs) => rs.map((r) => r.dataset.mid));
   ok('Zwei Plätze antippen tauscht sie', order[0] === order0[1] && order[1] === order0[0] && order[2] === order0[2], JSON.stringify([order0, order]));
-  await S.evaluate(() => { window.__ttgRand = () => 0.7; });
-  await S.click('[data-act="roll"]');
+  await S.evaluate(() => { const q = [1, 6, 2].map((w) => (w - 1) / 2 ** 32); window.__ttgRand = () => (q.length ? q.shift() : 0.5); });
+  await S.click('[data-act="roll"]'); // öffnet seit P9 den Würfeltisch
+  await S.click('.dt-felt');
+  await S.waitForSelector('[data-dice="accept"]:not([hidden])', { timeout: 10000 });
+  await S.click('[data-dice="accept"]');
+  await S.waitForSelector('.dt', { state: 'detached' });
   const starter = (await S.textContent('.su-startrow b')).trim();
   const firstSeat = order.findIndex((id) => starter.startsWith(Object.entries(ids).find(([, v]) => v === id)?.[0] ?? '§'));
   ok('Auswürfeln (Testhaken) setzt Startspieler', firstSeat >= 0, starter);

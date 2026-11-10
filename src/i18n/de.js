@@ -4,6 +4,10 @@ import life from './de-life.js';
 import dice from './de-dice.js';
 import attack from './de-attack.js';
 import ko from './de-ko.js';
+// Namensräume der Welle ttg-live-feinschliff-decks (Naht P3): decklist = P5, live = P6, table = P7.
+import decklist from './de-decklist.js';
+import live from './de-live.js';
+import table from './de-table.js';
 
 export default {
   app: 'Tracking the Gathering',
@@ -21,6 +25,11 @@ export default {
     sendLink: 'Link schicken', linkSent: 'Falls es ein Konto mit dieser Adresse gibt, ist der Link unterwegs.',
     newPwTitle: 'Neues Passwort', newPwSave: 'Passwort speichern', newPwDone: 'Passwort geändert.',
     checkMail: 'Fast geschafft: Bitte bestätige deine E-Mail-Adresse über den Link in der Mail.',
+    confirmTitle: 'Bestätige deine E-Mail',
+    confirmText: 'Wir haben eine Mail an {email} geschickt. Öffne den Link darin, um dein Konto zu bestätigen.',
+    confirmHint: 'Keine Mail da? Schau auch im Spam-Ordner nach. Hast du schon ein Konto, melde dich einfach an.',
+    resend: 'Mail erneut senden', resendLogin: 'Bestätigungsmail erneut senden', resendWait: 'Erneut senden in {s} s',
+    resendSent: 'Falls die Adresse auf eine Bestätigung wartet, ist eine neue Mail unterwegs.', toLogin: 'Zur Anmeldung',
     pendingCode: 'Nach der Anmeldung wird der Code {code} eingelöst.',
     errors: {
       'Invalid login credentials': 'E-Mail oder Passwort stimmt nicht.',
@@ -69,6 +78,17 @@ export default {
     membersCount: '{n} Mitglieder', membersCountOne: '1 Mitglied', membersCountGuests: '{n} Mitglieder · {g} ohne Konto',
     joined: 'Willkommen in „{name}“.', claimed: 'Profil übernommen. Deine Spiele sind jetzt bei dir.',
     codeWrong: 'Diesen Code kennen wir nicht. Bitte prüf ihn nochmal.',
+    dangerTitle: 'Gruppe löschen', dangerSub: 'Nur für Admins. Löscht die Playgroup für alle Mitglieder.', deleteGroup: 'Gruppe löschen',
+    deleteTitle: '„{name}“ löschen?',
+    deleteWarn: 'Löscht {games}, {members}, {guests} samt Decks und Bildern. Das lässt sich nicht rückgängig machen.',
+    deleteGames: '{n} Spiele', deleteGamesOne: '1 Spiel', deleteMembers: '{n} Mitgliedschaften', deleteMembersOne: '1 Mitgliedschaft',
+    deleteGuests: '{n} Spieler ohne Konto', deleteGuestsOne: '1 Spieler ohne Konto',
+    deleteKept: 'Bleiben: die Konten der Mitglieder, ihre eigenen Decks und ihre anderen Playgroups.',
+    deleteType: 'Zum Bestätigen den Namen der Gruppe eingeben', deleteYes: 'Endgültig löschen', deleted: '„{name}“ wurde gelöscht.',
+    deleteNameWrong: 'Der Name stimmt nicht.',
+    deleteDeckElsewhere: 'Löschen geht nicht: Ein Deck eines Spielers ohne Konto aus dieser Gruppe kommt in Spielen einer anderen Playgroup vor. Deren Historie bleibt geschützt.',
+    deleteMemberElsewhere: 'Löschen geht nicht: Spiele einer anderen Playgroup verweisen auf Mitglieder dieser Gruppe. Deren Historie bleibt geschützt.',
+    joinLiveSoon: 'Live-Beitritt kommt gleich', joinLiveSoonSub: 'Bald trittst du hier mit Code oder Link einem laufenden Spiel bei.',
   },
 
   addPlayer: {
@@ -171,9 +191,10 @@ export default {
     ],
   },
 
-  common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.' },
+  common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.', reload: 'Neu laden' },
 
   setup, life, dice, attack, ko,
+  decklist, live, table, // Naht P3 (Welle ttg-live-feinschliff-decks)
 };
 
 // Namensräume Etappe 4/5 (Naht P13): je Paket eine eigene Datei, oben im Objekt nach `soon` eingebunden (Imports sind gehoben).
