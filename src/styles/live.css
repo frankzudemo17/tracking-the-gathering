@@ -1,2 +1,32 @@
 /* live.css · gehört P6 der Welle ttg-live-feinschliff-decks (Live-UI).
    Naht aus P3: eingebunden in index.html und sw.js (SHELL); nur dieses Paket schreibt hier. */
+
+/* Live-Status im Spielmenü → Werkzeuge: Speicherstatus (.lc-live, life.css) + Verbindung als eine Karte */
+.lv-block { display: flex; flex-direction: column; border-radius: 16px; background: var(--sf2); overflow: hidden; }
+.lv-block .lc-live { border-radius: 0; background: transparent; }
+.lv-conn { display: flex; align-items: center; gap: 12px; padding: 12px; border-top: 1px solid var(--ln); color: var(--ink); }
+.lv-conn .grow, .lv-join .grow, .lv-pick .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lv-conn small, .lv-join small, .lv-pick small { font-size: 12px; color: var(--mu); line-height: 1.35; }
+.lv-conn svg { flex-shrink: 0; color: var(--mu); }
+.lv-conn[data-conn="live"] svg { color: var(--live); }
+.lv-conn[data-conn="offline"] svg { color: var(--danger); }
+.lv-conn[data-conn="connecting"] svg { animation: lv-pulse 1.4s ease-in-out infinite; }
+@keyframes lv-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .lv-conn[data-conn="connecting"] svg { animation: none; } }
+
+/* „Handy dazuholen“: Satz links, Teilen-Knopf darunter rechtsbündig (375 px ohne Umbruchchaos) */
+.lv-join { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; row-gap: 10px; align-items: start;
+  margin-top: 10px; padding: 12px; border-radius: 16px; box-shadow: inset 0 0 0 1.5px var(--ln); }
+.lv-join-ic { display: flex; padding-top: 1px; color: var(--mu); }
+.lv-join .btn { grid-column: 2; justify-self: start; }
+
+/* Rückgängig: welche Aktion zurückgenommen wird (Undo gilt für den ganzen Tisch) */
+.lv-undo { display: block; margin: -2px 2px 8px; font-size: 12px; color: var(--mu); overflow-wrap: anywhere; }
+
+/* Startseite: Auswahl bei mehreren laufenden Spielen */
+.lv-picks { display: flex; flex-direction: column; gap: 8px; }
+.lv-pick { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 12px; border: 0; border-radius: 16px;
+  background: var(--sf2); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.lv-pick > svg:first-child { flex-shrink: 0; color: var(--live); }
+.lv-pick > svg:last-child { flex-shrink: 0; color: var(--mu); }
+.lv-pick b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

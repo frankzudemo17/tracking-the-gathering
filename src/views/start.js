@@ -5,7 +5,8 @@ import { state, currentGroup } from '../state.js';
 import { html, mount, on } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { avatar, empty, memberName, memberAvatarPath } from '../lib/parts.js';
-import { toast } from '../lib/ui.js';
+import { sheet, toast } from '../lib/ui.js';
+import { go } from '../router.js';
 import { t } from '../i18n/index.js';
 import { MEMBER_SELECT } from './groups.js';
 import { latestDeckByMember } from '../lib/decks.js';
@@ -84,5 +85,24 @@ export default async function start(el, { isStale }) {
       <div class="card">${empty('trophy', t('home.noGames'), t('home.noGamesSub'))}</div>
     </div>`);
 
-  on(el, 'click', '[data-act="live"]', () => toast(t('home.joinSoon')));
+  // „Spiel beitreten“ (P6): laufendes Spiel der aktuellen Gruppe öffnen — frisch gefragt, Rückfall die geladene Liste
+  on(el, 'click', '[data-act="live"]', async () => {
+    const games = await createStore(sb).liveGames(state.groupId).catch(() => live);
+    if (isStale()) return;
+    if (!games.length) { toast(t('live.none')); return; }
+    if (games.length === 1) { go(`/spiel/${games[0].id}`); return; }
+    const row = (gm) => {
+      const min = Math.max(0, Math.floor((Date.now() - (Date.parse(gm.started_at) || Date.now())) / 60000));
+      const who = gm.players.map((p) => nameOf.get(p.member_id) || p.name).join(' · ');
+      return html`<button type="button" class="lv-pick" data-pick="${gm.id}">${icon('live', 20)}
+        <span class="grow"><b>${who}</b><small>${t('live.pick.meta', { r: gm.live_state?.round ?? gm.round ?? 1, min })}</small></span>${icon('chevRight', 18)}</button>`;
+    };
+    sheet(t('live.pick.title'), html`<div class="su-sheet lv-picks"><div class="su-sh-head"><span class="t"><h3>${t('live.pick.title')}</h3></span></div>${games.map(row)}</div>`, (sh, close) => {
+      sh.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-pick]');
+        if (!b) return;
+        close(); go(`/spiel/${b.dataset.pick}`);
+      });
+    });
+  });
 }

@@ -5,12 +5,12 @@
 // Aktion ⇒ act() ⇒ recorder.push(events) + store.publish(state) ⇒ Felder neu zeichnen.
 // Render-Strategie: das Brett wird nur bei Layout-/Farbwechsel neu aufgebaut; jede Aktion
 // aktualisiert gezielt die Teile der Felder (Zahl, Abzeichen, Knöpfe), die Tippzonen bleiben stehen.
-import { sb, must } from '../supabase.js';
+import { sb, must, appUrl } from '../supabase.js';
 import { state as app } from '../state.js';
 import { html, mount, on, $, $$, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { empty, memberName } from '../lib/parts.js';
-import { errText, sheet, toast } from '../lib/ui.js';
+import { errText, sheet, toast, copyText } from '../lib/ui.js';
 import { createStore } from '../lib/game-store.js';
 import { appRand } from '../lib/rand.js';
 import { fieldMode, modeColors, fieldStyle, styleText } from '../lib/field-color.js';
@@ -117,6 +117,13 @@ export default async function life(el, { params, isStale }) {
   let ctrSheet = null; // offenes Zähler-Sheet { repaint, close }
   let stopped = false;
   const timers = new Set();
+  // Live (P6): Kanalstatus aus store.subscribe, Fremd-Zustand während einer Geste aufgeschoben
+  let chan = null; // letzter Kanalstatus (SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, CLOSED)
+  let unsubLive = () => {};
+  let gesture = false; // Finger/Maus auf einem Feld (Tippen oder Ziehen, attack.js)
+  let remotePending = null;
+  let finishing = false; // dieses Handy beendet gerade selbst (kein Hinweis „beendet“)
+  let hiddenAt = 0;
 
   // ---------- Felder
   function fieldHtml(p, sl) {
@@ -291,6 +298,33 @@ export default async function life(el, { params, isStale }) {
       <span class="grow"><b data-live-text>${S[1]}</b><small>${S[2]}</small></span>${st.state === 'error' ? html`<span class="lc-retry">${t('life.live.retry')}</span>` : ''}</button>`;
   }
 
+  /** Verbindung abgeleitet, nicht gemerkt: offline schlägt alles, sonst Kanalstatus. */
+  function connState() {
+    if (globalThis.navigator?.onLine === false) return 'offline';
+    return chan === 'SUBSCRIBED' ? 'live' : 'connecting';
+  }
+
+  function connHtml() {
+    const c = connState();
+    return html`<div class="lv-conn" data-conn="${c}" role="status">${icon(c === 'offline' ? 'wifiSlash' : 'live', 22)}
+      <span class="grow"><b data-conn-text>${t(`live.conn.${c}`)}</b><small>${t(`live.conn.${c}Sub`)}</small></span></div>`;
+  }
+
+  const liveBlock = () => html`${liveHtml()}${connHtml()}`;
+
+  function joinHtml() {
+    return html`<div class="lv-join"><span class="lv-join-ic">${icon('deviceMobile', 22)}</span>
+      <span class="grow"><b>${t('live.join.title')}</b><small>${t('live.join.text')}</small></span>
+      <button type="button" class="btn small soft" data-m="share">${icon('share', 18)}${t('live.join.share')}</button></div>`;
+  }
+
+  async function shareLink() {
+    const url = appUrl(`#/spiel/${id}`);
+    const text = t('live.join.shareText');
+    if (navigator.share) { try { await navigator.share({ title: 'Tracking the Gathering', text, url }); return; } catch (e) { if (e?.name === 'AbortError') return; } }
+    copyText(url);
+  }
+
   function rollBoxHtml() {
     if (rollRes) {
       const L = t('life.rand');
@@ -322,7 +356,7 @@ export default async function life(el, { params, isStale }) {
       <div class="lc-msec"><span class="su-eyebrow">${t('life.layout')}</span>
         <div class="lc-chips">${LAYOUTS.map((k) => html`<button type="button" class="lc-pill" data-m="layout" data-l="${k}" aria-pressed="${String(layout === k)}">${t(`setup.layouts.${k}`)}</button>`)}</div>
         <span class="lc-hint">${t('life.layoutHint')}</span></div>
-      <div class="lc-msec"><span class="su-eyebrow">${t('life.live.title')}</span><div data-part="live">${liveHtml()}</div></div>`;
+      <div class="lc-msec"><span class="su-eyebrow">${t('life.live.title')}</span><div data-part="live" class="lv-block">${liveBlock()}</div>${joinHtml()}</div>`;
   }
 
   function logHtml() {
@@ -330,7 +364,16 @@ export default async function life(el, { params, isStale }) {
     const name = (x, kind) => (kind === 'seat' ? nm(bySeat(x)?.id) : nm(x));
     const ctr = (k) => (k === 'tax2' ? t('life.counters.labels.tax2', { name: '2' }) : t(`life.counters.labels.${k}`));
     const list = history(s).slice().reverse();
+    // Undo gilt für den ganzen Tisch (WELLE Dirigat): zeigen, welche Aktion es zurücknimmt
+    const what = (() => {
+      const u = act(s, { type: 'undo' }, { actor }).events;
+      if (!u.length) return '';
+      const seqs = new Set(u.map((e) => e.payload?.seq));
+      const en = history({ events: s.events.filter((e) => seqs.has(e.seq)) })[0];
+      return en ? logText(en, L, name, ctr) : '';
+    })();
     return html`<button type="button" class="btn soft" data-m="undo" ${canUndo(s) ? '' : 'disabled'}>${icon('arrowCounterClockwise', 18)}${t('life.undo')}</button>
+      ${what ? html`<small class="lv-undo" data-undo-what>${t('live.undoes', { what })}</small>` : ''}
       <div class="lc-log">${list.length
         ? list.map((en) => html`<div class="lc-logrow"><small>R${en.round}</small><span>${logText(en, L, name, ctr)}</span></div>`)
         : html`<span class="lc-hint">${t('life.logEmpty')}</span>`}</div>`;
@@ -348,7 +391,7 @@ export default async function life(el, { params, isStale }) {
       const repaint = () => { if (box.isConnected) mount(box, body()); };
       menu = {
         close, repaint,
-        live: () => { const lv = $('[data-part="live"]', box); if (lv) mount(lv, liveHtml()); },
+        live: () => { const lv = $('[data-part="live"]', box); if (lv) mount(lv, liveBlock()); },
       };
       watchClose(sh, () => {
         menu = null;
@@ -368,6 +411,7 @@ export default async function life(el, { params, isStale }) {
         if (m === 'kind') { if (rolling) return; rollKind = b.dataset.k; rollRes = null; repaint(); return; }
         if (m === 'roll') { startRoll(b); return; }
         if (m === 'layout') { layout = b.dataset.l; lsSet(layoutKey(id), layout); renderBoard(); repaint(); return; }
+        if (m === 'share') { shareLink(); return; }
         if (m === 'retry') { rec.flush().catch(() => {}); }
       });
     });
@@ -496,13 +540,14 @@ export default async function life(el, { params, isStale }) {
         const how = b.dataset.e;
         if (how === 'keep') { close(); return; }
         await busy(b, async () => {
+          finishing = true;
           try {
             await store.finishGame(id, s, how);
             stop();
             close();
             toast(t(how === 'finished' ? 'life.end.finished' : 'life.end.discarded'));
             go('/start', { replace: true });
-          } catch (ex) { err.textContent = errText(ex); err.hidden = false; }
+          } catch (ex) { finishing = false; err.textContent = errText(ex); err.hidden = false; }
         });
       });
     });
@@ -516,7 +561,70 @@ export default async function life(el, { params, isStale }) {
     for (const h of timers) clearTimeout(h);
     if (rolling) { clearInterval(rolling.iv); clearTimeout(rolling.to); rolling = null; }
     unsub();
+    unsubLive();
     window.removeEventListener('resize', clearHub);
+    window.removeEventListener('online', onNet);
+    window.removeEventListener('offline', onNet);
+    window.removeEventListener('hashchange', onHash);
+    window.removeEventListener('pointerup', release);
+    window.removeEventListener('pointercancel', release);
+    document.removeEventListener('visibilitychange', onVis);
+  }
+
+  // ---------- Live (P6): Fremd-Zustand übernehmen, Spielende von außen
+  /** Zustand aus store.subscribe: ersetzt s, Felder und offene Sheets zeigen ihn sofort. */
+  function applyRemote(next) {
+    remotePending = null;
+    if (stopped || !next) return;
+    const prev = s;
+    s = next;
+    for (const p of s.players) {
+      const q = prev.players.find((x) => x.id === p.id);
+      if (q && q.life !== p.life) bumpDelta(p.id, p.life - q.life);
+    }
+    // Entschieden auf einem anderen Handy: dort läuft der Abschluss, hier nur die Plaketten.
+    // Tödlich von außen: kein K.O.-Fenster, das Feld zeigt „Ausgeschieden?“ (wie nach Rückgängig).
+    if (s.finished) endShown = true;
+    paint();
+    if (!rolling) menu?.repaint();
+    ctrSheet?.repaint();
+  }
+
+  function endedRemote(status) {
+    stop();
+    rec.discard(); // Spiel ist zu: ungesendete Eingaben kann der Server nicht mehr annehmen
+    for (const w of document.querySelectorAll('.sheet-wrap')) w.remove();
+    el.classList.remove('lc-screen');
+    mount(el, html`${back}${empty('flag', t('live.ended.title'), t(status === 'finished' ? 'live.ended.finished' : 'live.ended.aborted'))}
+      <a class="btn block" href="#/start" data-live-ended>${t('live.ended.toStart')}</a>`);
+  }
+
+  function onRemote(next, info) {
+    if (stopped) return;
+    const st = info?.game?.status;
+    if (st && st !== 'live') { if (!finishing) endedRemote(st); return; }
+    if (gesture) { remotePending = next; return; } // laufende Geste nicht stören
+    applyRemote(next);
+  }
+
+  function release() {
+    if (!gesture) return;
+    gesture = false;
+    // erst nach dem click dieses Fingers neu zeichnen (sonst verschluckt ein ersetzter Knopf das Tippen)
+    if (remotePending) setTimeout(() => { if (!gesture && remotePending) applyRemote(remotePending); }, 0);
+  }
+  const onNet = () => menu?.live();
+  const onHash = () => { if (!location.hash.startsWith(`#/spiel/${id}`)) stop(); };
+  /** Nach langem Sperrbildschirm: Stand frisch laden (Realtime holt selbst nach, sobald der Kanal wieder steht). */
+  function onVis() {
+    if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+    if (!hiddenAt || Date.now() - hiddenAt < 20000 || stopped) return;
+    hiddenAt = 0;
+    store.loadGame(id).then((fresh) => {
+      if (stopped) return;
+      if (fresh.game.status !== 'live') { if (!finishing) endedRemote(fresh.game.status); return; }
+      if (gesture) remotePending = fresh.state; else applyRemote(fresh.state);
+    }).catch(() => { /* offline: online-Ereignis holt nach */ });
   }
   const clock = setInterval(() => {
     if (isStale() || !el.isConnected) { stop(); return; }
@@ -540,7 +648,19 @@ export default async function life(el, { params, isStale }) {
   el.classList.add('lc-screen');
   mount(el, html`<div class="lc" data-game="${id}"></div>`);
   attachAttack(el, { getState: () => s, onApply: doAct, name: nm, deck: deckOf, busy: () => koOpen || stopped });
+  el.addEventListener('pointerdown', (e) => { if (e.target.closest?.('.lc-field')) gesture = true; });
+  window.addEventListener('pointerup', release);
+  window.addEventListener('pointercancel', release);
+  window.addEventListener('online', onNet);
+  window.addEventListener('offline', onNet);
+  window.addEventListener('hashchange', onHash);
+  document.addEventListener('visibilitychange', onVis);
   renderBoard();
+  try {
+    unsubLive = store.subscribe(id, onRemote, {
+      onStatus: (st) => { if (st !== 'CATCHUP_ERROR') chan = st; menu?.live(); },
+    });
+  } catch (ex) { console.warn('Live-Abo', ex); }
   // Spiel schon entschieden (z. B. nach Neuladen): Abschluss-Sheet anbieten
   if (s.finished) openEnd();
 }
