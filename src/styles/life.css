@@ -203,3 +203,22 @@ html:has(.lc-screen), html:has(.lc-screen) body { overflow: hidden; overscroll-b
 @media (prefers-reduced-motion: reduce) {
   .lc-field::after { transition: none; }
 }
+
+/* ---------- Treffer (P13): kurzer Rand-Puls von außen nach innen, wenn sich das Leben eines Feldes ändert.
+   Über Bild und Inhalt, unter Rahmen und „am Zug“ (::after, gleiche Ebene, später im Baum). Die Mitte bleibt frei.
+   Nur opacity wird animiert; Grundzustand unsichtbar, ohne hit-* gibt es das Pseudo-Element nicht.
+   Tiefe = Unschärfe + Ausdehnung in cqmin (kürzere Feldseite): B 16 %, D 26 % (Ring 7,5 %: sichtbar innerhalb des Zug-Rahmens). */
+.lc-field.hit-dmg::before, .lc-field.hit-gain::before, .lc-field.hit-big::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 8; opacity: 0;
+  animation: lc-hit .3s ease-out 1; }
+.lc-field.hit-dmg::before { box-shadow: inset 0 0 14cqmin 2cqmin color-mix(in srgb, var(--danger) 70%, black); }
+.lc-field.hit-gain::before { box-shadow: inset 0 0 14cqmin 2cqmin color-mix(in srgb, var(--hero-ink) 50%, transparent); }
+.lc-field.hit-big::before { animation: lc-hit-big .55s ease-out 1;
+  box-shadow: inset 0 0 4cqmin 3.5cqmin color-mix(in srgb, var(--danger) 82%, black), inset 0 0 20cqmin 6cqmin color-mix(in srgb, var(--danger) 60%, black); }
+@keyframes lc-hit { from { opacity: 1; } to { opacity: 0; } }
+@keyframes lc-hit-big { 0%, 22% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .lc-field.hit-dmg::before, .lc-field.hit-gain::before, .lc-field.hit-big::before { content: none; animation: none; }
+}
+html[data-motion="reduce"] .lc-field.hit-dmg::before, html[data-motion="reduce"] .lc-field.hit-gain::before,
+html[data-motion="reduce"] .lc-field.hit-big::before { content: none; animation: none; }

@@ -8,6 +8,8 @@
     "lint": "node tools/gate/lint.mjs",
     "test": "node tools/gate/test.mjs",
     "build": "node tools/gate/build-check.mjs",
+    "sw": "node tests/sw/run.mjs",
+    "release-check": "node tools/release-check.mjs",
     "e2e": "node tests/e2e/run.mjs"
   },
   "devDependencies": {

@@ -16,12 +16,21 @@ const TYPES = {
   '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain; charset=utf-8',
 };
 
-/** Startet den Server. port 0 = freier Port. Liefert { url, port, close }. */
-export function serve({ root = ROOT, port = 0, host = 'localhost' } = {}) {
-  const base = path.resolve(root);
+/**
+ * Startet den Server. port 0 = freier Port. Liefert { url, port, close, setRoot }.
+ * Optional (P11 Tempo, tests/sw — ohne diese Angaben verhält sich der Server wie zuvor):
+ *   cacheControl  Wert des Cache-Control-Kopfs (Standard 'no-store')
+ *   onRequest({ method, path, url })  Protokoll jeder Anfrage auf der Server-Seite
+ *   intercept(req, res, path)  true ⇒ Antwort selbst geschrieben (Fehlerfälle: 404, Abbruch, falscher Typ)
+ *   setRoot(dir)  Wurzel zur Laufzeit umschalten (Versionswechsel unter derselben Herkunft)
+ */
+export function serve({ root = ROOT, port = 0, host = 'localhost', cacheControl = 'no-store', onRequest = null, intercept = null } = {}) {
+  let base = path.resolve(root);
   const server = http.createServer((req, res) => {
     let rel;
     try { rel = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400).end(); return; }
+    onRequest?.({ method: req.method, path: rel, url: req.url });
+    if (intercept?.(req, res, rel)) return;
     let file = path.resolve(base, '.' + rel);
     // nichts außerhalb der Wurzel, keine versteckten Ordner (.git, .claude …)
     if ((file !== base && !file.startsWith(base + path.sep)) || path.relative(base, file).split(path.sep).some((s) => s.startsWith('.'))) {
@@ -32,7 +41,7 @@ export function serve({ root = ROOT, port = 0, host = 'localhost' } = {}) {
       if (e) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('404'); return; }
       res.writeHead(200, {
         'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream',
-        'Cache-Control': 'no-store',
+        'Cache-Control': cacheControl,
       });
       res.end(req.method === 'HEAD' ? undefined : buf);
     });
@@ -45,6 +54,7 @@ export function serve({ root = ROOT, port = 0, host = 'localhost' } = {}) {
         port: p,
         url: `http://${host}:${p}/`,
         close: () => new Promise((r) => { server.closeAllConnections?.(); server.close(() => r()); }),
+        setRoot: (dir) => { base = path.resolve(dir); },
       });
     });
   });

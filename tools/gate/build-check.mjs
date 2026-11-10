@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, walk, rel, lineOf, existsExact, relativeImports, stripComments } from './util.mjs';
+import { checkShell, cssUrls } from './shell.mjs';
 
 const findings = [];
 const report = (file, line, rule, msg) => findings.push(`${rel(file)}:${line} [${rule}] ${msg}`);
@@ -66,29 +67,25 @@ else {
 }
 summary.push(`B3 lokale Verweise · index.html + manifest.webmanifest · ${b3} Verweise`);
 
-// ---- B4: sw.js SHELL — jeder Eintrag existiert, und jede Kerndatei steht drin
+// ---- B4: sw.js SHELL vollständig (Spec P11 Tempo, E7; Regeln in tools/gate/shell.mjs):
+// jeder Eintrag existiert, keiner doppelt, kein fremder/sw.js; Pflicht sind jede Datei unter src/**,
+// jeder lokale Verweis aus index.html und jede lokale url(…) aus src/styles/**/*.css.
 const SW = path.join(ROOT, 'sw.js');
 const swText = fs.existsSync(SW) ? read(SW) : '';
 const shellM = swText.match(/\bconst\s+SHELL\s*=\s*\[([\s\S]*?)\]/);
-const shell = new Set();
 if (!shellM) report(SW, 0, 'B4', 'const SHELL = [...] nicht gefunden');
 else {
   const base = swText.indexOf(shellM[1]);
-  for (const m of stripComments(shellM[1]).matchAll(/(['"])([^'"]*)\1/g)) {
-    const u = m[2];
-    const line = lineOf(swText, base + m.index);
-    if (isExternal(u)) continue;
-    const p = clean(u).replace(/^\.\//, '');
-    shell.add(p);
-    const abs = p === '' ? ROOT : path.join(ROOT, p);
-    if (!existsExact(abs)) report(SW, line, 'B4', `SHELL-Eintrag '${u}' existiert nicht (cache.addAll scheitert)`);
-  }
-  const must = [
-    ...['lib', 'game', 'i18n', 'styles'].flatMap((d) => walk(path.join(SRC, d))),
-    ...fs.readdirSync(SRC, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith('.js')).map((e) => path.join(SRC, e.name)),
-  ];
-  for (const f of must) if (!shell.has(rel(f))) report(SW, lineOf(swText, swText.indexOf(shellM[0])), 'B4', `${rel(f)} fehlt in SHELL`);
-  summary.push(`B4 sw.js SHELL · ${shell.size} Einträge · ${must.length} Pflichtdateien (src/lib, src/game, src/i18n, src/styles, src/*.js)`);
+  const entries = [...stripComments(shellM[1]).matchAll(/(['"])([^'"]*)\1/g)]
+    .map((m) => ({ value: m[2], line: lineOf(swText, base + m.index) }));
+  const indexHtml = fs.existsSync(INDEX) ? read(INDEX).replace(/<!--[\s\S]*?-->/g, '') : '';
+  const indexRefs = [...indexHtml.matchAll(/\b(?:href|src)\s*=\s*(["'])([^"']*)\1/gi)].map((m) => m[2]);
+  const cssRefs = walk(path.join(SRC, 'styles'), ['.css'])
+    .flatMap((f) => cssUrls(read(f)).map((url) => ({ from: rel(f), url })));
+  const shellLine = lineOf(swText, swText.indexOf(shellM[0]));
+  const r = checkShell({ entries, files: walk(ROOT).map(rel), indexRefs, cssRefs });
+  for (const f of r.findings) report(SW, f.line || shellLine, 'B4', `R${f.rule} ${f.msg}`);
+  summary.push(`B4 sw.js SHELL · ${r.counts.entries} Einträge · Pflicht: src/** ${r.counts.src} · index.html ${r.counts.index} · CSS url() ${r.counts.css}`);
 }
 
 for (const s of summary) console.log(s);
