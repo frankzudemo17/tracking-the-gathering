@@ -1,3 +1,10 @@
+// Namensräume der Spiel-Pakete (Naht aus P7): je Paket eine eigene Datei, hier nur eingebunden.
+import setup from './de-setup.js';
+import life from './de-life.js';
+import dice from './de-dice.js';
+import attack from './de-attack.js';
+import ko from './de-ko.js';
+
 export default {
   app: 'Tracking the Gathering',
   tagline: 'Eure Commander-Runden. Jedes Spiel, jeder Salt-Moment, jede Revanche.',
@@ -105,4 +112,6 @@ export default {
   },
 
   common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.' },
+
+  setup, life, dice, attack, ko,
 };

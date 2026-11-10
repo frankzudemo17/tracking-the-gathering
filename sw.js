@@ -2,13 +2,15 @@
 // Strategie: eigene Dateien „Netz zuerst, sonst Cache“ (so kommen Updates sofort an),
 // Google Fonts „Cache zuerst“. Supabase-Anfragen werden nie gecacht.
 // Die Ereignis-Warteschlange für Offline-Spiele folgt in Etappe 5/6.
-const VERSION = 'ttg-v10';
+const VERSION = 'ttg-v11';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './src/styles/tokens.css', './src/styles/base.css', './src/styles/components.css',
+  './src/styles/setup.css', './src/styles/life.css', './src/styles/dice.css', './src/styles/attack.css', './src/styles/ko.css',
   './src/main.js', './src/router.js', './src/state.js', './src/supabase.js', './src/config.js',
   './src/i18n/index.js', './src/i18n/de.js', './src/i18n/en.js',
-  './src/lib/dom.js', './src/lib/icons.js', './src/lib/ui.js', './src/lib/parts.js', './src/lib/avatar.js', './src/lib/group-actions.js', './src/lib/scryfall.js', './src/lib/decks.js', './src/lib/game-store.js',
+  './src/i18n/de-setup.js', './src/i18n/en-setup.js', './src/i18n/de-life.js', './src/i18n/en-life.js', './src/i18n/de-dice.js', './src/i18n/en-dice.js', './src/i18n/de-attack.js', './src/i18n/en-attack.js', './src/i18n/de-ko.js', './src/i18n/en-ko.js',
+  './src/lib/dom.js', './src/lib/icons.js', './src/lib/ui.js', './src/lib/parts.js', './src/lib/avatar.js', './src/lib/group-actions.js', './src/lib/scryfall.js', './src/lib/decks.js', './src/lib/game-store.js', './src/lib/field-color.js', './src/lib/rand.js',
   './src/game/engine.js', './src/game/layouts.js', './src/game/rng.js', './src/game/ko.js',
   './assets/icons/logo-light.png', './assets/icons/logo-dark.png', './assets/icons/favicon.png', './assets/icons/icon-192.png',
 ];

@@ -26,6 +26,10 @@ route('/einstellungen', v('settings'), { nav: 'me' });
 route('/spieler-neu', v('add-player'), { group: true });
 route('/deck-neu/:memberId', v('add-deck'), { group: true });
 route('/deck/:id', v('deck'), { nav: 'me', group: true });
+// Spielen (Etappe 3): /spielen bleibt bis P8 auf „Bald verfügbar“ (jeder Merge ist live, ohne
+// Lifecounter darf die Startseite nicht in ein unspielbares Spiel führen).
+route('/spiel-neu', v('setup'), { group: true });
+route('/spiel/:id', v('life'), { group: true });
 
 const NAV = [
   ['start', '#/start', 'home'], ['play', '#/spielen', 'play'], ['history', '#/historie', 'history'],

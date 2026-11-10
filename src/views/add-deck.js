@@ -11,17 +11,21 @@ import { t } from '../i18n/index.js';
 import { go } from '../router.js';
 import { MEMBER_SELECT } from './groups.js';
 
+// Rückweg ins Setup (Spec P7): #/…?zurueck=setup — der Router ignoriert den Query-Teil.
+const fromSetup = () => new URLSearchParams(location.hash.split('?')[1] || '').get('zurueck') === 'setup';
+
 export default async function addDeck(el, { params, isStale }) {
   const member = await sb.from('members').select(MEMBER_SELECT).eq('id', params.memberId).maybeSingle().then(must);
   if (isStale()) return;
   const isMe = member?.profile_id && member.profile_id === state.profile?.id;
   if (!member || (!isMe && member.profile_id)) { mount(el, html`${backHead('', '#/profil')}${empty('play', t('decks.notFound'), '')}`); return; }
 
+  const back = fromSetup();
   const s = { primary: null, partner: null, searchingPartner: false, bracket: 3, link: '' };
   let ctrl = null; let timer = null;
 
   mount(el, html`
-    ${backHead(t('decks.add'), `#/profil/${member.id}`)}
+    ${backHead(t('decks.add'), back ? '#/spiel-neu' : `#/profil/${member.id}`)}
     ${isMe ? '' : html`<p class="muted" style="margin-top:-8px">${t('decks.addFor', { name: memberName(member) })}</p>`}
     <div id="ad-pick" class="section"></div>
     <div id="ad-rest" class="form" hidden>
@@ -146,7 +150,7 @@ export default async function addDeck(el, { params, isStale }) {
       try {
         const d = await sb.from('decks').insert(row).select('id').single().then(must);
         toast(t('decks.saved'));
-        go(`/deck/${d.id}`, { replace: true });
+        go(back ? `/spiel-neu?deck=${d.id}&fuer=${member.id}` : `/deck/${d.id}`, { replace: true });
       } catch (ex) { err.textContent = errText(ex); err.hidden = false; }
     });
   });
