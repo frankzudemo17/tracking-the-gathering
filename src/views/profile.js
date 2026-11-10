@@ -10,6 +10,10 @@ import { setAvatar, removeAvatar } from '../lib/avatar.js';
 import { t, fmtDate, getLang } from '../i18n/index.js';
 import { go } from '../router.js';
 import { MEMBER_SELECT } from './groups.js';
+import { groupData } from '../lib/data.js';
+import { memberProfile, deckProfile } from '../lib/stats.js';
+import { fmtAvg, fmtPct, fmtMmss } from '../lib/format.js';
+import { kpis, section, moodRows, saltBars, pointsLine, highlight, deckThumb, iconDisc } from './stats-ui.js';
 
 // Decks auf- oder zugeklappt: pro Gerät gemerkt (reine Ansichtssache)
 const DECKS_KEY = 'ttg.decksOpen';
@@ -23,8 +27,9 @@ export default async function profile(el, { params, isStale }) {
   if (isStale()) return;
   if (!m) { mount(el, html`${backHead(t('nav.me'), '#/gruppen')}${empty('user', t('profile.notFound'), '')}`); return; }
 
-  const [statsRows, urls, decks] = await Promise.all([
-    sb.from('v_member_stats').select('*').eq('member_id', m.id).then(must),
+  // Statistik: eine Rechenquelle (stats.js über groupData, WELLE D3); ein Ausfall bricht das Profil nicht
+  const [data, urls, decks] = await Promise.all([
+    groupData.loadGroup(m.playgroup_id || state.groupId).catch((ex) => { console.warn('Statistik laden', ex); return null; }),
     avatarUrls([memberAvatarPath(m)]),
     decksOf(m),
   ]);
@@ -35,8 +40,15 @@ export default async function profile(el, { params, isStale }) {
   const canEdit = isMe || isGuest; // Bild und Name: eigenes Profil und Spieler ohne Konto
   const name = isMe ? state.profile.display_name : memberName(m);
   const avPath = isMe ? state.profile.avatar_path : memberAvatarPath(m);
-  const st = statsRows[0] || {};
-  const num = (v) => (v == null ? '–' : String(v).replace('.', getLang() === 'de' ? ',' : '.'));
+  const lang = getLang();
+  const pr = data ? memberProfile(data, m.id) : null;
+  const deckLine = (id) => {
+    if (!data) return '';
+    const dp = deckProfile(data, id);
+    return dp.games ? t('stats.deckLine', { games: gamesText(dp.games), rate: fmtPct(dp.winRate, lang) }) : t('decks.noGames');
+  };
+  const statsHtml = pr ? await profileStats({ pr, data, isMe: !!isMe, name, lang }) : html`<p class="small muted st-err">${t('stats.loadError')}</p>`;
+  if (isStale()) return;
   const group = state.memberships.find((x) => x.playgroup_id === m.playgroup_id)?.playgroups || currentGroup();
   const target = isMe ? { kind: 'profile', id: state.profile.id } : { kind: 'member', id: m.id };
   const showBack = !!params.memberId && params.memberId !== mineId;
@@ -69,12 +81,7 @@ export default async function profile(el, { params, isStale }) {
       </div>
     </div>` : ''}
 
-    <div class="stats">
-      <div class="stat"><b>${num(st.games ?? 0)}</b><span>${t('profile.stats.games')}</span></div>
-      <div class="stat"><b>${num(st.wins ?? 0)}</b><span>${t('profile.stats.wins')}</span></div>
-      <div class="stat"><b>${num(st.points ?? 0)}</b><span>${t('profile.stats.points')}</span></div>
-      <div class="stat"><b>${num(st.avg_place)}</b><span>${t('profile.stats.place')}</span></div>
-    </div>
+    ${statsHtml}
 
     <div class="section">
       <button type="button" class="collapse-head" data-act="toggle-decks" aria-expanded="${decksOpen}" aria-controls="prof-decks">
@@ -86,7 +93,7 @@ export default async function profile(el, { params, isStale }) {
       ${decks.length ? html`<div class="decks">${decks.map((d) => html`
         <a class="deck-card" href="#/deck/${d.id}">
           <span class="arts ${d.partner_image_url ? 'split' : ''}">${[d.image_url, d.partner_image_url].filter(Boolean).map((a) => html`<span style="background-image:url('${a}')"></span>`)}</span>
-          <span class="info"><b>${d.short_name}</b><span class="meta">${manaPips(sortColors(d.color_identity), 10)}<span>${t('decks.bracket')} ${d.bracket} · ${bracketName(d.bracket)}</span></span></span>
+          <span class="info"><b>${d.short_name}</b><span class="meta">${manaPips(sortColors(d.color_identity), 10)}<span>${t('decks.bracket')} ${d.bracket} · ${bracketName(d.bracket)}</span></span>${data ? html`<span class="st-deck-line tiny muted">${deckLine(d.id)}</span>` : ''}</span>
         </a>`)}</div>` : html`<div class="card">${empty('play', t('decks.none'), isMe || isGuest ? '' : t('decks.noneOther', { name }))}</div>`}
       ${canEdit ? html`<a class="btn soft" href="#/deck-neu/${m.id}">${icon('plus', 20)}${t('decks.add')}</a>` : ''}
       </div>
@@ -116,6 +123,89 @@ export default async function profile(el, { params, isStale }) {
       } catch (ex) { toast(errText(ex)); }
     });
   });
+}
+
+// ---- Statistik (P18) ----
+const gamesText = (n) => t(n === 1 ? 'stats.games1' : 'stats.gamesN', { n });
+
+/**
+ * Statistik-Teil des Profils (Kacheln, Stimmung, Verläufe, Tempo, Highlights) aus memberProfile.
+ * Ohne Spiele nur die Kacheln (0/–), keine leeren Diagramme (Spec P18, Kriterium 4).
+ * @param {{ pr: import('../lib/stats.js').MemberProfile, data: import('../lib/history-data.js').GroupData, isMe: boolean, name: string, lang: string }} o
+ */
+async function profileStats({ pr, data, isMe, name, lang }) {
+  const tiles = kpis([
+    { v: pr.games, l: t('profile.stats.games') },
+    { v: pr.wins, l: t('profile.stats.wins') },
+    { v: pr.points, l: t('profile.stats.points') },
+    { v: fmtAvg(pr.avgPlace, lang), l: t('profile.stats.place') },
+    { v: fmtPct(pr.winRate, lang), l: t('stats.winRate') },
+  ]);
+  if (!pr.games) return tiles;
+
+  const members = new Map((data.members || []).map((x) => [x.id, x]));
+  const decks = new Map((data.decks || []).map((x) => [x.id, x]));
+  const who = (id) => members.get(id)?.name || '–';
+  const deckName = (id) => decks.get(id)?.shortName || decks.get(id)?.commanderName || '–';
+  const deckHref = (id) => `#/deck/${encodeURIComponent(id)}`;
+
+  const mood = section(t('stats.mood'), moodRows([
+    { icon: 'salt', label: t('stats.avgSalt'), value: pr.avgSalt },
+    { icon: 'smiley', label: t('stats.avgFun'), value: pr.avgFun },
+    { icon: 'starFill', label: t('stats.avgDeck'), value: pr.avgDeckRating },
+  ], lang));
+  const salt = pr.saltTrend.length ? section(t('stats.saltTrend'), saltBars(pr.saltTrend)) : '';
+  const line = pr.pointsSeries.length >= 2 ? section(t('stats.pointsTrend'), pointsLine(pr.pointsSeries)) : '';
+
+  const tp = pr.tempo;
+  const tempo = tp.avgTurnSec != null && tp.rank != null ? section(t('stats.tempo'), html`<div class="card st-tempo">
+    <span class="st-ic" aria-hidden="true">${icon('timer', 22)}</span>
+    <span class="grow-col"><b>${t('stats.tempoLine', { time: fmtMmss(tp.avgTurnSec), rank: tp.rank, of: tp.of })}</b>${
+      tp.of > 1 && tp.rank === 1 ? html`<span class="small muted">${t('stats.slowest')}</span>` : ''}${
+      tp.of > 1 && tp.rank === tp.of ? html`<span class="small muted">${t('stats.fastest')}</span>` : ''}</span>
+  </div>`) : '';
+
+  // Highlights: nur vorhandene Kacheln
+  const hl = [];
+  if (pr.nemesis) {
+    const nm = members.get(pr.nemesis.memberId);
+    let url = null;
+    if (nm?.avatarPath) { try { url = (await avatarUrls([nm.avatarPath]))[nm.avatarPath] || null; } catch { url = null; } }
+    hl.push(highlight({
+      label: t('stats.nemesis'),
+      text: t(isMe ? 'stats.nemesisMe' : 'stats.nemesisOther', { name: who(pr.nemesis.memberId), who: name, n: pr.nemesis.count }),
+      media: avatar({ name: who(pr.nemesis.memberId), url, size: 44 }),
+      href: `#/profil/${encodeURIComponent(pr.nemesis.memberId)}`,
+    }));
+  }
+  const fav = pr.favoriteDeck; const best = pr.bestDeck;
+  if (fav && best && fav.deckId === best.deckId) {
+    // Lieblingsdeck = bestes Deck ⇒ eine Kachel mit beiden Aussagen (statt zweimal dasselbe Bild)
+    hl.push(highlight({
+      label: t('stats.favBestDeck'), text: deckName(fav.deckId),
+      sub: `${gamesText(fav.games)} · ${t('stats.winRateLine', { v: fmtPct(best.winRate, lang) })}`,
+      media: deckThumb(decks.get(fav.deckId)?.imageUrl, deckName(fav.deckId)), href: deckHref(fav.deckId),
+    }));
+  } else {
+    if (fav) hl.push(highlight({
+      label: t('stats.favDeck'), text: deckName(fav.deckId), sub: gamesText(fav.games),
+      media: deckThumb(decks.get(fav.deckId)?.imageUrl, deckName(fav.deckId)), href: deckHref(fav.deckId),
+    }));
+    if (best) hl.push(highlight({
+      label: t('stats.bestDeck'), text: deckName(best.deckId), sub: t('stats.winRateLine', { v: fmtPct(best.winRate, lang) }),
+      media: deckThumb(decks.get(best.deckId)?.imageUrl, deckName(best.deckId)), href: deckHref(best.deckId),
+    }));
+  }
+  if (pr.longestStreak > 0) hl.push(highlight({
+    label: t('stats.streak'), text: t(pr.longestStreak === 1 ? 'stats.streak1' : 'stats.streakN', { n: pr.longestStreak }), media: iconDisc('fire'),
+  }));
+  if (pr.fastestWin) hl.push(highlight({
+    label: t('stats.fastestWin'), text: t('stats.inRounds', { n: pr.fastestWin.rounds }), media: iconDisc('lightning'),
+    href: `#/partie/${encodeURIComponent(pr.fastestWin.gameId)}`,
+  }));
+  const highlights = hl.length ? section(t('stats.highlights'), html`<div class="st-hls">${hl}</div>`) : '';
+
+  return html`${tiles}${mood}${salt}${line}${tempo}${highlights}`;
 }
 
 function openAvatarSheet({ name, url, has, target, isMe, onDone }) {

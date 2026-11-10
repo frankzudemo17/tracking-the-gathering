@@ -8,6 +8,10 @@ import { sheet, toast, errText } from '../lib/ui.js';
 import { BRACKETS, bracketName, sortColors, linkInfo, normalizeLink } from '../lib/decks.js';
 import { t, getLang } from '../i18n/index.js';
 import { go } from '../router.js';
+import { groupData } from '../lib/data.js';
+import { deckProfile, gameSummary } from '../lib/stats.js';
+import { fmtAvg, fmtPct } from '../lib/format.js';
+import { kpis, section, iconScale, fmtDay } from './stats-ui.js';
 
 export default async function deckView(el, { params, isStale }) {
   const d = await sb.from('decks').select('*').eq('id', params.id).maybeSingle().then(must);
@@ -15,20 +19,20 @@ export default async function deckView(el, { params, isStale }) {
   if (!d) { mount(el, html`${backHead('', '#/profil')}${empty('play', t('decks.notFound'), '')}`); return; }
 
   // Besitzer: Konto → Profil, Spieler ohne Konto → Mitglied
-  const [owner, ownerMember, statsRows] = await Promise.all([
+  const [owner, ownerMember, data] = await Promise.all([
     d.owner_profile_id ? sb.from('profiles').select('display_name').eq('id', d.owner_profile_id).maybeSingle().then(must) : null,
     d.owner_member_id
       ? sb.from('members').select('id, display_name, profile_id').eq('id', d.owner_member_id).maybeSingle().then(must)
       : sb.from('members').select('id').eq('profile_id', d.owner_profile_id).eq('playgroup_id', state.groupId).maybeSingle().then(must),
-    sb.from('v_deck_stats').select('*').eq('deck_id', d.id).eq('playgroup_id', state.groupId).then(must),
+    // Statistik: eine Rechenquelle (stats.js über groupData, WELLE D3); ein Ausfall bricht die Seite nicht
+    groupData.loadGroup(state.groupId).catch((ex) => { console.warn('Statistik laden', ex); return null; }),
   ]);
   if (isStale()) return;
   const ownerName = owner?.display_name || ownerMember?.display_name || '';
   const canEdit = d.owner_profile_id === state.profile?.id || (!!d.owner_member_id && !ownerMember?.profile_id);
   const backTo = ownerMember?.id ? `#/profil/${ownerMember.id}` : '#/profil';
-  const st = statsRows[0] || { games: 0, wins: 0 };
-  const fmt = (v) => (v == null ? '–' : String(v).replace('.', getLang() === 'de' ? ',' : '.'));
-  const rate = st.games ? `${Math.round((st.wins / st.games) * 100)} %` : '–';
+  const lang = getLang();
+  const dp = data ? deckProfile(data, d.id) : null;
   const link = d.list_url ? linkInfo(d.list_url) : null;
   const arts = [d.image_url, d.partner_image_url].filter(Boolean);
   const names = [d.commander_name, d.partner_name].filter(Boolean);
@@ -44,12 +48,7 @@ export default async function deckView(el, { params, isStale }) {
       </div>
     </div>
 
-    <div class="stats">
-      <div class="stat"><b>${st.games}</b><span>${t('decks.games')}</span></div>
-      <div class="stat"><b>${st.wins}</b><span>${t('decks.wins')}</span></div>
-      <div class="stat"><b>${rate}</b><span>${t('decks.winrate')}</span></div>
-      <div class="stat"><b>${fmt(st.avg_place)}</b><span>${t('decks.place')}</span></div>
-    </div>
+    ${dp ? deckStats(dp, data, d.id, lang) : html`<p class="small muted st-err">${t('stats.loadError')}</p>`}
 
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('decks.list')}</h3></div>
@@ -134,4 +133,56 @@ export default async function deckView(el, { params, isStale }) {
       });
     });
   });
+}
+
+// ---- Statistik (P18) ----
+
+/**
+ * Kacheln, Bewertung und letzte Spiele aus deckProfile (Zahlen fertig aus stats.js).
+ * Nie gespielt ⇒ Kacheln 0/–, keine Bewertung, Leerzustand statt Spielliste.
+ * @param {import('../lib/stats.js').DeckProfile} dp
+ * @param {import('../lib/history-data.js').GroupData} data
+ * @param {string} deckId
+ * @param {string} lang
+ */
+function deckStats(dp, data, deckId, lang) {
+  const tiles = kpis([
+    { v: dp.games, l: t('decks.games') },
+    { v: dp.wins, l: t('decks.wins') },
+    { v: fmtPct(dp.winRate, lang), l: t('decks.winrate') },
+    { v: fmtAvg(dp.avgPlace, lang), l: t('decks.place') },
+    { v: dp.points, l: t('profile.stats.points') },
+  ]);
+  if (!dp.games) return html`${tiles}<div class="card">${empty('play', t('decks.noGames'), '')}</div>`;
+
+  const rating = section(t('stats.rating'), html`<div class="card st-rate">
+    <div class="st-rate-row">
+      <span class="st-mood-txt"><span>${t('stats.ownRating')}</span></span>
+      ${iconScale(dp.avgOwnRating, 'star', lang)}<b class="st-val">${fmtAvg(dp.avgOwnRating, lang)}</b>
+    </div>
+    <div class="st-rate-row">
+      <span class="st-mood-txt"><span>${t('stats.salt')}</span><span class="tiny muted">${dp.salt
+        ? t(dp.salt.ratings === 1 ? 'stats.saltLine1' : 'stats.saltLineN', { v: fmtAvg(dp.salt.avgSalt, lang), n: dp.salt.ratings })
+        : t('stats.noSalt')}</span></span>
+      ${iconScale(dp.salt ? dp.salt.avgSalt : null, 'salt', lang)}<b class="st-val">${fmtAvg(dp.salt ? dp.salt.avgSalt : null, lang)}</b>
+    </div>
+    <div class="st-rate-row">
+      <span class="st-mood-txt"><span>${t('stats.fun')}</span></span>
+      ${iconScale(dp.avgFun, 'fun', lang)}<b class="st-val">${fmtAvg(dp.avgFun, lang)}</b>
+    </div>
+  </div>`);
+
+  const rows = dp.recentGameIds.map((id) => {
+    const g = gameSummary(data, id);
+    const p = g?.placements.find((x) => x.deckId === deckId) || null;
+    const place = p?.place ?? null;
+    return html`<a class="st-game" href="#/partie/${encodeURIComponent(id)}">
+      <span class="st-place ${place === 1 ? 'win' : ''}" aria-hidden="true">${place === 1 ? icon('trophyFill', 18) : place ?? '–'}</span>
+      <span class="grow-col"><b>${place === 1 ? t('stats.win') : place != null ? t('stats.place', { n: place }) : '–'}</b>
+        <span class="small muted">${fmtDay(g?.startedAt, lang)}${g?.rounds ? ` · ${t('stats.rounds', { n: g.rounds })}` : ''}</span></span>
+      <span class="st-hl-go" aria-hidden="true">${icon('chevRight', 18)}</span>
+    </a>`;
+  });
+  const recent = section(t('stats.recent'), html`<div class="card st-games">${rows}</div>`);
+  return html`${tiles}${rating}${recent}`;
 }
