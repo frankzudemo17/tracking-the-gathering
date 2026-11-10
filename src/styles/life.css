@@ -52,7 +52,9 @@
 .lc-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; gap: 2px; }
 .lc-big { font-family: var(--f-display); font-weight: 700; font-size: clamp(42px, 34cqmin, 132px); line-height: .9; letter-spacing: -.045em;
   font-variant-numeric: tabular-nums; text-shadow: 0 2px 14px rgba(0,0,0,.35); }
-.lc-big.low { color: var(--danger); }
+/* F6 a: rote Zahl. Die Felder sind in jedem Look dunkel (Commander-Bild + Abdunklung), daher ein helles Rot
+   für alle Looks statt --danger (Arktis/Lachs: dunkles Rot für helle Flächen, auf dem Feld nur 2,3–3,6:1). */
+.lc-big.low { color: #FF948C; }
 .lc-field.out .lc-big { opacity: .35; }
 .lc-delta { position: absolute; top: calc(50% - clamp(42px, 34cqmin, 132px) * .5 - 26px); font-size: 18px; font-weight: 800; padding: 1px 10px; border-radius: 12px;
   background: rgba(var(--scrim), .7); font-variant-numeric: tabular-nums; }
