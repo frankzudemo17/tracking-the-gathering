@@ -103,7 +103,7 @@ export function createStore(sb, {
   function ctxOf(gameId) {
     let c = contexts.get(gameId);
     if (!c) {
-      c = { init: null, game: null, guest: false, server: new Map(), cids: new Set(), maxSeq: 0,
+      c = { init: null, game: null, server: new Map(), cids: new Set(), maxSeq: 0,
         subs: new Set(), channel: null, onOnline: null, catching: null, catchAgain: false, pendingEmit: null };
       contexts.set(gameId, c);
     }
@@ -234,7 +234,7 @@ export function createStore(sb, {
     /** Nach Umnummerieren: neuen Zustand melden und selbst veröffentlichen (Entscheid 7). */
     function announceRebase() {
       const state = emit(gameId, 'rebase');
-      if (state && !ctx.guest) publish(gameId, state);
+      if (state) publish(gameId, state);
     }
 
     async function writeRows(rows) {
@@ -460,7 +460,7 @@ export function createStore(sb, {
     const rebased = rec ? rec._sync.rebaseKnown() : false;
     if (!fresh && !rebased) return;
     const state = emit(gameId, rebased ? 'rebase' : reason);
-    if (rebased && state && !ctx.guest) publish(gameId, state);
+    if (rebased && state) publish(gameId, state);
   }
 
   /** Eingehende Server-Zeilen (Realtime, Nachholen) — dedupliziert per seq + cid. */
@@ -535,21 +535,7 @@ export function createStore(sb, {
     }
   }
 
-  /** Spieler + Decks für Gäste: nur über live_roster (members trägt claim_code, R2). */
-  async function guestRoster(gameId) {
-    const res = await sb.rpc('live_roster', { p_game: gameId });
-    if (res.error) fail(res, 'Spieler laden');
-    const list = res.data || [];
-    const members = list.map((r) => ({ id: r.member_id, display_name: r.display_name }));
-    const decks = list.map((r) => r.deck).filter((d) => d && d.id);
-    return { mres: { data: members }, dres: { data: decks } };
-  }
-
-  /**
-   * @param {string} gameId
-   * @param {{ guest?: boolean }} [opts] guest: Spieler + Decks über live_roster (Block B)
-   */
-  async function loadGame(gameId, { guest = false } = {}) {
+  async function loadGame(gameId) {
     const g = await sb.from('games').select(GAME_COLS).eq('id', gameId).single();
     if (g.error) fail(g, 'Spiel laden');
     const game = g.data;
@@ -563,16 +549,11 @@ export function createStore(sb, {
     // Recorder VOR dem Server-Lesen anlegen: bestätigt ein laufender Schreibvorgang zwischen
     // Lesen und Abgleich, steht die Zeile über confirm() im Spiel-Kontext (nichts fällt heraus).
     const rec = recorder(gameId);
-    let mres; let dres; let server;
-    if (guest) {
-      [{ mres, dres }, server] = await Promise.all([guestRoster(gameId), allEvents(gameId)]);
-    } else {
-      [mres, dres, server] = await Promise.all([
-        memberIds.length ? sb.from('members').select('id, display_name, avatar_path, profile_id').in('id', memberIds) : { data: [] },
-        deckIds.length ? sb.from('decks').select(DECK_COLS).in('id', deckIds) : { data: [] },
-        allEvents(gameId),
-      ]);
-    }
+    const [mres, dres, server] = await Promise.all([
+      memberIds.length ? sb.from('members').select('id, display_name, avatar_path, profile_id').in('id', memberIds) : { data: [] },
+      deckIds.length ? sb.from('decks').select(DECK_COLS).in('id', deckIds) : { data: [] },
+      allEvents(gameId),
+    ]);
     if (mres.error) fail(mres, 'Mitglieder laden');
     if (dres.error) fail(dres, 'Decks laden');
     const names = new Map((mres.data || []).map((m) => [m.id, m]));
@@ -582,7 +563,6 @@ export function createStore(sb, {
     const ctx = ctxOf(gameId);
     for (const r of server) addServer(ctx, toEvent(r));
     ctx.game = game;
-    ctx.guest = guest;
     ctx.init = createGame({
       players: players.map((p) => ({ id: p.member_id, name: p.name, seat: p.seat, partner: !!decks[p.deck_id]?.partner_name })),
       startingLife: game.starting_life,
@@ -699,9 +679,8 @@ export function createStore(sb, {
     });
   }
 
-  /** „Letzter gewinnt“ (abgeleitete Kopie). Für Gäste ein No-op (Block B). */
+  /** „Letzter gewinnt“ (abgeleitete Kopie). */
   function publish(gameId, state) {
-    if (contexts.get(gameId)?.guest) return;
     const p = publisher(gameId);
     p.latest = state;
     const last = state.events?.[state.events.length - 1];
@@ -783,27 +762,5 @@ export function createStore(sb, {
     return res.data;
   }
 
-  // -------------------------------------------------------------------------
-  // Gäste per Code (Block B, Migration 20261115020000_live_gast.sql)
-
-  /** Mitglied öffnet das laufende Spiel für Gäste; liefert den Code (immer derselbe). */
-  async function openLiveJoin(gameId) {
-    const res = await sb.rpc('open_live_join', { p_game: gameId });
-    if (res.error) fail(res, 'Beitritts-Code');
-    return res.data;
-  }
-
-  /** Gast (auch anonym) tritt per Code bei; liefert die Spiel-ID. Falscher Code ⇒ Fehler. */
-  async function joinLiveGame(code) {
-    const res = await sb.rpc('join_live_game', { p_code: String(code ?? '').trim().toUpperCase() });
-    if (res.error) fail(res, 'Beitreten');
-    if (!res.data) {
-      const e = new Error('Code nicht gefunden');
-      e.code = 'P0002';
-      throw e;
-    }
-    return res.data;
-  }
-
-  return { startGame, loadGame, recorder, subscribe, publish, finishGame, liveGames, setFieldColor, setCounterPins, openLiveJoin, joinLiveGame };
+  return { startGame, loadGame, recorder, subscribe, publish, finishGame, liveGames, setFieldColor, setCounterPins };
 }
