@@ -85,6 +85,8 @@ export async function server(stand, { cacheControl } = {}) {
 
 // ---------------------------------------------------------------- Browser
 export const prod = { requests: 0, hosts: new Set() };
+/** Alle Hosts, die der Kontext-Zähler gesehen hat — für die Positivkontrolle des K27-Zählers in S1b. */
+export const seenHosts = new Set();
 let chromium;
 async function pw() {
   if (chromium) return chromium;
@@ -116,6 +118,7 @@ export async function browser(profile, { offline = false, rule = true, sw = true
   ctx.on('request', (r) => {
     let h = '';
     try { h = new URL(r.url()).hostname; } catch { return; }
+    seenHosts.add(h);
     if (h === 'supabase.co' || h.endsWith('.supabase.co')) { prod.requests++; prod.hosts.add(h); }
   });
   return ctx;

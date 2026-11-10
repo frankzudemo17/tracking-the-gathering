@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  Abort, makeStand, archiveStartMain, server, browser, start, state, updateAndSettle, navigate, until, sleep, tmpDir, READY,
+  Abort, makeStand, archiveStartMain, server, browser, start, state, updateAndSettle, navigate, until, sleep, tmpDir, READY, seenHosts,
 } from './helpers.mjs';
 
 const EXT = 'ttg-ext-supabase-' + fs.readFileSync(new URL('../../src/supabase.js', import.meta.url), 'utf8').match(/supabase-js@([\d.]+)/)[1];
@@ -97,6 +97,16 @@ export async function S1() {
       throw new Abort(`S1b Messgerät untauglich: Eich-Abrufe eigen=${eich.eigen}, esm.sh=${eich.fremd} (beide müssen scheitern)`);
     }
     c.ok('S1b Eichung: eigene Adresse ohne Cache und esm.sh scheitern offline', true, JSON.stringify(eich));
+    // Positivkontrolle des K27-Zählers: ein fremder Abruf aus der gesteuerten Seite nimmt denselben Weg wie
+    // supabase.co (kein respondWith) und verlässt den Rechner nicht (.invalid, Resolver-Regel). Sieht der
+    // Kontext-Zähler ihn nicht, wäre „0 Anfragen an *.supabase.co“ wertlos ⇒ Messgerät untauglich.
+    const ctrl = await p.evaluate(async () => {
+      try { await fetch('https://eichung.invalid/k27'); } catch { /* scheitert erwartungsgemäß */ }
+      return !!navigator.serviceWorker.controller;
+    });
+    await sleep(300);
+    if (!ctrl || !seenHosts.has('eichung.invalid')) throw new Abort(`S1b Messgerät untauglich: K27-Zähler sieht fremde Abrufe nicht (gesteuert=${ctrl})`);
+    c.ok('S1b K27-Zähler sieht fremde Abrufe aus der gesteuerten Seite (Positivkontrolle eichung.invalid)', true);
   } finally {
     await ctx.close();
     await s.close();
