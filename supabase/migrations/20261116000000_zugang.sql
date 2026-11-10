@@ -48,6 +48,9 @@
 --  - Tor abschalten, z. B. um ein Konto im Dashboard anzulegen („Add user“ scheitert ohne
 --    Code, gewollt):      alter table auth.users disable trigger ttg_signup_gate;
 --    danach wieder an:    alter table auth.users enable trigger ttg_signup_gate;
+--    Meldet das „must be owner of table users“ (auth.users gehört supabase_auth_admin):
+--    signup_gate() mit „begin return new; end“ ersetzen (gehört postgres) und danach die
+--    Fassung aus dieser Datei wieder einspielen.
 --  - Deckel ohne App:     update public.app_settings set max_accounts = <n>;
 --  - Superadmin lösen (etwa damit sich das Konto löschen lässt) bzw. setzen:
 --      update public.profiles set is_superadmin = false where id = '<profil-id>';
