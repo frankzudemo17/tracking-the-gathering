@@ -50,29 +50,31 @@ function memStorage({ throws = false } = {}) {
 }
 
 /**
- * Fake-Supabase. `upserts`: Liste der Ergebnisse je upsert-Aufruf (danach 'ok'):
+ * Fake-Supabase. `upserts`: Liste der Ergebnisse je Schreibaufruf (danach 'ok'):
  *   'ok' · { status, code } (Fehler) · 'lost' (speichert, wirft dann) · { hang: true } (wartet auf release()).
+ * Seit P4 (Welle ttg-live-feinschliff-decks) schreibt der Store per insert: ein Stapel ganz oder
+ * gar nicht, Unique (game_id, seq) ⇒ { code: '23505' }, HTTP 409 (wie PostgREST).
  */
 function fakeSb(db = {}, { upserts = [], rpc = {} } = {}) {
   const tables = { games: [], game_players: [], members: [], decks: [], game_events: [], ...db };
   const calls = [];
   const hanging = [];
-  const store = (rows, opts) => {
-    for (const r of rows) {
-      const dup = tables.game_events.some((e) => e.game_id === r.game_id && e.seq === r.seq);
-      if (dup && opts?.ignoreDuplicates) continue;
-      if (dup) throw new Error('duplicate key');
-      tables.game_events.push({ id: tables.game_events.length + 1, created_at: 'x', ...structuredClone(r) });
-    }
+  const store = (rows) => {
+    const keys = rows.map((r) => `${r.game_id}|${r.seq}`);
+    const dup = new Set(keys).size !== keys.length
+      || rows.some((r) => tables.game_events.some((e) => e.game_id === r.game_id && e.seq === r.seq));
+    if (dup) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "game_events_game_seq_key"' }, status: 409 };
+    for (const r of rows) tables.game_events.push({ id: tables.game_events.length + 1, created_at: 'x', ...structuredClone(r) });
+    return { data: null, error: null, status: 201 };
   };
   async function exec(q) {
     calls.push({ op: q.op, table: q.table, rows: q.rows && q.rows.map((r) => ({ ...r })), opts: q.opts, values: q.values, cols: q.cols });
-    if (q.op === 'upsert') {
+    if (q.op === 'insert') {
       const plan = upserts.length ? upserts.shift() : 'ok';
-      if (plan === 'ok') { store(q.rows, q.opts); return { data: null, error: null, status: 201 }; }
-      if (plan === 'lost') { store(q.rows, q.opts); throw new TypeError('Failed to fetch'); }
+      if (plan === 'ok') return store(q.rows);
+      if (plan === 'lost') { store(q.rows); throw new TypeError('Failed to fetch'); }
       if (plan.hang) {
-        return new Promise((resolve) => hanging.push(() => { store(q.rows, q.opts); resolve({ data: null, error: null, status: 201 }); }));
+        return new Promise((resolve) => hanging.push(() => { resolve(store(q.rows)); }));
       }
       return { data: null, error: { code: plan.code ?? '', message: `Fehler ${plan.status}` }, status: plan.status };
     }
@@ -95,11 +97,12 @@ function fakeSb(db = {}, { upserts = [], rpc = {} } = {}) {
       eq(k, v) { q.filters.push((r) => r[k] === v); return b; },
       in(k, vs) { q.filters.push((r) => vs.includes(r[k])); return b; },
       not(k, op, v) { assert.equal(op, 'is'); assert.equal(v, null); q.filters.push((r) => r[k] != null); return b; },
+      gt(k, v) { q.filters.push((r) => r[k] != null && r[k] > v); return b; },
       order(k, { ascending = true } = {}) { q.order = [k, ascending]; return b; },
       range(a, z) { q.range = [a, z]; return b; },
       single() { q.single = true; return b; },
       update(v) { q.op = 'update'; q.values = v; return b; },
-      upsert(rows, opts) { q.op = 'upsert'; q.rows = rows; q.opts = opts; return b; },
+      insert(rows, opts) { q.op = 'insert'; q.rows = rows; q.opts = opts; return b; },
       then(ok, ko) { return exec(q).then(ok, ko); },
     };
     return b;
@@ -107,7 +110,7 @@ function fakeSb(db = {}, { upserts = [], rpc = {} } = {}) {
   return {
     tables, calls, hanging,
     release() { hanging.shift()(); },
-    upserts: () => calls.filter((c) => c.op === 'upsert'),
+    upserts: () => calls.filter((c) => c.op === 'insert'), // Schreibaufrufe (seit P4 insert)
     updates: () => calls.filter((c) => c.op === 'update'),
     rpcs: (name) => calls.filter((c) => c.op === 'rpc' && (!name || c.name === name)),
     from,
@@ -184,7 +187,8 @@ test('G1 Reihenfolge + Bündeln: 3 push in 100 ms ⇒ genau 1 upsert [1,2,3] nac
   const u = sb.upserts()[0];
   assert.deepEqual(seqs(u), [1, 2, 3]);
   assert.equal(u.table, 'game_events');
-  assert.deepEqual(u.opts, { onConflict: 'game_id,seq', ignoreDuplicates: true });
+  assert.equal(u.op, 'insert', 'insert statt upsert(ignoreDuplicates) (Spec P4 Entscheid 2)');
+  assert.equal(u.opts, undefined);
   assert.deepEqual(Object.keys(u.rows[0]).sort(), ['actor', 'amount', 'game_id', 'payload', 'round', 'seq', 'source', 'target', 'type']);
   assert.equal(u.rows[0].game_id, GAME);
   await t.advance(5000);
@@ -502,8 +506,8 @@ test('G11 finish wartet: pending 2 ⇒ finish_game erst nach erfolgreichem Flush
   await assert.rejects(store.finishGame(GAME, state, 'finished'), 'erster Flush scheitert ⇒ Fehler');
   assert.equal(sb.rpcs('finish_game').length, 0, 'kein RPC ohne geleerte Warteschlange');
   await store.finishGame(GAME, state, 'finished');
-  const order = sb.calls.filter((c) => c.op === 'upsert' || c.op === 'rpc').map((c) => c.op);
-  assert.deepEqual(order, ['upsert', 'upsert', 'rpc']);
+  const order = sb.calls.filter((c) => c.op === 'insert' || c.op === 'rpc').map((c) => c.op);
+  assert.deepEqual(order, ['insert', 'insert', 'rpc']);
   assert.equal(sb.tables.game_events.length, 2);
   assert.equal(storage.getItem(`ttg.queue.${GAME}`), null, 'Warteschlange nach Spielende gelöscht');
 });
@@ -566,8 +570,8 @@ test('G13 Startwurf: nach RPC genau ein roll-Ereignis seq 1, payload.kind start'
   const id = await store.startGame(startInput({ startRoll: { values: [3, 5, 6, 2], winnerSeat: 2 } }));
   assert.equal(id, 'g-new');
   await t.advance(300);
-  const order = sb.calls.filter((c) => c.op === 'upsert' || c.op === 'rpc').map((c) => c.op);
-  assert.deepEqual(order, ['rpc', 'upsert']);
+  const order = sb.calls.filter((c) => c.op === 'insert' || c.op === 'rpc').map((c) => c.op);
+  assert.deepEqual(order, ['rpc', 'insert']);
   assert.equal(sb.upserts().length, 1);
   const rows = sb.upserts()[0].rows;
   assert.equal(rows.length, 1);
