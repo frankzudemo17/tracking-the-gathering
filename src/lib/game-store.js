@@ -41,9 +41,9 @@ const cidOf = (e) => e?.payload?.cid ?? null;
 function newCid() {
   const c = globalThis.crypto;
   if (typeof c?.randomUUID === 'function') return c.randomUUID();
+  if (typeof c?.getRandomValues !== 'function') throw new Error('Web Crypto fehlt: keine Ereignis-Kennung möglich');
   const b = new Uint8Array(16);
-  if (typeof c?.getRandomValues === 'function') c.getRandomValues(b);
-  else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256); // nur ohne Web Crypto
+  c.getRandomValues(b);
   b[6] = (b[6] & 0x0f) | 0x40;
   b[8] = (b[8] & 0x3f) | 0x80;
   const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
