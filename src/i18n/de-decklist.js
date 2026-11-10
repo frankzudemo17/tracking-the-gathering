@@ -95,6 +95,7 @@ export default {
       tutors: 'Tutoren',
       fast_mana: 'Schnelles Mana',
       unknown_cards: '{n} Karten kennt Commander Spellbook nicht',
+      unknown_cards1: '1 Karte kennt Commander Spellbook nicht',
       banned: 'Im Commander gebannt',
       other: 'Hinweis',
     },

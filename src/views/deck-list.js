@@ -166,8 +166,9 @@ export async function renderDeckList(slot, { deck, canEdit }) {
     return s === k ? t('decklist.bracket.reasons.other', { n: r.floor }) : s;
   }
   function hintText(h) {
-    const k = `decklist.bracket.hintCodes.${h.code}`;
-    const s = t(k, { n: h.count ?? list(h.cards).length });
+    const n = h.count ?? list(h.cards).length;
+    const k = `decklist.bracket.hintCodes.${h.code}${n === 1 && h.code === 'unknown_cards' ? '1' : ''}`;
+    const s = t(k, { n });
     return s === k ? t('decklist.bracket.hintCodes.other') : s;
   }
 
