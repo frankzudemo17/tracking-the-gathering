@@ -96,7 +96,9 @@ export function tools(db) {
   async function seedUser(id, { email = null, meta = {}, anonymous = false, confirmed = true } = {}) {
     const st = await save();
     await db.exec('reset role;');
-    const gate = await has(`select exists (select 1 from pg_trigger where tgname = 'ttg_signup_gate' and tgrelid = 'auth.users'::regclass) x`);
+    // nur ein AKTIVES Tor ab- und danach wieder anschalten (ein vorher abgeschaltetes bleibt aus)
+    const gate = await has(`select exists (select 1 from pg_trigger where tgname = 'ttg_signup_gate' and tgrelid = 'auth.users'::regclass
+                              and tgenabled <> 'D') x`);
     await db.exec('begin;');
     try {
       if (gate) await db.exec('alter table auth.users disable trigger ttg_signup_gate;');
