@@ -109,3 +109,20 @@ test('K2 stats.js: leere Formen bei leerer Gruppe', async () => {
   const a = s.memberProfile(e(), 'm-x'); const b = s.memberProfile(e(), 'm-x');
   assert.notEqual(a.saltTrend, b.saltTrend); assert.notEqual(a.tempo, b.tempo);
 });
+
+// ---------- Kriterium 6: Icons ----------
+const NEW_ICONS = ['salt', 'starFill', 'smiley', 'medal', 'fire', 'quotes', 'shareNetwork', 'downloadSimple', 'notePencil', 'mapPin', 'calendarBlank', 'funnel'];
+
+test('K6 icons.js: die 12 neuen Schlüssel, je genau einmal, salt im Kopf als eigene Zeichnung', async () => {
+  const { I } = await import('../../src/lib/icons.js');
+  const keys = Object.keys(I);
+  for (const k of NEW_ICONS) {
+    assert.ok(keys.includes(k), `Icon ${k} fehlt`);
+    assert.equal(typeof I[k], 'string');
+    assert.ok(/^<(path|circle|rect|line|polyline|polygon|g)\b/.test(I[k]), `${k}: innere SVG-Elemente erwartet`);
+  }
+  const src = read('src/lib/icons.js');
+  for (const k of [...NEW_ICONS, 'star', 'trophyFill']) assert.equal(src.match(new RegExp(`^  ${k}:`, 'gm'))?.length, 1, `${k} doppelt oder fehlt`);
+  const head = src.split('export const I')[0];
+  assert.ok(/salt/.test(head) && /eigene Zeichnung/.test(head), 'Dateikopf nennt salt nicht als eigene Zeichnung');
+});
