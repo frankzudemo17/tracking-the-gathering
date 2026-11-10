@@ -326,13 +326,17 @@ Franco gibt keinen Schlüssel in den Chat, sondern meldet sich selbst an. Ablauf
 3. **Spielen:** Setup mit Sitzordnung und Layouts, Feldfarben, Lifecounter komplett (Tippen, Zähler, Pins, Mittelknopf, Verlauf, Rückgängig), Angriff per Ziehen mit Zielfernrohr, Würfeltisch, Ereignisse speichern, K.O.-Screens.
 4. **Spielende und Historie:** Ergebnis, Bewertungen, Deck-Salt, Play of the Game, Foto, Historie nach Abenden, Spieldetail.
 5. **Statistik:** Rangliste (Spieler, Decks, Salt), Profile mit Tempo und Nemesis, Deckprofile, Spieleabend-Karte zum Teilen. Dazu **Profil-Stats als Highlight-Kacheln** (Franco 09.11.2026): Siegquote/Ø Platz/Punkte im Verlauf, Tempo, Nemesis, Lieblings- und bestes Deck, längste Siegesserie, schnellster Sieg, Salt/Spaß; optional wechselnder Titel unter dem Namen. Keine Abzeichen zum Freischalten.
-6. **Live und Feinschliff:** Realtime auf mehreren Handys, Offline-Warteschlange, Wake Lock, Englisch fertig übersetzen, Barrierefreiheit prüfen, Bestätigungsmail bei Registrierung wieder einschalten (in der Testphase aus).
+6. **Live und Feinschliff:** Realtime auf mehreren Handys, Offline-Warteschlange, Wake Lock, Englisch fertig übersetzen, Barrierefreiheit prüfen, Bestätigungsmail bei Registrierung wieder einschalten (in der Testphase aus). Dazu **Tisch-Einstellungen** in den Einstellungen: Bildschirm anlassen, Vibration, K.O.-Screens (alle/einzelne/aus), weniger Bewegung.
 
 Nach jeder Etappe kurz mit Franco abstimmen und auf GitHub Pages veröffentlichen.
 
 ---
 
 ## 10. Noch offen oder später
+
+- **Gruppe löschen** (Admin): eigene RPC mit sicherer Reihenfolge (erst Spiele, dann Gruppe), weil game_players.member_id/deck_id bewusst keine Kaskade haben (Historie schützen). Befund aus P6, Franco 10.11.2026.
+
+- **Einstellungen-Plan** (Franco 09.11.2026): Konto (Passwort/E-Mail ändern, Konto löschen) + Rechtliches (Version, Datenschutz, Impressum, Fan-Content-Hinweis WotC, Credits Scryfall) als Paket P12; Spiel-Standards (Startleben, Tischlayout, Standard-Pins, Zugzeit an/aus) mit Etappe 3; Tisch-Einstellungen mit Etappe 6.
 
 - **Für Etappe 3 zu klären:** `decks.field_color` und `counter_pins` darf laut RLS nur der Deck-Besitzer ändern. Am Tisch setzt aber oft der Host die Feldfarbe für alle. Lösung vorschlagen (z. B. RPC, die das für Decks der eigenen Gruppe erlaubt).
 - **Deckliste in der App + Bracket-Rechner + ManaBox-Import** (Wunsch von Franco, nach Etappe 2 je nach Aufwand): Text-/CSV-Export aus ManaBox einlesen, über Scryfall `/cards/collection` auflösen, Game Changers zählen. Vorher echten ManaBox-Export von Franco holen.
