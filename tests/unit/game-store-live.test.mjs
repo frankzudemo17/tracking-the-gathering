@@ -717,6 +717,22 @@ test('Alte Warteschlange ohne cid, Server hat dieselbe seq ohne cid (frühere Ve
   assert.deepEqual(d.rec.status, { state: 'saved', pending: 0 });
 });
 
+test('Server-Zeile OHNE cid mit anderem Inhalt auf eigener seq (altes Gerät, frühere Version) ⇒ fremd, umnummeriert, beide stehen', async () => {
+  const server = seeded(2);
+  const t = clock();
+  const x = await device(server, t);
+  // altes Gerät (vor P4): schreibt seq 3 ohne cid, anderer Inhalt
+  server.addEvent({ game_id: GAME, seq: 3, round: 1, type: 'life', actor: 'B', source: null, target: 'B', amount: -5, payload: { act: 3 } });
+  const [ev] = x.act({ type: 'life', target: 'A', d: -1 });
+  assert.equal(ev.seq, 3);
+  await t.advance(3000);
+  assert.deepEqual(server.seqs(), [1, 2, 3, 4], 'kein Ereignis verloren');
+  assert.equal(server.events()[2].payload.cid, undefined, 'Zeile des alten Geräts bleibt');
+  assert.equal(server.events()[3].payload.cid, ev.payload.cid, 'eigenes Ereignis auf 4');
+  assert.deepEqual(serverReplay(server).players.map((p) => p.life), [40 - 1 - 1, 40 - 1 - 5]);
+  assert.deepEqual(x.rec.status, { state: 'saved', pending: 0 });
+});
+
 test('Laden: eigene ausstehende Zeile auf einer seq mit FREMDER cid ⇒ umnummeriert statt verworfen', async () => {
   const server = seeded(2);
   const t = clock();

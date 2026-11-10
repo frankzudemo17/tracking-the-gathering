@@ -37,6 +37,19 @@ function toEvent(row) {
 const toRow = (gameId, ev) => ({ game_id: gameId, ...toEvent(ev) });
 const cidOf = (e) => e?.payload?.cid ?? null;
 
+/** Schlüsselreihenfolge-unabhängige Form (jsonb ordnet Schlüssel um). */
+function canon(v) {
+  if (Array.isArray(v)) return `[${v.map(canon).join(',')}]`;
+  if (v && typeof v === 'object') return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(',')}}`;
+  return JSON.stringify(v === undefined ? null : v);
+}
+
+/** Gleicher Inhalt ohne cid (Server-Zeile einer früheren Version ohne cid ⇔ dieselbe Zeile). */
+function sameContent(a, b) {
+  const strip = (e) => { const x = toEvent(e); delete x.seq; const { cid: _c, ...rest } = x.payload; x.payload = rest; return x; };
+  return canon(strip(a)) === canon(strip(b));
+}
+
 /** Kennung eines Ereignisses: UUID v4 (Fallback: 128 bit aus getRandomValues). */
 function newCid() {
   const c = globalThis.crypto;
@@ -190,7 +203,8 @@ export function createStore(sb, {
 
     /**
      * Warteschlange gegen die bekannten Server-Zeilen abgleichen: eigene (gleiche cid; ohne
-     * cid auf dem Server = frühere Version, gleiche seq ⇒ dasselbe Ereignis) bestätigen.
+     * cid auf dem Server = frühere Version: gleiche seq UND gleicher Inhalt ⇒ dasselbe
+     * Ereignis) bestätigen. Cid-lose Zeile mit anderem Inhalt gilt als fremd.
      * @returns {number|null} kleinste seq, auf der eine fremde Server-Zeile liegt
      */
     function reconcile() {
@@ -199,7 +213,7 @@ export function createStore(sb, {
         const c = cidOf(r);
         if (c && ctx.cids.has(c)) return false;
         const s = ctx.server.get(r.seq);
-        return !(s && !cidOf(s));
+        return !(s && !cidOf(s) && sameContent(s, r));
       });
       if (queue.length !== before) persist();
       let min = null;
