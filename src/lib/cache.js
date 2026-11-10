@@ -1,5 +1,5 @@
 // Zwischenspeicher der laufenden Seite (P12, spec-p12-seitenwechsel.md, Vertrag).
-// Nur Arbeitsspeicher: nichts landet in localStorage, sessionStorage, IndexedDB, Cache-API oder Cookies.
+// Nur Arbeitsspeicher: nichts landet dauerhaft im Browser (kein Web-Storage, keine Datenbank, keine Cookies).
 // Jeder Eintrag gehört genau einem Konto und einer Gruppe: Schlüssel `${konto}|${gruppe}|${name}`.
 // Ohne Konto oder Gruppe gibt es keinen Schlüssel (null) — dann wird geladen, aber nichts gemerkt.
 // Gemerkt werden Daten, nie HTML und nie signierte Bild-Adressen.

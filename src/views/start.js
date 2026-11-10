@@ -42,7 +42,9 @@ export default async function start(el, { isStale, fail }) {
     const gid = sc.gid;
     const prevLive = pageCache.peek(pageKey)?.value?.live;
     // Anzeigetafel: ein Fehler hier lässt die Startseite unverändert (bisherige Liste, sonst keine)
-    const liveP = createStore(sb).liveGames(gid).catch((e) => { console.warn('Laufende Spiele', e); return prevLive || []; });
+    // Mit gemerktem Stand zählt ein Ausfall als gescheitertes Auffrischen (nie eine alte Liste mit neuem Zeitstempel).
+    const liveP = createStore(sb).liveGames(gid).catch((e) => { console.warn('Laufende Spiele', e); if (prevLive) throw e; return []; });
+    liveP.catch(() => {}); // scheitern die Mitglieder zuerst, wartet niemand mehr auf liveP
     const ownUrl = signed([]);
     const members = await sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', gid).order('created_at').then(must);
     const [latest, live] = await Promise.all([latestDeckByMember(members), liveP, signed(members), ownUrl]);
@@ -205,6 +207,7 @@ export default async function start(el, { isStale, fail }) {
     if (!sc.ok()) return;
   }
   draw();
+  stale.from(p.cached?.failed ? p.cached : g.cached?.failed ? { at: p.cached?.at ?? g.cached.at, failed: true } : undefined);
 
   p.promise?.then(async (v) => {
     if (!sc.ok()) return;

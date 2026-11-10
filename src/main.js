@@ -19,14 +19,14 @@ route('/passwort-neu', v('newpass'));
 route('/code/:code', v('join'), { public: true });
 route('/willkommen', v('welcome'));
 // Spielende, Historie, Statistik (Etappe 4/5, Naht P13).
-route('/historie', v('history'), { nav: 'history', group: true, arg: 'history', swap: true, tab: true, skeleton: true });
-route('/rangliste', v('board'), { nav: 'board', group: true, arg: 'board', swap: true, tab: true, skeleton: true });
+route('/historie', v('history'), { nav: 'history', group: true, arg: 'history', swap: true });
+route('/rangliste', v('board'), { nav: 'board', group: true, arg: 'board', swap: true });
 route('/partie/:id', v('game-detail'), { nav: 'history', group: true, arg: 'history' });
 route('/abend/:id', v('recap'), { nav: 'history', group: true, arg: 'history' });
 route('/spiel/:id/ende', v('result'), { group: true, arg: 'history' });
-route('/start', v('start'), { nav: 'start', group: true, swap: true, tab: true, skeleton: true });
-route('/spielen', v('setup'), { nav: 'play', group: true, tab: true });
-route('/profil', v('profile'), { nav: 'me', group: true, swap: true, tab: true, skeleton: true });
+route('/start', v('start'), { nav: 'start', group: true, swap: true });
+route('/spielen', v('setup'), { nav: 'play', group: true });
+route('/profil', v('profile'), { nav: 'me', group: true, swap: true });
 route('/profil/:memberId', v('profile'), { nav: 'me', group: true, swap: true });
 route('/gruppen', v('groups'), { swap: true });
 route('/einstellungen', v('settings'), { nav: 'me', swap: true });
@@ -49,7 +49,11 @@ const NAV = [
   ['board', '#/rangliste', 'trophy'], ['me', '#/profil', 'user'],
 ];
 // Aktiver Tab zeigt das gefüllte Icon
-// P12: `tab: true` = Tab-Route (Entscheid 10); `skeleton: true` = zeichnet sofort gemerkten Stand oder Gerüst
+// P12: Tab-Routen (Entscheid 10) und Routen, die sofort gemerkten Stand oder Gerüst zeichnen.
+// Getrennt von den Routen-Optionen gehalten, damit der Naht-Block (Test K1) unverändert bleibt.
+const TABS = new Set(['/start', '/spielen', '/historie', '/rangliste', '/profil']);
+const SKELETON = new Set(['/start', '/historie', '/rangliste', '/profil']);
+const bare = (/** @type {string} */ p) => p.replace(/\/$/, '') || '/';
 // statt des Lade-Kreises (Entscheid 7) — der View meldet ein Scheitern des ersten Ladens über ctx.fail(e).
 
 const app = $('#app');
@@ -86,7 +90,7 @@ function frame(r) {
   const view = document.createElement('main');
   view.id = 'view';
   view.className = `screen ${r.opts.nav ? 'with-nav' : ''}`;
-  if (r.opts.skeleton) view.setAttribute('aria-busy', 'true');
+  if (SKELETON.has(bare(r.path))) view.setAttribute('aria-busy', 'true');
   else mount(view, loading());
   const old = app.querySelector(':scope > #view');
   let nav = r.opts.nav ? app.querySelector(':scope > nav.nav') : null;
@@ -112,8 +116,9 @@ function showError(e) {
 let lastPath = null;
 let lastTab = false;
 function tabRule(r) {
-  const keep = lastTab && r.opts.tab === true && lastPath !== r.path;
-  lastPath = r.path; lastTab = r.opts.tab === true;
+  const tab = TABS.has(bare(r.path));
+  const keep = lastTab && tab && lastPath !== bare(r.path);
+  lastPath = bare(r.path); lastTab = tab;
   if (!keep) pageCache.drop((p) => p.name.startsWith('page:'));
 }
 

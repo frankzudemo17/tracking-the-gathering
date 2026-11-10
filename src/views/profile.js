@@ -65,7 +65,6 @@ export default async function profile(el, { params, isStale, fail }) {
   let avUrl = '';
   const lang = getLang();
   const showBack = !!params.memberId && params.memberId !== mineId;
-  const decksOpen = decksOpenPref();
   const deckLine = (id) => {
     if (!data) return '';
     const dp = deckProfile(data, id);
@@ -91,6 +90,7 @@ export default async function profile(el, { params, isStale, fail }) {
     target = isMe ? { kind: 'profile', id: state.profile.id } : { kind: 'member', id: m.id };
 
     avUrl = urls[avPath] || '';
+    const decksOpen = decksOpenPref(); // beim Neuzeichnen gilt der zuletzt gewählte Zustand
     const av = avatar({ name, url: avUrl, size: 72 });
     const avView = html`<button type="button" class="avatar-view" data-act="avatar-zoom" aria-label="${t('avatar.view', { name })}">${av}</button>`;
     paint(html`
@@ -187,6 +187,7 @@ export default async function profile(el, { params, isStale, fail }) {
     urls = (await settled(signed(m))) || {};
     if (!sc.ok()) return;
     await draw();
+    stale.from(p.cached?.failed ? p.cached : g.cached?.failed ? { at: p.cached?.at ?? g.cached.at, failed: true } : undefined);
     p.promise?.then(async (v) => {
       if (!sc.ok()) return;
       if (!v.m) { notFound(); return; }

@@ -124,20 +124,21 @@ let failing = false;
 const hhmm = (at) => new Date(at).toLocaleTimeString(getLang() === 'en' ? 'en-GB' : 'de-DE', { hour: '2-digit', minute: '2-digit' });
 
 /**
- * Zustand „nicht aktualisiert“ je Seitenbesuch: `bad(at)` setzt #view[data-stale="1"] (+ Toast einmal je Serie),
- * `good()` nimmt ihn zurück, solange in diesem Besuch nichts gescheitert ist.
+ * Zustand „nicht aktualisiert“ je Seitenbesuch: `bad(at)` setzt #view[data-stale="1"] (+ Toast einmal je Serie);
+ * `good()` — erst aufrufen, wenn alle Ladungen dieses Besuchs gelangen — nimmt ihn zurück und beendet die Serie.
+ * `from(entry)`: ein gezeigter Eintrag, dessen letztes Auffrischen scheiterte, gilt sofort als nicht aktualisiert
+ * (auch wenn der Ausfall eintraf, während eine andere Seite offen war).
  * @param {HTMLElement} el
  */
 export function staleMark(el) {
-  let failed = false;
+  const bad = (/** @type {number} */ at) => {
+    el.setAttribute('data-stale', '1');
+    if (!failing) { failing = true; toast(t('common.stale', { time: hhmm(at) })); }
+  };
   return {
-    bad(/** @type {number} */ at) {
-      failed = true;
-      el.setAttribute('data-stale', '1');
-      if (!failing) { failing = true; toast(t('common.stale', { time: hhmm(at) })); }
-    },
+    bad,
+    from(/** @type {{ at: number, failed: boolean } | undefined} */ entry) { if (entry?.failed) bad(entry.at); },
     good() {
-      if (failed) return;
       failing = false;
       el.removeAttribute('data-stale');
     },

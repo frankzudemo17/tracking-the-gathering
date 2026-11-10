@@ -129,8 +129,6 @@ const uniq = (xs) => [...new Set(xs.filter((x) => x != null))];
  * @returns {{ loadGroup: (groupId: string, opts?: { force?: boolean }) => Promise<GroupData>, loadGame: (gameId: string) => Promise<GameData|null>, invalidate: (groupId: string) => void }}
  */
 export function createHistoryData(sb, { cache: shared, key } = {}) {
-  /** @type {Map<string, Promise<GroupData>>} */
-  const cache = new Map();
 
   /** Eine Abfrage seitenweise bis zur letzten Seite. `where(q)` setzt die Filter. */
   async function paged(table, cols, where) {
@@ -250,6 +248,9 @@ export function createHistoryData(sb, { cache: shared, key } = {}) {
     };
   }
 
+  /** Rückfall ohne übergebenen Speicher (Tests K13, Werkzeuge): eigener Speicher je Gruppe.
+   * @type {Map<string, Promise<GroupData>>} */
+  const cache = new Map();
   return {
     /** Zwischengespeichert je Gruppe (Promise ⇒ parallele Aufrufe teilen eine Ladung); Fehlschlag wird nicht gespeichert. */
     loadGroup(groupId, { force = false } = {}) {

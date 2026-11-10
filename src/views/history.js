@@ -141,6 +141,7 @@ export default async function history(el, { isStale, fail }) {
     u.then((x) => { if (sc.ok()) { urls = x; draw(); } });
   }
   draw();
+  stale.from(g.cached);
   g.promise?.then(async (d) => {
     if (!sc.ok()) return;
     const u = await signed(d);

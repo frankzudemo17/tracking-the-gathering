@@ -176,6 +176,7 @@ export default async function spielEndeE2e({ browser, base: BASE }) {
   // ---------------------------------------------------------------- Startseite: Rangliste + Zuletzt gespielt mit dem Spiel
   await Q.goto(BASE + '#/start');
   await Q.waitForSelector(`[data-recent="${g}"]`, { timeout: 10000 }).catch(() => {});
+  await Q.waitForSelector('.home-top-row', { timeout: 10000 }).catch(() => {}); // P12: Rangliste-Teil füllt nach den Leuten
   ok('Startseite (B): Spiel unter „Zuletzt gespielt“ + Rangliste', (await Q.locator(`[data-recent="${g}"]`).count()) === 1 && (await Q.locator('.home-top-row').count()) >= 1);
   await Q.shot('p20-07-startseite');
   ok('Keine JS-Fehler (B)', Q.errs.length === 0, Q.errs.join(' | '));
