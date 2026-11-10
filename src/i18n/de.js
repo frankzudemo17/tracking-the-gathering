@@ -114,7 +114,7 @@ export default {
   avatar: {
     title: 'Profilbild', take: 'Foto aufnehmen', gallery: 'Aus Galerie wählen', remove: 'Bild entfernen',
     hint: 'Das Bild wird quadratisch zugeschnitten und klein gespeichert. Ohne Bild stehen die Initialen da.',
-    forWhom: 'für {name}', change: 'Profilbild von {name} ändern', saved: 'Profilbild gespeichert.', removed: 'Profilbild entfernt.',
+    forWhom: 'für {name}', change: 'Profilbild von {name} ändern', view: 'Profilbild von {name} groß ansehen', alt: 'Profilbild von {name}', saved: 'Profilbild gespeichert.', removed: 'Profilbild entfernt.',
     tooBig: 'Das Bild ließ sich nicht lesen.',
   },
 

@@ -114,7 +114,7 @@ export default {
   avatar: {
     title: 'Profile picture', take: 'Take photo', gallery: 'Choose from gallery', remove: 'Remove picture',
     hint: 'The picture is cropped square and stored small. Without a picture, initials are shown.',
-    forWhom: 'for {name}', change: 'Change profile picture of {name}', saved: 'Profile picture saved.', removed: 'Profile picture removed.',
+    forWhom: 'for {name}', change: 'Change profile picture of {name}', view: 'View profile picture of {name} larger', alt: 'Profile picture of {name}', saved: 'Profile picture saved.', removed: 'Profile picture removed.',
     tooBig: 'The picture could not be read.',
   },
 

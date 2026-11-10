@@ -5,7 +5,7 @@ import { html, mount, on, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { avatar, backHead, empty, memberName, memberAvatarPath, roleChip, manaPips } from '../lib/parts.js';
 import { decksOf, sortColors, bracketName } from '../lib/decks.js';
-import { sheet, toast, errText, copyText } from '../lib/ui.js';
+import { sheet, toast, errText, copyText, openPhoto } from '../lib/ui.js';
 import { setAvatar, removeAvatar } from '../lib/avatar.js';
 import { t, fmtDate, getLang } from '../i18n/index.js';
 import { go } from '../router.js';
@@ -54,7 +54,9 @@ export default async function profile(el, { params, isStale }) {
   const showBack = !!params.memberId && params.memberId !== mineId;
   const decksOpen = decksOpenPref();
 
-  const av = avatar({ name, url: urls[avPath], size: 72 });
+  const avUrl = urls[avPath] || '';
+  const av = avatar({ name, url: avUrl, size: 72 });
+  const avView = html`<button type="button" class="avatar-view" data-act="avatar-zoom" aria-label="${t('avatar.view', { name })}">${av}</button>`;
   mount(el, html`
     ${showBack || isMe ? html`<div class="prof-top">
       ${showBack ? html`<a class="icon-btn" href="#/gruppen" aria-label="${t('common.back')}">${icon('back')}</a>` : html`<span></span>`}
@@ -62,8 +64,10 @@ export default async function profile(el, { params, isStale }) {
     </div>` : ''}
     <div class="prof-head">
       ${canEdit
-        ? html`<button type="button" class="avatar-edit" data-act="photo" aria-label="${t('avatar.change', { name })}">${av}<span class="cam">${icon('camera', 14)}</span></button>`
-        : av}
+        ? (avUrl
+          ? html`<span class="avatar-edit">${avView}<button type="button" class="cam" data-act="photo" aria-label="${t('avatar.change', { name })}">${icon('camera', 14)}</button></span>`
+          : html`<button type="button" class="avatar-edit" data-act="photo" aria-label="${t('avatar.change', { name })}">${av}<span class="cam">${icon('camera', 14)}</span></button>`)
+        : (avUrl ? avView : av)}
       <div class="grow-col">
         <h2 class="prof-name">${name}${canEdit ? html`<button type="button" class="rename" data-act="rename" aria-label="${t('profile.rename')}">${icon('edit', 16)}</button>` : ''}</h2>
         <span class="small muted">${t('profile.since', { group: group?.name || '', date: fmtDate(m.created_at) })}</span>
@@ -106,6 +110,7 @@ export default async function profile(el, { params, isStale }) {
 
   const rerender = () => go(location.hash.slice(1));
 
+  on(el, 'click', '[data-act="avatar-zoom"]', () => { if (avUrl) openPhoto(avUrl, t('avatar.alt', { name }), { round: true }); });
   on(el, 'click', '[data-act="photo"]', () => openAvatarSheet({ name, url: urls[avPath], has: !!avPath, target, isMe, onDone: rerender }));
   on(el, 'click', '[data-act="rename"]', () => openRename({ name, isMe, member: m, onDone: rerender }));
   on(el, 'click', '[data-act="claim-link"]', () => copyText(appUrl(`#/code/${m.claim_code}`)));

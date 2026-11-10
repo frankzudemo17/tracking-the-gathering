@@ -1,6 +1,7 @@
 // Toast, Bottom-Sheet, Fehlertexte
 import { html, mount, $ } from './dom.js';
 import { t } from '../i18n/index.js';
+import { icon } from './icons.js';
 
 let toastTimer;
 export function toast(msg) {
@@ -38,6 +39,39 @@ export function sheet(label, content, onMount) {
   const first = sh.querySelector('input:not([type=file]), button, label');
   first?.focus?.();
   return close;
+}
+
+/**
+ * Vollbild-Overlay für ein Bild (Spielfoto, Profilbild): Schließen per Knopf, Escape, Tippen daneben
+ * oder Routenwechsel; Fokus zurück. round: als Kreis zeigen (Profilbild).
+ * @param {string} url @param {string} alt @param {{ round?: boolean }} [opt]
+ */
+export function openPhoto(url, alt, { round = false } = {}) {
+  const prev = document.activeElement;
+  const wrap = document.createElement('div');
+  wrap.className = round ? 'gd-full gd-full-round' : 'gd-full';
+  wrap.setAttribute('role', 'dialog');
+  wrap.setAttribute('aria-modal', 'true');
+  wrap.setAttribute('aria-label', alt);
+  mount(wrap, html`<button type="button" class="gd-full-close icon-btn" data-act="close" aria-label="${t('common.close')}">${icon('close', 22)}</button>
+    <img src="${url}" alt="${alt}">`);
+  document.body.append(wrap);
+  const close = () => {
+    wrap.remove();
+    document.removeEventListener('keydown', onKey);
+    window.removeEventListener('hashchange', close);
+    if (prev instanceof HTMLElement && prev.isConnected) prev.focus();
+  };
+  // Fokusfalle: einziges Bedienelement im Dialog ist Schließen
+  const onKey = (e) => {
+    if (e.key === 'Escape') close();
+    else if (e.key === 'Tab') { e.preventDefault(); /** @type {HTMLElement|null} */ (wrap.querySelector('[data-act="close"]'))?.focus(); }
+  };
+  document.addEventListener('keydown', onKey);
+  window.addEventListener('hashchange', close);
+  // Profilbild: auch ein Tipp aufs Bild schließt (es gibt dort nichts zu bedienen)
+  wrap.addEventListener('click', (e) => { if (round || e.target === wrap || (e.target instanceof Element && e.target.closest('[data-act="close"]'))) close(); });
+  /** @type {HTMLElement|null} */ (wrap.querySelector('[data-act="close"]'))?.focus();
 }
 
 /** Supabase-/Netzfehler in einen verständlichen Satz übersetzen. */

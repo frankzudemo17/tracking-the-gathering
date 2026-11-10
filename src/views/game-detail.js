@@ -11,6 +11,7 @@ import { html, mount, on } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { avatar, backHead, empty } from '../lib/parts.js';
 import { t, getLang } from '../i18n/index.js';
+import { openPhoto } from '../lib/ui.js';
 import { WINCONS, byId, deckArt, colorDeck, damageGrid, fmtDateTime, num } from './history-ui.js';
 
 export default async function gameDetail(el, { params, isStale }) {
@@ -200,32 +201,4 @@ export default async function gameDetail(el, { params, isStale }) {
   img?.addEventListener('error', () => el.querySelector('.gd-photo-sec')?.remove(), { once: true });
 
   on(el, 'click', '[data-act="photo"]', () => { if (photo) openPhoto(photo, t('history.photoAlt', { date: when })); });
-}
-
-/** Vollbild-Overlay fürs Foto: Schließen per Knopf, Escape, Tippen daneben oder Routenwechsel; Fokus zurück. */
-function openPhoto(url, alt) {
-  const prev = document.activeElement;
-  const wrap = document.createElement('div');
-  wrap.className = 'gd-full';
-  wrap.setAttribute('role', 'dialog');
-  wrap.setAttribute('aria-modal', 'true');
-  wrap.setAttribute('aria-label', alt);
-  mount(wrap, html`<button type="button" class="gd-full-close icon-btn" data-act="close" aria-label="${t('common.close')}">${icon('close', 22)}</button>
-    <img src="${url}" alt="${alt}">`);
-  document.body.append(wrap);
-  const close = () => {
-    wrap.remove();
-    document.removeEventListener('keydown', onKey);
-    window.removeEventListener('hashchange', close);
-    if (prev instanceof HTMLElement && prev.isConnected) prev.focus();
-  };
-  // Fokusfalle: einziges Bedienelement im Dialog ist Schließen
-  const onKey = (e) => {
-    if (e.key === 'Escape') close();
-    else if (e.key === 'Tab') { e.preventDefault(); /** @type {HTMLElement|null} */ (wrap.querySelector('[data-act="close"]'))?.focus(); }
-  };
-  document.addEventListener('keydown', onKey);
-  window.addEventListener('hashchange', close);
-  wrap.addEventListener('click', (e) => { if (e.target === wrap || (e.target instanceof Element && e.target.closest('[data-act="close"]'))) close(); });
-  /** @type {HTMLElement|null} */ (wrap.querySelector('[data-act="close"]'))?.focus();
 }
