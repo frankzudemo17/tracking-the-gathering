@@ -25,7 +25,7 @@ import { openFieldColor } from './setup.js';
 import { showKo } from './ko.js';
 import { attachAttack } from './attack.js';
 import {
-  mmss, signed, counterRows, togglePin, DEFAULT_PINS, rollText, logText, lowLife, cmdLine, shortCmd, byPlace, flickerValue, secondsSince,
+  mmss, signed, counterRows, togglePin, DEFAULT_PINS, rollText, logText, lowLife, cmdLine, shortCmd, byPlace, flickerValue, secondsSince, hitStep, hitDiff,
 } from './life-ui.js';
 
 // Ein Store für alle Besuche: die Schreib-Warteschlange je Spiel (Timer, online-Ereignis) lebt
@@ -34,6 +34,8 @@ const store = createStore(sb);
 
 const DELTA_MS = 1800;
 const FLICKER_MS = 500;
+const HIT_CLS = ['hit-dmg', 'hit-gain', 'hit-big'];
+const HIT_MS = { dmg: 340, gain: 340, big: 600 }; // Klasse weg nach Puls (300/550 ms), Grenze 450/700 ms
 const ROLL_KINDS = ['w6', 'w6x2', 'w20', 'coin', 'player'];
 const CTR_ICON = { poison: 'drop', tax: 'coins', tax2: 'coins', energy: 'lightning', exp: 'star', rad: 'radioactive', speed: 'gauge', ring: 'eye', dungeon: 'castleTurret' };
 const FLAGS = [['monarch', 'crown'], ['init', 'shieldStar'], ['city', 'buildings']];
@@ -127,6 +129,8 @@ export default async function life(el, { params, isStale }) {
   let unsubLive = () => {};
   let gesture = false; // Finger/Maus auf einem Feld (Tippen oder Ziehen, attack.js)
   let remotePending = null;
+  let remoteWhy = null; // Grund des geparkten Fremd-Zustands (P13: nur 'remote' pulst)
+  const hits = new Map(); // member_id ⇒ { acc, timer, f } Treffer-Puls je Feld (P13)
   let finishing = false; // dieses Handy beendet gerade selbst (kein Hinweis „beendet“)
   let hiddenAt = 0;
 
@@ -227,6 +231,40 @@ export default async function life(el, { params, isStale }) {
     deltas.set(mid, entry);
   }
 
+  /** Treffer-Puls (P13): genau eine hit-*-Klasse am Feld, Neustart bei jeder Änderung, weg per Zeitgeber. */
+  function pulseField(mid, d) {
+    const h = hits.get(mid) || { acc: null, timer: null, f: null };
+    hits.set(mid, h);
+    const r = hitStep(h.acc, d, Date.now(), DELTA_MS);
+    h.acc = r.acc;
+    if (!r.level) return;
+    if (h.timer) { clearTimeout(h.timer); timers.delete(h.timer); h.timer = null; }
+    h.f?.classList.remove(...HIT_CLS);
+    const f = $(`.lc-field[data-pid="${mid}"]`, el);
+    h.f = f;
+    if (!f) return;
+    void f.offsetWidth; // Stil ohne Klasse übernehmen ⇒ der Puls startet neu (beginnt voll, kein Einblenden)
+    f.classList.add(`hit-${r.level}`);
+    const timer = setTimeout(() => {
+      timers.delete(timer);
+      f.classList.remove(...HIT_CLS);
+      if (h.timer === timer) h.timer = null;
+    }, HIT_MS[r.level]);
+    h.timer = timer;
+    timers.add(timer);
+  }
+
+  /** Treffer eines Zustandswechsels zeigen; still (Entscheid 3) setzt die Schadenssummen aller Felder zurück. */
+  function showHits(list, prev, next, reason) {
+    const lifeMoved = next.players.some((p) => { const q = prev.players.find((x) => x.id === p.id); return q && q.life !== p.life; });
+    const seen = new Set(prev.events.map((e) => e.seq));
+    const undone = next.events.some((e) => e.type === 'undo' && !seen.has(e.seq)); // auch Rückgängig ohne Lebensänderung (Gift …)
+    const quiet = document.visibilityState !== 'visible' || next.finished
+      || (reason !== 'local' && reason !== 'remote') || undone || (!list.length && lifeMoved);
+    if (quiet) { for (const h of hits.values()) h.acc = null; return; }
+    for (const { id: mid, d } of list) pulseField(mid, d);
+  }
+
   /** Quelle des tödlichen Ereignisses (Angriff), Tippen hat keine (HANDOFF 5.4). */
   const sourceOf = (events, mid) => events.find((e) => e.target === mid && e.source != null && e.source !== mid)?.source ?? null;
 
@@ -245,6 +283,7 @@ export default async function life(el, { params, isStale }) {
     if (action.type === 'life') bumpDelta(action.target, action.d);
     if (action.type === 'undo') { for (const dl of deltas.values()) clearTimeout(dl.timer); deltas.clear(); }
     paint();
+    showHits(hitDiff(prev, s, 'local'), prev, s, 'local');
     // Nach Rückgängig kein neuer K.O.-Ablauf: das Feld zeigt „Ausgeschieden?“, Antippen öffnet ihn
     if (action.type !== 'undo') for (const mid of newlyLethal(prev, s)) koQueue.push({ mid, by: sourceOf(r.events, mid), force: false });
     nextKo();
@@ -583,8 +622,9 @@ export default async function life(el, { params, isStale }) {
 
   // ---------- Live (P6): Fremd-Zustand übernehmen, Spielende von außen
   /** Zustand aus store.subscribe: ersetzt s, Felder und offene Sheets zeigen ihn sofort. */
-  function applyRemote(next) {
+  function applyRemote(next, reason) {
     remotePending = null;
+    remoteWhy = null;
     if (stopped || !next) return;
     const prev = s;
     s = next;
@@ -596,6 +636,7 @@ export default async function life(el, { params, isStale }) {
     // Tödlich von außen: kein K.O.-Fenster, das Feld zeigt „Ausgeschieden?“ (wie nach Rückgängig).
     if (s.finished) endShown = true;
     paint();
+    showHits(hitDiff(prev, s, reason), prev, s, reason);
     if (!rolling) menu?.repaint();
     ctrSheet?.repaint();
   }
@@ -613,13 +654,19 @@ export default async function life(el, { params, isStale }) {
     if (stopped) return;
     const st = info?.game?.status;
     if (st && st !== 'live') { if (!finishing) endedRemote(st); return; }
-    if (gesture) { remotePending = next; return; } // laufende Geste nicht stören
-    applyRemote(next);
+    if (gesture) { park(next, info?.reason ?? 'unknown'); return; } // laufende Geste nicht stören
+    applyRemote(next, info?.reason ?? 'unknown');
+  }
+
+  /** Fremd-Zustand parken; mehrere zusammengelegt ⇒ still, sobald einer davon still wäre (P13 3d). */
+  function park(next, why) {
+    remoteWhy = remotePending && remoteWhy !== why ? 'mixed' : why;
+    remotePending = next;
   }
 
   /** Geparkten Fremd-Zustand übernehmen (vor jeder eigenen Aktion; der Schnappschuss enthält die
    *  eigenen ungesendeten Zeilen bis dahin, aber nie eine danach eingetragene). */
-  function takePending() { if (remotePending) applyRemote(remotePending); }
+  function takePending() { if (remotePending) applyRemote(remotePending, remoteWhy); }
 
   function release() {
     if (!gesture) return;
@@ -639,7 +686,7 @@ export default async function life(el, { params, isStale }) {
     store.loadGame(id).then((fresh) => {
       if (stopped) return;
       if (fresh.game.status !== 'live') { if (!finishing) endedRemote(fresh.game.status); return; }
-      if (gesture) remotePending = fresh.state; else applyRemote(fresh.state);
+      if (gesture) park(fresh.state, 'reload'); else applyRemote(fresh.state, 'reload'); // Nachladen: still (P13 3c)
     }).catch(() => { /* offline: online-Ereignis holt nach */ });
   }
   const clock = setInterval(() => {

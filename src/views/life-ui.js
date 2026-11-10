@@ -140,3 +140,42 @@ export function flickerValue(kind, i, n = 2) {
 
 /** Ganze Sekunden von `fromMs` bis `nowMs`, nie negativ (Uhrabweichung zum Server). */
 export const secondsSince = (fromMs, nowMs) => Math.max(0, Math.floor((Number(nowMs) - Number(fromMs)) / 1000) || 0);
+
+// ---------- Treffer (Spec P13): Rand-Puls im Feld bei Lebensverlust und -gewinn, stärker ab HIT_BIG
+
+/** Schaden eines Feldes im Sammelfenster, ab dem der Puls „groß“ ist. */
+export const HIT_BIG = 10;
+
+/**
+ * Ein Schritt der Treffer-Stufe eines Feldes. `acc` = null | { sum, at } (Schadenssumme des
+ * laufenden Fensters, Zeit der letzten Schadensänderung), `d` = Lebensänderung mit Vorzeichen.
+ * @returns {{ level: 'dmg'|'big'|'gain'|null, acc: { sum: number, at: number }|null }}
+ */
+export function hitStep(acc, d, now, windowMs = 1800) {
+  if (typeof d !== 'number' || !Number.isFinite(d) || d === 0) return { level: null, acc };
+  if (d > 0) return { level: 'gain', acc: null };
+  const sum = (acc && now - acc.at < windowMs ? acc.sum : 0) + Math.abs(d);
+  return { level: sum >= HIT_BIG ? 'big' : 'dmg', acc: { sum, at: now } };
+}
+
+const HIT_REASONS = ['local', 'remote'];
+
+/**
+ * Lebensänderungen zwischen zwei gezeigten Zuständen, die einen Puls auslösen: je Spieler mit
+ * geänderter `life` ein { id, d }. Still (leer): ohne prev/next, Grund nicht local/remote,
+ * neues Rückgängig im Übergang. Ohne Eintrag: Spieler, die prev nicht kennt, Ausgeschiedene, d = 0.
+ */
+export function hitDiff(prev, next, reason = 'local') {
+  if (!prev || !next || !HIT_REASONS.includes(reason)) return [];
+  const seen = new Set((prev.events || []).map((e) => e.seq));
+  if ((next.events || []).some((e) => e.type === 'undo' && !seen.has(e.seq))) return [];
+  const out = [];
+  for (const p of next.players || []) {
+    if (p.out) continue;
+    const q = (prev.players || []).find((x) => x.id === p.id);
+    if (!q) continue;
+    const d = p.life - q.life;
+    if (Number.isFinite(d) && d !== 0) out.push({ id: p.id, d });
+  }
+  return out;
+}
