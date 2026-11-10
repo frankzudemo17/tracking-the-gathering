@@ -135,7 +135,7 @@ export default async function spielEndeE2e({ browser, base: BASE }) {
   await waitHash(P, `#/partie/${g}`);
   const replacedOk = await toastIs(P, /^Gespeichert$/);
   const meta2 = await poll(META, metaArg, (v) => v && (v.etag !== meta1?.etag || v.at !== meta1?.at));
-  ok('K4 Foto ersetzen klappt (upsert, Policy photos_update): kein „Foto nicht gespeichert“, Objekt geändert', replacedOk && meta2?.size > 0 && (meta2.etag !== meta1?.etag || meta2.at !== meta1?.at), JSON.stringify([meta1, meta2]));
+  ok('K4 Foto ersetzen klappt (upsert, Policy photos_update): kein „Foto nicht gespeichert“, Objekt geändert', replacedOk && meta2?.size > 0 && (meta2.etag !== meta1?.etag || meta2.at !== meta1?.at), JSON.stringify({ toastGespeichert: replacedOk, vorher: meta1, nachher: meta2 }));
 
   // ---------------------------------------------------------------- Kriterium 4: B bewertet über #/partie/<id> ⇒ „Bewerten“
   console.log('  Spielende: B (Luka Test) bewertet auf eigenem Gerät');
