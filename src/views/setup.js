@@ -10,15 +10,14 @@ import { icon } from '../lib/icons.js';
 import { memberName } from '../lib/parts.js';
 import { errText, sheet, toast } from '../lib/ui.js';
 import { createStore } from '../lib/game-store.js';
-import { appRand } from '../lib/rand.js';
 import {
   PALETTE, PALETTE_KEYS, COLORLESS, commanderColors, fieldColors, fieldMode, modeColors, fieldBg, fieldStyle, styleText, swatchBg, frameColor,
 } from '../lib/field-color.js';
 import { LAYOUTS, layoutFor } from '../game/layouts.js';
-import { roll } from '../game/rng.js';
 import { t } from '../i18n/index.js';
 import { go } from '../router.js';
 import { MEMBER_SELECT } from './groups.js';
+import { openDiceTable } from './dice.js';
 
 const MAX = 6;
 const LIVES = [20, 25, 30, 40];
@@ -191,6 +190,7 @@ export default async function setup(el, { isStale }) {
   }
 
   const render = () => { if (el.isConnected) mount(el, view()); };
+  let rolled = null; // letzter übernommener Startwurf (P9) ⇒ roll-Ereignis beim Start
 
   // ---------- Aktionen
   on(el, 'click', '[data-act]', async (e, b) => {
@@ -217,7 +217,13 @@ export default async function setup(el, { isStale }) {
     else if (act === 'lifeset') s.life = clampLife(b.dataset.v);
     else if (act === 'roll') {
       if (s.sel.length < 2) return;
-      s.start = roll('player', s.sel.map((_, seat) => ({ seat })), appRand).winnerSeat;
+      const sel = s.sel.slice(); // Würfeltisch (P9); Schließen ohne Übernehmen ändert nichts
+      openDiceTable(document.body, { players: sel.map((id, seat) => ({ seat, name: name(id) })), onAccept: ({ winnerSeat, values }) => {
+        if (!el.isConnected || s.sel.join() !== sel.join()) return;
+        s.start = winnerSeat; rolled = { key: sel.join(), startRoll: { values, winnerSeat } };
+        s.error = ''; save(); render();
+      } });
+      return;
     } else if (act === 'color') { openColor(b.dataset.mid); return; }
     else if (act === 'start') { await start(); return; }
     s.error = '';
@@ -234,6 +240,7 @@ export default async function setup(el, { isStale }) {
         layout: layoutFor(n, s.layout).layout,
         startingLife: s.life,
         firstSeat: firstSeat(),
+        startRoll: rolled && rolled.key === s.sel.join() && rolled.startRoll.winnerSeat === s.start ? rolled.startRoll : null,
         players: s.sel.map((id, seat) => ({ memberId: id, deckId: s.deck[id], seat })),
       });
       clearDraft(gid);
