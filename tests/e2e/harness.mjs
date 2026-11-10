@@ -8,14 +8,67 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { Abort } from './fixture-core.mjs';
-import { ROOT, TARGET, email, password } from './fixture-api.mjs';
+import { Abort, checkGuard } from './fixture-core.mjs';
+import { probeMembers, membersCleanup } from './fixture-members.mjs';
+import {
+  ROOT, TARGET, email, password, baseState as baseStateRest, fixtureIds, signIn, rpc, get, api, rest, ensureMember,
+} from './fixture-api.mjs';
 
 export { Abort, ROOT, TARGET };
 export {
   prepare, ensureMember, ensurePlaceholder, ensureDeck, zugangLive, inviteCode, fixtureIds, NAMES, FIXTURE_NAME,
-  baseState, snapshot, rpc, get, signIn, api, rest, tally,
+  snapshot, rpc, get, signIn, api, rest, tally,
 } from './fixture-api.mjs';
+
+// ---------------------------------------------------------------- P10 Mitglieder: Probe + Grundzustand über RPC
+let mLive = null;
+/** Gibt es member_removal_check in der Ziel-Datenbank (P10-Migration in Prod)? Einmal je Lauf, als Konto A. */
+export async function mitgliederLive() {
+  if (mLive !== null) return mLive;
+  try {
+    mLive = await probeMembers((fn, args) => rpc('a', fn, args));
+  } catch (e) {
+    if (e instanceof Abort) throw e;
+    throw new Abort('Mitglieder-Probe', `member_removal_check antwortet unerwartet: ${e.message}`);
+  }
+  return mLive;
+}
+
+/**
+ * Block K6 schließt direktes delete auf members (Policy mem_delete weg). Nach dem db push nimmt der Grundzustand
+ * Platzhalter, B/C und frühere bzw. markierte Zeilen deshalb über die P10-Funktionen (fixture-members.mjs,
+ * Ablauf und Beweis dort bzw. in tests/db/mitglieder.test.mjs). Danach läuft der bisherige Grundzustand
+ * (fixture-api.mjs, unverändert) und findet keine Zeile mehr, die er per REST löschen müsste.
+ */
+async function membersViaRpc(log) {
+  const fx = fixtureIds();
+  if (!fx) throw new Abort('Fixture', 'tests/e2e/fixture-ids.json fehlt — node tests/e2e/fixture.mjs --pruefen');
+  const me = await signIn('a');
+  if (me.uid !== fx.a) throw new Abort('Wächter', 'Konto A passt nicht zu fixture-ids.json — nichts gelöscht');
+  const io = {
+    members: async () => {
+      const groups = await get('a', `playgroups?select=id,name,created_by&id=eq.${fx.group}`);
+      const members = await get('a', `members?select=*&playgroup_id=eq.${fx.group}`);
+      checkGuard({ fixture: fx, group: groups[0] ?? null, members });
+      return members;
+    },
+    deleteGames: async () => (await api('DELETE', rest(`games?playgroup_id=eq.${fx.group}`), { token: me.token, prefer: 'return=representation' })).length,
+    rejoin: (k) => ensureMember(k),
+    rpc: (fn, args) => rpc('a', fn, args),
+    removeFiles: async (names) => {
+      const rm = await api('DELETE', `${TARGET.url}/storage/v1/object/avatars`, { token: me.token, body: { prefixes: names } });
+      return Array.isArray(rm) ? rm.length : 0;
+    },
+  };
+  const n = await membersCleanup(io, fx);
+  log(`Grundzustand P10 (RPC): ${n.games} Spiele, ${n.rejoined} frühere Zeile(n) zurückgeholt, ${n.restored} wiederhergestellt, ${n.deleted} Zeile(n) gelöscht, ${n.files} Bild(er), ${n.rounds} Runde(n)`);
+}
+
+/** Grundzustand: nach dem db push zuerst über RPC (K6), dann wie bisher (fixture-api.mjs). Vorher: nur der alte Weg. */
+export async function baseState(opts = {}) {
+  if (await mitgliederLive()) await membersViaRpc(opts.log || (() => {}));
+  return baseStateRest(opts);
+}
 export const OUT = path.join(ROOT, 'tests', 'e2e', 'out');
 
 // ---------------------------------------------------------------- Lauf, Prüfzähler
@@ -54,12 +107,12 @@ export async function ctx(browser, name) {
   const p = await c.newPage();
   p.errs = [];
   p.bad = [];
-  p.transit = []; // 404 der zwei Übergangsstellen (src/zugang/invite.js) vor dem db push — gewollt, kein Fehler
+  p.transit = []; // 404 der Übergangsstellen vor dem db push — gewollt, kein Fehler: src/zugang/invite.js (P9b), rpc/list_all_playgroups (P10, Verwaltung „Alle Gruppen“)
   p.on('pageerror', (e) => p.errs.push('pageerror: ' + e.message));
   p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) p.errs.push('console: ' + m.text()); });
   p.on('response', (r) => {
     const u = r.url();
-    if (r.status() === 404 && u.startsWith(TARGET.url + '/rest/v1/') && /\/rest\/v1\/(rpc\/check_invite|playgroup_invites)(\?|$)/.test(u)) { p.transit.push(u.split('?')[0]); return; }
+    if (r.status() === 404 && u.startsWith(TARGET.url + '/rest/v1/') && /\/rest\/v1\/(rpc\/check_invite|rpc\/list_all_playgroups|playgroup_invites)(\?|$)/.test(u)) { p.transit.push(u.split('?')[0]); return; }
     if (r.status() === 429 && u.startsWith(TARGET.url + '/auth/')) env.rateLimited = true;
     if (/api\.scryfall\.com/.test(u) && (r.status() === 429 || r.status() >= 500)) env.scryfallDown = true;
     if (r.status() >= 400) p.bad.push(r.status() + ' ' + u.split('?')[0] + (u.includes('grant_type=password') ? '?grant_type=password' : ''));

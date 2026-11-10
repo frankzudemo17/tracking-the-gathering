@@ -51,6 +51,16 @@ export default {
       signup_code_invalid: 'Diesen Code kennen wir nicht (mehr). Bitte frag in deiner Gruppe nach einem neuen.',
       signup_full: 'Zurzeit sind alle Plätze vergeben.',
       signup_anonymous_disabled: 'Ohne Konto geht es hier nicht. Bitte registriere dich mit einem Einladungscode.',
+      // Kennwörter aus P10 (Mitglieder)
+      member_removed: 'Dieser Spieler ist aus der Gruppe entfernt und kann nicht mehr mitspielen.',
+      member_has_account: 'Mitglieder mit Konto kommen über den Einladungslink zurück.',
+      member_state_changed: 'Inzwischen hat sich etwas geändert. Bitte prüf es nochmal.',
+      member_files_pending: 'Das Profilbild ließ sich nicht löschen. Bitte versuch es nochmal.',
+      group_not_found: 'Diese Gruppe gibt es nicht (mehr).',
+      member_is_admin: 'Admins lassen sich nicht entfernen. Entzieh zuerst die Admin-Rechte.',
+      member_is_self: 'Dich selbst entfernst du über „Gruppe verlassen“.',
+      last_admin: 'Du bist der einzige Admin. Ernenne vorher einen weiteren Admin.',
+      unavailable: 'Noch nicht verfügbar. Bitte später erneut versuchen.',
     },
   },
 
@@ -104,6 +114,30 @@ export default {
     renew: 'Link erneuern', renewTitle: 'Link erneuern?', renewText: 'Der bisherige Link und QR-Code gelten dann nicht mehr.',
     renewYes: 'Neuen Link erstellen', renewed: 'Neuer Link ist aktiv.',
     inviteAdminsOnly: 'Einladen können die Admins dieser Gruppe.',
+  },
+
+  // P10: Spieler entfernen, wiederherstellen, Gruppe verlassen
+  memberRemove: {
+    button: 'Aus Gruppe entfernen', title: '{name} entfernen?', chip: 'Entfernt',
+    deleteText: '{name} hat noch kein Spiel und wird vollständig gelöscht.',
+    deleteTextAccount: '{name} hat noch kein Spiel in dieser Gruppe und wird aus der Gruppe entfernt. Das Konto bleibt bestehen.',
+    deleteDecks: '{n} Decks werden mitgelöscht.', deleteDecksOne: '1 Deck wird mitgelöscht.',
+    markGames: '{name} ist in {n} Spielen eingetragen.', markGamesOne: '{name} ist in einem Spiel eingetragen.',
+    markGamesNone: '{name} kommt in der Historie vor.',
+    markRest: 'Die Spiele bleiben erhalten. {name} verschwindet aus Mitgliederliste, Spielaufbau und Rangliste. Rückgängig unter Gruppe → Entfernte Spieler.',
+    markRestAccount: 'Die Spiele bleiben erhalten. {name} sieht die Gruppe danach nicht mehr und verschwindet aus Mitgliederliste, Spielaufbau und Rangliste.',
+    accountBack: 'Entfernen ist keine Sperre: Mit dem Einladungslink kommt {name} zurück. Soll {name} draußen bleiben, erneuere danach den Link.',
+    live: 'Ein laufendes Spiel mit {name} läuft weiter.',
+    again: 'Inzwischen hat sich etwas geändert. Bitte prüf es nochmal.',
+    yesDelete: 'Endgültig löschen', yesMark: 'Entfernen',
+    deleted: '{name} wurde gelöscht.', marked: '{name} wurde entfernt.', already: '{name} ist schon entfernt.',
+    removedTitle: 'Entfernte Spieler', restore: 'Wiederherstellen', restored: '{name} ist wieder dabei.',
+    viaInvite: 'kommt über den Einladungslink zurück', accountDeleted: 'Konto gelöscht',
+    leave: 'Gruppe verlassen', leaveSub: 'Deine Spiele bleiben in der Historie.', leaveTitle: '„{name}“ verlassen?',
+    leaveText: 'Du verlässt „{name}“. Deine Spiele bleiben in der Historie; du siehst die Gruppe danach nicht mehr. Über Verwaltung → Alle Gruppen kannst du sie wieder betreten.',
+    leaveTextMember: 'Du verlässt „{name}“. Deine Spiele bleiben in der Historie; du siehst die Gruppe danach nicht mehr. Zurück kommst du mit einem Einladungslink.',
+    leaveNoAdmin: 'Danach hat die Gruppe keinen Admin: niemand außer dir kann einladen oder Spieler entfernen. Ernenne vorher einen Admin.',
+    leaveYes: 'Verlassen', left: 'Du hast „{name}“ verlassen.',
   },
 
   addPlayer: {
@@ -167,6 +201,7 @@ export default {
     capLabel: 'Höchstzahl an Konten', capHint: '1 bis 1000. Bestehende Konten bleiben bestehen.',
     capSave: 'Speichern', capSaved: 'Deckel gespeichert.',
     groupsTitle: 'Gruppen', createGroup: 'Gruppe erstellen', groupsHint: 'Einladungslinks findest du bei der jeweiligen Gruppe.',
+    allGroups: 'Alle Gruppen', noAdmin: 'kein Admin', enter: 'Betreten', entered: 'Du bist jetzt in „{name}“.', allNone: 'Noch keine Gruppen.',
   },
 
   account: {

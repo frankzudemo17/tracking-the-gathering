@@ -5,7 +5,7 @@
 // Laden: jede Abfrage seitenweise (range à 1000, feste Sortierung über den Primärschlüssel, bis eine
 // Seite < 1000 liefert), ID-Listen in Stücken ≤ 200 (URL-Länge), jedes Stück wieder seitenweise.
 
-/** @typedef {{ id: string, name: string, profileId: string|null, avatarPath: string|null, isPlaceholder: boolean }} MemberRow */
+/** @typedef {{ id: string, name: string, profileId: string|null, avatarPath: string|null, isPlaceholder: boolean, removed: boolean, formerProfileId: string|null }} MemberRow */
 /** @typedef {{ id: string, shortName: string, commanderName: string, partnerName: string|null, imageUrl: string|null, colors: string[], bracket: number|null, ownerProfileId: string|null, ownerMemberId: string|null, archived: boolean }} DeckRow */
 /** @typedef {{ id: string, playedOn: string, location: string|null }} SessionRow */
 /** @typedef {{ id: string, sessionId: string|null, status: 'finished'|'live'|'aborted', startedAt: string, endedAt: string|null, round: number, wincon: string|null, note: string|null, photoPath: string|null, startingLife: number }} GameRow */
@@ -71,6 +71,9 @@ function toMember(r) {
     profileId: r.profile_id ?? null,
     avatarPath: (r.profile_id ? pr?.avatar_path : r.avatar_path) || null,
     isPlaceholder: r.profile_id == null,
+    // P10: kommen über '*' (MEMBER_SELECT); vor dem db push fehlen die Spalten ⇒ false/null
+    removed: r.removed_at != null,
+    formerProfileId: r.former_profile_id ?? null,
   };
 }
 /** @returns {DeckRow} */

@@ -442,8 +442,9 @@ check('B1 Aufbau M: Decks von A in S, G4, G1, G2 gespielt; G5 mit übernommenem 
   await mq(`update members set created_at = now() - interval '5 days' where id = $1`, [M.b5]);
   mBefore = { G1: await msnap(M.G1.id, false), G2: await msnap(M.G2.id, false), G4: await msnap(M.G4.id, false),
     seeC: await visibleDecks(U.C, M.G2.id), seeB: await visibleDecks(U.B, M.G1.id), seeD: await visibleDecks(U.D, M.G4.id) };
-  // D sieht AE/AF vorher NICHT: A ist aus G4 ausgetreten, teilt dort keine Gruppe mehr mit D
-  ok(J([mBefore.seeC, mBefore.seeB, mBefore.seeD]) === J([{ ids: 3, seen: 3 }, { ids: 3, seen: 3 }, { ids: 3, seen: 1 }]),
+  // D sieht AE/AF auch nach A's Austritt aus G4: beide wurden dort gespielt (w1, w2) — can_see_deck-Zweig aus
+  // 20261117000000_mitglieder.sql D (Spec P10 Zeile 31, Krit. 10). Vor P10 war der Sollwert seen 1 (kein Besitzer mehr in G4).
+  ok(J([mBefore.seeC, mBefore.seeB, mBefore.seeD]) === J([{ ids: 3, seen: 3 }, { ids: 3, seen: 3 }, { ids: 3, seen: 3 }]),
     J([mBefore.seeC, mBefore.seeB, mBefore.seeD]));
 });
 check('B1 (i) A löscht: AD-Original bleibt in G1, inhaltsgleiche Kopie in G2, G2-Verweise auf der Kopie, kein Deck an zwei Gruppen', async () => {
@@ -553,7 +554,8 @@ check('Gegenprobe Migration: ohne 20261112000000_konto.sql gibt es delete_my_acc
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ttg-p12-ohne-'));
   let old;
   try {
-    for (const f of fs.readdirSync(MIGRATIONS)) if (f.endsWith('.sql') && f !== FILE) fs.copyFileSync(path.join(MIGRATIONS, f), path.join(dir, f));
+    // P10 K5: 20261117000000_mitglieder.sql schreibt delete_my_account fort ⇒ Stand VOR dieser Migration, nicht „alle außer“
+    for (const f of fs.readdirSync(MIGRATIONS)) if (f.endsWith('.sql') && f < FILE) fs.copyFileSync(path.join(MIGRATIONS, f), path.join(dir, f));
     old = await freshDb({ migrations: dir });
     const e = await old.query(DEL).then(() => null, (x) => x.message);
     ok(/does not exist/.test(e || ''), e);

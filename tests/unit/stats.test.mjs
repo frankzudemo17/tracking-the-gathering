@@ -335,3 +335,42 @@ test('K12 Unveränderlichkeit: Eingabe nach jedem Aufruf tief gleich', async () 
   for (const dk of ['d-atraxa', 'd-prosper', 'd-edgar', 'd-krenko', 'd-kinnan', 'd-yuriko']) s.deckProfile(data, dk);
   assert.deepStrictEqual(data, before);
 });
+
+// ---------------------------------------------------------------- Spec P10 Krit. 15
+// Entfernte Mitglieder (MemberRow.removed) fallen aus playerTable, Plätze lückenlos; alle Werte der übrigen
+// Zeilen und alle anderen Auswertungen bleiben gleich (ihre Spiele gegen den Entfernten zählen weiter).
+const withRemoved = (...gone) => {
+  const d = fixtureGroupData();
+  d.members = d.members.map((m) => (gone.includes(m.id) ? { ...m, removed: true } : m));
+  return d;
+};
+const sansRank = ({ rank, ...r }) => r;
+
+test('P10 K15 playerTable: m-F und m-T entfernt ⇒ 3 Zeilen, Plätze 1–3, Kennzahlen wie vorher', async () => {
+  const { playerTable } = await S();
+  const before = playerTable(fixtureGroupData());
+  const t = playerTable(withRemoved('m-F', 'm-T'));
+  assert.deepEqual(t.map((r) => [r.memberId, r.rank]), [['m-M', 1], ['m-L', 2], ['m-D', 3]]);
+  for (const r of t) assert.deepEqual(sansRank(r), sansRank(byId(before, 'memberId', r.memberId)), r.memberId);
+});
+
+test('P10 K15 playerTable: nur m-F entfernt ⇒ 4 Zeilen, M 1, L 2, D 3, T 4', async () => {
+  const { playerTable } = await S();
+  const t = playerTable(withRemoved('m-F'));
+  assert.deepEqual(t.map((r) => [r.memberId, r.rank]), [['m-M', 1], ['m-L', 2], ['m-D', 3], ['m-T', 4]]);
+  assert.deepEqual(playerTable(withRemoved()).map((r) => r.rank), [1, 1, 3, 4, 5], 'ohne Entfernte wie K2');
+});
+
+test('P10 K15 deckTable, deckSaltTable, gameSummary, evenings, recap vor = nach; Name des Entfernten bleibt', async () => {
+  const s = await S();
+  const a = fixtureGroupData();
+  const b = withRemoved('m-F', 'm-T');
+  assert.deepEqual(s.deckTable(b), s.deckTable(a));
+  assert.deepEqual(s.deckSaltTable(b), s.deckSaltTable(a));
+  assert.deepEqual(s.evenings(b), s.evenings(a));
+  for (const g of a.games) assert.deepEqual(s.gameSummary(b, g.id), s.gameSummary(a, g.id), g.id);
+  for (const sid of ['s0', 's1', 's2']) assert.deepEqual(s.recap(b, sid), s.recap(a, sid), sid);
+  for (const id of ['m-F', 'm-T', 'm-M']) assert.deepEqual(s.memberProfile(b, id), s.memberProfile(a, id), `memberProfile ${id}`);
+  assert.ok(s.gameSummary(b, 'g1').placements.some((p) => p.memberId === 'm-F'), 'm-F steht in g1');
+  assert.equal(b.members.find((m) => m.id === 'm-F').name, 'Franco', 'Name löst weiter auf');
+});

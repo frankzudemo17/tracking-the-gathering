@@ -9,21 +9,23 @@ import { sheet, toast, errText, copyText, openPhoto } from '../lib/ui.js';
 import { setAvatar, removeAvatar } from '../lib/avatar.js';
 import { t, fmtDate, getLang } from '../i18n/index.js';
 import { go } from '../router.js';
-import { MEMBER_SELECT } from './groups.js';
 import { groupData } from '../lib/data.js';
 import { memberProfile, deckProfile } from '../lib/stats.js';
 import { fmtAvg, fmtPct, fmtMmss } from '../lib/format.js';
+import { runMemberRemoval, canRemoveMember } from './member-remove.js';
 import { kpis, section, moodRows, saltBars, pointsLine, highlight, deckThumb, iconDisc } from './stats-ui.js';
 
 // Decks auf- oder zugeklappt: pro Gerät gemerkt (reine Ansichtssache)
 const DECKS_KEY = 'ttg.decksOpen';
 const decksOpenPref = () => { try { return localStorage.getItem(DECKS_KEY) !== '0'; } catch { return true; } };
 const setDecksOpenPref = (v) => { try { localStorage.setItem(DECKS_KEY, v ? '1' : '0'); } catch { /* egal */ } };
+// Wie MEMBER_SELECT (groups.js) + is_superadmin des Zielprofils: kein Entfernen-Knopf beim Superadmin (P10 B1)
+const PROFILE_MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path, is_superadmin)';
 
 export default async function profile(el, { params, isStale }) {
   const mineId = currentMembership()?.id;
   const memberId = params.memberId || mineId;
-  const m = await sb.from('members').select(MEMBER_SELECT).eq('id', memberId).maybeSingle().then(must);
+  const m = await sb.from('members').select(PROFILE_MEMBER_SELECT).eq('id', memberId).maybeSingle().then(must);
   if (isStale()) return;
   if (!m) { mount(el, html`${backHead(t('nav.me'), '#/gruppen')}${empty('user', t('profile.notFound'), '')}`); return; }
 
@@ -37,7 +39,10 @@ export default async function profile(el, { params, isStale }) {
 
   const isMe = m.profile_id && m.profile_id === state.profile?.id;
   const isGuest = !m.profile_id;
-  const canEdit = isMe || isGuest; // Bild und Name: eigenes Profil und Spieler ohne Konto
+  const removed = !!m.removed_at; // P10: entfernte Zeile ist eingefroren (kein Umbenennen, kein Bild, kein Code)
+  const canEdit = !removed && (isMe || isGuest); // Bild und Name: eigenes Profil und Spieler ohne Konto
+  // P10 H/K7: Entfernen-Knopf für Gruppen-Admins (und Superadmin), nicht bei Admins, nicht beim Superadmin, nicht bei sich selbst
+  const canRemove = canRemoveMember(m, { isMe: !!isMe, isAdmin: isAdmin(), isSuperadmin: isSuperadmin() });
   const name = isMe ? state.profile.display_name : memberName(m);
   const avPath = isMe ? state.profile.avatar_path : memberAvatarPath(m);
   const lang = getLang();
@@ -75,7 +80,7 @@ export default async function profile(el, { params, isStale }) {
       </div>
     </div>
 
-    ${isGuest && m.claim_code ? html`
+    ${isGuest && !removed && m.claim_code ? html`
     <div class="guest-card">
       <b>${t('profile.guestTitle', { name })}</b>
       <span class="hint">${t('profile.guestText', { name })}</span>
@@ -105,6 +110,8 @@ export default async function profile(el, { params, isStale }) {
 
     ${!isGuest && !isMe && (m.role === 'admin' ? isAdmin() || isSuperadmin() : isSuperadmin()) ? html`
     <button type="button" class="btn soft" data-act="role">${icon('shield', 18)}${m.role === 'admin' ? t('profile.removeAdmin') : t('profile.makeAdmin')}</button>` : ''}
+    ${canRemove ? html`
+    <button type="button" class="btn danger" data-act="remove-member">${icon('trash', 18)}${t('memberRemove.button')}</button>` : ''}
 
 `);
 
@@ -126,6 +133,59 @@ export default async function profile(el, { params, isStale }) {
         must(await sb.rpc('set_member_role', { p_member: m.id, p_role: m.role === 'admin' ? 'member' : 'admin' }));
         toast(t('profile.roleChanged')); rerender();
       } catch (ex) { toast(errText(ex)); }
+    });
+  });
+  // P10 G/H: Ablauf in member-remove.js; hier nur Bestätigung (Sheet) und Ergebnis
+  on(el, 'click', '[data-act="remove-member"]', async (e, b) => {
+    let round = 0;
+    await busy(b, async () => {
+      try {
+        const res = await runMemberRemoval(sb, m, {
+          confirm: (c) => confirmRemoval({ name, check: c, account: !!m.profile_id, again: round++ > 0 }),
+          invalidate: () => groupData.invalidate(m.playgroup_id),
+        });
+        if (res === 'cancelled') return;
+        if (res === 'unavailable') { toast(t('auth.errors.unavailable')); return; }
+        toast(t(`memberRemove.${res === 'deleted' ? 'deleted' : res === 'marked' ? 'marked' : 'already'}`, { name }));
+        groupData.invalidate(m.playgroup_id);
+        if (res === 'deleted') go('/gruppen', { replace: true }); else rerender();
+      } catch (ex) { toast(errText(ex)); }
+    });
+  });
+}
+
+/** Text der Bestätigung nach Modus des Probelaufs (Spec H; Block K: Konto-Ziel). */
+function removalLines({ name, check: c, account }) {
+  const n = (k1, kn, v) => t(v === 1 ? k1 : kn, { n: v, name });
+  if (c.mode === 'delete') {
+    return [t(account ? 'memberRemove.deleteTextAccount' : 'memberRemove.deleteText', { name }), c.decks > 0 ? n('memberRemove.deleteDecksOne', 'memberRemove.deleteDecks', c.decks) : '',
+      account ? t('memberRemove.accountBack', { name }) : ''].filter(Boolean);
+  }
+  return [
+    `${c.games > 0 ? n('memberRemove.markGamesOne', 'memberRemove.markGames', c.games) : t('memberRemove.markGamesNone', { name })} ${t(account ? 'memberRemove.markRestAccount' : 'memberRemove.markRest', { name })}`,
+    c.live_games > 0 ? t('memberRemove.live', { name }) : '',
+    account ? t('memberRemove.accountBack', { name }) : '',
+  ].filter(Boolean);
+}
+
+/** Bestätigungs-Sheet; löst mit true (Ja) oder false (Abbrechen, Tippen daneben, Escape, Routenwechsel) auf. */
+function confirmRemoval({ name, check, account, again }) {
+  return new Promise((resolve) => {
+    const del = check.mode === 'delete';
+    sheet(t('memberRemove.title', { name }), html`
+      <h2 class="sheet-title">${t('memberRemove.title', { name })}</h2>
+      ${again ? html`<p class="note warn" role="status" data-again>${icon('warn', 16)}<span>${t('memberRemove.again')}</span></p>` : ''}
+      <div data-remove-mode="${check.mode}">${removalLines({ name, check, account }).map((l) => html`<p class="sheet-text">${l}</p>`)}</div>
+      <button type="button" class="btn block ${del ? 'danger-fill' : 'danger'}" data-act="remove-yes">${icon('trash', 18)}${t(del ? 'memberRemove.yesDelete' : 'memberRemove.yesMark')}</button>
+      <button type="button" class="btn block soft" data-act="cancel">${t('common.cancel')}</button>`, (sh, close) => {
+      let done = false;
+      const onKey = (ev) => { if (ev.key === 'Escape') end(false); };
+      const end = (v) => { if (!done) { done = true; document.removeEventListener('keydown', onKey); resolve(v); } };
+      sh.parentElement.querySelector('.scrim').addEventListener('click', () => end(false));
+      document.addEventListener('keydown', onKey);
+      window.addEventListener('hashchange', () => end(false), { once: true });
+      on(sh, 'click', '[data-act="cancel"]', () => { end(false); close(); });
+      on(sh, 'click', '[data-act="remove-yes"]', () => { end(true); close(); });
     });
   });
 }

@@ -334,7 +334,9 @@ export function openFieldColor(d, onChange, { name = '', life = 40, store = crea
 
 /** Mitglieder (inkl. Profilnamen) und alle nicht archivierten Decks der Gruppe. */
 async function loadGroup(gid) {
-  const members = await sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', gid).order('created_at').then(must);
+  // P10: nur aktive Mitglieder (Filter im Client, Übergangsregel H) ⇒ Entfernte fallen auch aus Entwurf und ?spieler=
+  const members = (await sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', gid).order('created_at').then(must))
+    .filter((m) => !m.removed_at);
   const pids = members.filter((m) => m.profile_id).map((m) => m.profile_id);
   const mids = members.filter((m) => !m.profile_id).map((m) => m.id);
   const ors = [];
