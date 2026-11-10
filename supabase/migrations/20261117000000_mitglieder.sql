@@ -267,9 +267,14 @@ returns jsonb language plpgsql security definer set search_path = public as $$
 declare m members; mode text;
 begin
   if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
-  if not public.is_superadmin() then raise exception 'superadmin_only'; end if;
   select * into m from members where playgroup_id = p_group and profile_id = auth.uid() for update;
   if m.id is null then return jsonb_build_object('result', 'already'); end if;
+  -- Block K2: jedes Mitglied darf gehen; der letzte Admin (außer dem Superadmin) erst nach Nachfolge
+  if m.role = 'admin' and not public.is_superadmin()
+     and not exists (select 1 from members o where o.playgroup_id = p_group and o.id <> m.id
+                     and o.role = 'admin' and o.removed_at is null) then
+    raise exception 'last_admin';
+  end if;
   mode := public._member_detach(m.id);
   return jsonb_build_object('result', 'left', 'mode', mode,
     'admins_left', (select count(*) from members where playgroup_id = p_group and role = 'admin' and removed_at is null));
