@@ -88,11 +88,15 @@ export default function register(el) {
         options: { data: { display_name: name, invite_code: code }, emailRedirectTo: mailRedirect() },
       });
       if (error) {
-        // Das Tor meldet GoTrue nur als „Database error saving new user“ ⇒ erneut prüfen, was los ist
-        if (/Database error saving new user/i.test(error.message || '')) {
-          const again = await checkInvite(sb, code).catch(() => null);
-          if (again?.status === 'full') { showFull(form); return; }
-          if (again?.status === 'invalid') { fieldErr(t('auth.errors.signup_code_invalid')); return; }
+        // Das Tor meldet sich je nach GoTrue-Stand mit dem Kennwort der Migration (Prod, gemessen 10.11.2026:
+        // 500 signup_code_required / signup_code_invalid) oder nur als „Database error saving new user“
+        // ⇒ im zweiten Fall erneut prüfen, was los ist
+        const m = error.message || '';
+        const gate = /^signup_(full|code_invalid)$/.test(m) ? m : null;
+        if (gate || /Database error saving new user/i.test(m)) {
+          const again = gate ? null : await checkInvite(sb, code).catch(() => null);
+          if (gate === 'signup_full' || again?.status === 'full') { showFull(form); return; }
+          if (gate === 'signup_code_invalid' || again?.status === 'invalid') { fieldErr(t('auth.errors.signup_code_invalid')); return; }
         }
         err.textContent = errText(error); err.hidden = false; return;
       }

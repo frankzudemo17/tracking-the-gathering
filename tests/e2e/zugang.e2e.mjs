@@ -237,6 +237,26 @@ export async function anonPart({ browser, base, offline = false }) {
     await P.waitForSelector('form [data-state="full"]');
     ok('K3 signup 500 „Database error saving new user“ + danach full ⇒ „alle Plätze vergeben“',
       signups.length === 2 && (await P.textContent('form [data-state="full"]')).includes('Zurzeit sind alle Plätze vergeben'));
+
+    // Prod-GoTrue (gemessen 10.11.2026) reicht das Kennwort des Tors durch ⇒ gleicher Zustand ohne zweite Prüfung
+    await fresh(P, base, '#/registrieren');
+    await P.waitForSelector('#rg-code');
+    mockCheck(OK_INVITE, OK_INVITE);
+    signupRes = json(500, { code: 500, error_code: 'unexpected_failure', msg: 'signup_full', message: 'signup_full' });
+    await fill('TTG-ABC234');
+    await submit();
+    await P.waitForSelector('form [data-state="full"]');
+    ok('K3 signup 500 „signup_full“ (Kennwort) ⇒ „alle Plätze vergeben“',
+      signups.length === 3 && (await P.textContent('form [data-state="full"]')).includes('Zurzeit sind alle Plätze vergeben'));
+
+    await fresh(P, base, '#/registrieren');
+    await P.waitForSelector('#rg-code');
+    mockCheck(OK_INVITE, OK_INVITE);
+    signupRes = json(500, { code: 500, error_code: 'unexpected_failure', msg: 'signup_code_invalid', message: 'signup_code_invalid' });
+    await fill('TTG-ABC234');
+    await submit();
+    await P.waitForFunction((t) => document.querySelector('[data-code-err]')?.textContent === t && !document.querySelector('[data-code-err]').hidden, de.auth.errors.signup_code_invalid);
+    ok('K3 signup 500 „signup_code_invalid“ (Kennwort) ⇒ Feldfehler am Code', signups.length === 4);
   });
 
   footer([['ZP', P]], { ZP: [`500 ${SB}/rest/v1/rpc/check_invite`, `500 ${SB}/auth/v1/signup`] }, { ZP: [/^console: .*XX000.*boom/] });
@@ -342,7 +362,8 @@ export async function signupPart({ browser, base, code, mail, pass, probe, prep 
     ok(`${SIGNUP_CASE}: lief durch`, false, String(e?.message || e).split('\n')[0].slice(0, 240));
     await R.shot('fehler-wegwerf').catch(() => {});
   }
-  footer([['ZR', R]]);
+  // Nach „Konto löschen“ meldet die App die Sitzung ab; das Konto gibt es nicht mehr ⇒ GoTrue antwortet 403 (Prod, gemessen 10.11.2026), supabase-js räumt die Sitzung trotzdem ab
+  footer([['ZR', R]], { ZR: [`403 ${SB}/auth/v1/logout`] });
   await R.context().close();
   if (!gone) await signupCleanup({ browser, base, mail, pass, probe, prep, uid });
 }
@@ -564,8 +585,8 @@ export default async function zugangE2e({ browser, base }) {
 
   // ---------------------------------------------------------------- Krit 13: Tor-Fälle (nur nach dem db push)
   const TOR = [
-    'K13 signUp über die API ohne Code ⇒ „Database error saving new user“, keine Sitzung',
-    'K13 signUp über die API mit falschem Code ⇒ „Database error saving new user“, keine Sitzung',
+    'K13 signUp über die API ohne Code ⇒ 500 signup_code_required (oder „Database error saving new user“), keine Sitzung',
+    'K13 signUp über die API mit falschem Code ⇒ 500 signup_code_invalid (oder „Database error saving new user“), keine Sitzung',
     'K13 signInAnonymously() ⇒ Fehler',
     'K13 B liest playgroup_invites ⇒ 0 Zeilen, A ⇒ 1 Zeile',
     'K13 A create_playgroup ⇒ superadmin_only',
@@ -582,11 +603,12 @@ export default async function zugangE2e({ browser, base }) {
         let d = {}; try { d = await r.json(); } catch { /* leer */ }
         return { status: r.status, msg: String(d.msg || d.message || d.error_description || ''), session: !!d.access_token };
       };
-      const gate = (x) => x.status >= 400 && /Database error saving new user/i.test(x.msg) && !x.session;
+      // Prod-GoTrue reicht das Kennwort des Tors durch (gemessen 10.11.2026); ältere Stände melden nur den allgemeinen Satz
+      const gate = (x, word) => x.status >= 400 && (x.msg === word || /^Database error saving new user$/i.test(x.msg)) && !x.session;
       let x = await raw({ email: plus('p9btor1'), password: `${password()}x`, data: { display_name: 'Tor' } });
-      ok(TOR[0], gate(x), `${x.status} ${x.msg.slice(0, 80)}`);
+      ok(TOR[0], gate(x, 'signup_code_required'), `${x.status} ${x.msg.slice(0, 80)}`);
       x = await raw({ email: plus('p9btor2'), password: `${password()}x`, data: { display_name: 'Tor', invite_code: 'TTG-FALSCH' } });
-      ok(TOR[1], gate(x), `${x.status} ${x.msg.slice(0, 80)}`);
+      ok(TOR[1], gate(x, 'signup_code_invalid'), `${x.status} ${x.msg.slice(0, 80)}`);
       x = await raw({ data: {} });
       ok(TOR[2], x.status >= 400 && !x.session, String(x.status));
       const rb = await get('b', `playgroup_invites?select=code&playgroup_id=eq.${G}`);

@@ -72,7 +72,7 @@ async function backend(route) {
     return route.fulfill(x ? json(200, session(x)) : json(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' }));
   }
   if (p === '/auth/v1/user') return route.fulfill(me ? json(200, userOut(me)) : json(403, { code: 403, error_code: 'user_not_found', msg: 'User from sub claim in JWT does not exist' }));
-  if (p === '/auth/v1/logout') return route.fulfill({ status: 204, body: '' });
+  if (p === '/auth/v1/logout') return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ code: 403, error_code: 'user_not_found', msg: 'User from sub claim in JWT does not exist' }) }); // Status wie Prod nach dem Löschen (gemessen 10.11.2026), Rumpf nachgebildet
   if (m === 'HEAD') return route.fulfill({ status: 200, headers: { 'content-range': '*/0' }, body: '' });
 
   if (p.startsWith('/rest/v1/rpc/')) {
