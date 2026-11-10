@@ -83,16 +83,111 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- C. Einladungscode in eigener Tabelle (vorher las jedes Mitglied playgroups.invite_code).
+-- Tabelle statt Spaltenrechten: Spaltenrechte bräuchten revoke select auf ganz playgroups,
+-- jedes select('*') der Clients bräche dann mit 42501.
+-- ---------------------------------------------------------------------------
+create table public.playgroup_invites (
+  playgroup_id uuid primary key references public.playgroups (id) on delete cascade,
+  code         text not null unique default public.short_code('TTG'),
+  renewed_at   timestamptz,
+  renewed_by   uuid references public.profiles (id) on delete set null
+);
+alter table public.playgroup_invites enable row level security;
+revoke all on public.playgroup_invites from anon, authenticated;
+grant select on public.playgroup_invites to authenticated;
+create policy pi_select on public.playgroup_invites for select
+  using (public.is_group_admin(playgroup_id) or public.is_superadmin());
+-- keine Schreib-Policy: geschrieben wird nur über Funktionen (security definer)
+
+-- Umzug: jede Gruppe behält ihren Code, bestehende Links bleiben gültig
+insert into public.playgroup_invites (playgroup_id, code)
+select id, invite_code from public.playgroups;
+
+-- jede neue Gruppe bekommt ihre Zeile (deckt jeden Einfügepfad)
+create or replace function public.playgroup_invite_create()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into playgroup_invites (playgroup_id) values (new.id) on conflict (playgroup_id) do nothing;
+  return new;
+end $$;
+
+create trigger ttg_playgroup_invite
+  after insert on public.playgroups
+  for each row execute function public.playgroup_invite_create();
+
+-- Neuer Code, alter sofort ungültig. Gruppen-Admin oder Superadmin (ohne Mitgliedschaft).
+create or replace function public.renew_invite(p_group uuid)
+returns text language plpgsql security definer set search_path = public as $$
+declare c text;
+begin
+  if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
+  if not (public.is_group_admin(p_group) or public.is_superadmin()) then raise exception 'not_group_admin'; end if;
+  update playgroup_invites set code = public.short_code('TTG'), renewed_at = now(), renewed_by = auth.uid()
+  where playgroup_id = p_group returning code into c;
+  if c is null then raise exception 'Gruppe nicht gefunden'; end if;
+  return c;
+end $$;
+
+-- Signatur, Rückgabe, Normalisierung und Drossel unverändert; liest aus playgroup_invites
+create or replace function public.join_playgroup(p_code text)
+returns public.members language plpgsql security definer set search_path = public as $$
+declare gid uuid; m members; dn text;
+begin
+  if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
+  if not public.code_rate_ok() then raise exception 'Zu viele Versuche. Bitte in einer Stunde nochmal.'; end if;
+  select playgroup_id into gid from playgroup_invites where code = upper(trim(p_code));
+  if gid is null then
+    insert into code_attempts (user_id, kind) values (auth.uid(), 'join');
+    return null;
+  end if;
+  select * into m from members where playgroup_id = gid and profile_id = auth.uid();
+  if m.id is not null then return m; end if;
+  select display_name into dn from profiles where id = auth.uid();
+  insert into members (playgroup_id, profile_id, display_name, created_by)
+  values (gid, auth.uid(), left(coalesce(dn, 'Neu'), 40), auth.uid()) returning * into m;
+  return m;
+end $$;
+
+-- erst nach dem Umzug: Spalte entfernen
+alter table public.playgroups drop column invite_code;
+
+-- ---------------------------------------------------------------------------
 -- Ausführungsrechte (neue Funktionen bekommen per Default-Privileges anon + authenticated)
 -- ---------------------------------------------------------------------------
-revoke execute on function public.is_superadmin() from public, anon;
-grant execute on function public.is_superadmin() to authenticated;
-revoke execute on function public.superadmin_delete_guard() from public, anon, authenticated;
+revoke execute on function public.is_superadmin(), public.renew_invite(uuid) from public, anon;
+grant execute on function public.is_superadmin(), public.renew_invite(uuid) to authenticated;
+revoke execute on function public.superadmin_delete_guard(), public.playgroup_invite_create() from public, anon, authenticated;
 
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen; Einladungscodes wandern zurück nach playgroups,
 -- Konten, Gruppen und Mitgliedschaften bleiben; Deckel-Einstellung geht verloren):
 -- RÜCKWÄRTS-BEGINN
+-- alter table public.playgroups add column invite_code text unique default public.short_code('TTG');
+-- update public.playgroups g set invite_code = i.code from public.playgroup_invites i where i.playgroup_id = g.id;
+-- alter table public.playgroups alter column invite_code set not null;
+-- create or replace function public.join_playgroup(p_code text)
+-- returns public.members language plpgsql security definer set search_path = public as $$
+-- declare g playgroups; m members; dn text;
+-- begin
+--   if auth.uid() is null or public.is_anon_user() then raise exception 'Nicht angemeldet'; end if;
+--   if not public.code_rate_ok() then raise exception 'Zu viele Versuche. Bitte in einer Stunde nochmal.'; end if;
+--   select * into g from playgroups where invite_code = upper(trim(p_code));
+--   if g.id is null then
+--     insert into code_attempts (user_id, kind) values (auth.uid(), 'join');
+--     return null;
+--   end if;
+--   select * into m from members where playgroup_id = g.id and profile_id = auth.uid();
+--   if m.id is not null then return m; end if;
+--   select display_name into dn from profiles where id = auth.uid();
+--   insert into members (playgroup_id, profile_id, display_name, created_by)
+--   values (g.id, auth.uid(), left(coalesce(dn, 'Neu'), 40), auth.uid()) returning * into m;
+--   return m;
+-- end $$;
+-- drop function public.renew_invite(uuid);
+-- drop trigger ttg_playgroup_invite on public.playgroups;
+-- drop function public.playgroup_invite_create();
+-- drop table public.playgroup_invites;
 -- create or replace function public.set_member_role(p_member uuid, p_role public.member_role)
 -- returns public.members language plpgsql security definer set search_path = public as $$
 -- declare m members;

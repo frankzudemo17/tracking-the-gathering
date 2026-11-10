@@ -210,3 +210,129 @@ check('K4 check_delete_my_account() und delete_my_account() als Superadmin ⇒ s
   ok(/superadmin_cannot_delete/.test(await err(`delete from auth.users where id = $1`, [SA]) || ''), 'Dashboard');
   eq(await allCounts(), c0);
 });
+
+// ---------------------------------------------------------------- Krit. 5: Einladungscode lesen / schreiben / erneuern
+const invRows = async (gid) => (await q(`select playgroup_id, code from playgroup_invites where playgroup_id = $1`, [gid])).length;
+check('K5 Lesen: Admin 1 · Superadmin (nicht Mitglied) 1 · Mitglied 0 · andere Gruppe 0 · anon 42501', async () => {
+  await as(U.A); ok(await invRows(X.id) === 1, 'Admin');
+  await as(SA); ok(await invRows(X.id) === 1, 'Superadmin');
+  await as(U.C); ok(await invRows(X.id) === 0, 'Mitglied');
+  ok(await n(`select count(*)::int n from playgroup_invites`) === 0, 'Mitglied sieht gar keine Zeile, kein Fehler');
+  await as(U.D); ok(await invRows(X.id) === 0, 'Konto ohne Gruppe');
+  await as(U.G, { anonymous: true }); ok(await invRows(X.id) === 0, 'anonymes Konto');
+  await as(null);
+  eq(await code(`select * from playgroup_invites`), '42501');
+});
+check('K5 Schreiben direkt (insert/update/delete) für jede Client-Rolle abgelehnt', async () => {
+  for (const who of [U.A, SA, U.C, null]) {
+    await as(who);
+    eq(await code(`insert into playgroup_invites (playgroup_id, code) values ($1, 'TTG-AAAAAA')`, [SG.id]), '42501', `insert ${who}`);
+    eq(await code(`update playgroup_invites set code = 'TTG-AAAAAA' where playgroup_id = $1`, [X.id]), '42501', `update ${who}`);
+    eq(await code(`delete from playgroup_invites where playgroup_id = $1`, [X.id]), '42501', `delete ${who}`);
+  }
+  await su();
+  ok((await q(`select code from playgroup_invites where playgroup_id = $1`, [X.id]))[0].code === X.invite_code, 'Code unverändert');
+});
+let oldX;
+check('K5 renew_invite: Admin ⇒ neuer Code, alter ungültig (join ⇒ null); Mitglied/Fremder ⇒ not_group_admin; Superadmin ohne Mitgliedschaft ⇒ geht', async () => {
+  oldX = X.invite_code;
+  await as(U.C);
+  ok(/not_group_admin/.test(await err(`select renew_invite($1)`, [X.id]) || ''), 'Mitglied');
+  await as(U.D);
+  ok(/not_group_admin/.test(await err(`select renew_invite($1)`, [X.id]) || ''), 'Fremder');
+  await as(U.A);
+  const [{ c }] = await q(`select renew_invite($1) c`, [X.id]);
+  ok(CODE_RE.test(c) && c !== oldX, c);
+  await su();
+  const [r] = await q(`select code, renewed_by, renewed_at is not null t from playgroup_invites where playgroup_id = $1`, [X.id]);
+  eq(r, { code: c, renewed_by: U.A, t: true });
+  await as(U.D);
+  ok((await q(`select * from join_playgroup($1)`, [oldX]))[0]?.id == null, 'alter Code ⇒ null');
+  await as(SA);
+  const [{ c: c2 }] = await q(`select renew_invite($1) c`, [X.id]);
+  ok(CODE_RE.test(c2) && c2 !== c);
+  X.invite_code = c2;
+  await as(null);
+  eq(await code(`select renew_invite($1)`, [X.id]), '42501');
+});
+
+// ---------------------------------------------------------------- Krit. 6: Beitritt bestehender Konten
+check('K6 join_playgroup: klein + Leerzeichen ⇒ Mitglied; zweimal ⇒ dieselbe Mitgliedschaft; falsch ⇒ null + 1 code_attempts; 11. ⇒ Drossel', async () => {
+  const K = uid(401);
+  await seedUser(K, { email: 'k@example.test' });
+  await as(K);
+  const [m1] = await q(`select * from join_playgroup($1)`, [' ' + X.invite_code.toLowerCase() + ' ']);
+  ok(m1?.id && m1.role === 'member' && m1.playgroup_id === X.id);
+  const [m2] = await q(`select * from join_playgroup($1)`, [X.invite_code]);
+  ok(m2.id === m1.id);
+  ok((await q(`select * from join_playgroup('TTG-ZZZZZZ')`))[0]?.id == null);
+  await su(); ok(await n(`select count(*)::int n from code_attempts where user_id = $1`, [K]) === 1);
+  await as(K);
+  for (let i = 0; i < 9; i++) await q(`select * from join_playgroup('TTG-ZZZZZZ')`);
+  ok(/Zu viele Versuche/.test(await err(`select * from join_playgroup($1)`, [X.invite_code]) || ''));
+});
+
+// ---------------------------------------------------------------- Negativraum: kein anderer Weg zum Code
+check('Negativraum: Mitglied bekommt den Code auf keinem Weg (join/create-Rückgabe, members, playgroups); select * auf playgroups ohne Fehler', async () => {
+  await as(U.C);
+  const [pg] = await q(`select * from playgroups where id = $1`, [X.id]);
+  ok(pg && !('invite_code' in pg), JSON.stringify(pg));
+  const txt = JSON.stringify([await q(`select * from playgroups`), await q(`select * from members`),
+    await q(`select * from join_playgroup($1)`, [X.invite_code])]);
+  ok(!txt.includes(X.invite_code.slice(4)), 'Code taucht nirgends auf');
+  await as(SA);
+  const [g] = await q(`select * from create_playgroup('Leck')`);
+  ok(!('invite_code' in g), 'Rückgabe create_playgroup ohne Code');
+  await su();
+  ok(await n(`select count(*)::int n from information_schema.columns where table_schema = 'public' and table_name = 'playgroups' and column_name = 'invite_code'`) === 0);
+  await q(`delete from playgroups where id = $1`, [g.id]);
+});
+check('Negativraum: delete_playgroup ⇒ playgroup_invites-Zeile fällt per Kaskade', async () => {
+  await as(SA);
+  const [g] = await q(`select * from create_playgroup('Weg')`);
+  await su(); ok(await invRows(g.id) === 1);
+  await as(SA);
+  ok(await err(`select delete_playgroup($1, 'Weg')`, [g.id]) === null);
+  await su(); ok(await invRows(g.id) === 0);
+});
+
+// ---------------------------------------------------------------- Bestandsprobe (Krit. 1, 5, 12)
+// Zeilenzahl je public-Tabelle als Text „tabelle=n,…“
+const PUBLIC_COUNTS = `select string_agg(t || '=' || (xpath('/row/c/text()', query_to_xml('select count(*) c from public.' || quote_ident(t), false, true, '')))[1]::text, ',' order by t) s
+  from (select tablename t from pg_tables where schemaname = 'public') x`;
+const countMap = (s) => Object.fromEntries(s.split(',').map((x) => x.split('=')));
+let bestand;
+after(async () => { await bestand?.db.close(); });
+check('Bestand: Migration auf alten Stand (2 Gruppen, 25 Konten, 1 anonyme Zeile, Spiel) ⇒ Flag nur für die Profil-ID, Codes umgezogen, nichts gelöscht', async () => {
+  const b = await freshDb({ until: FILE });
+  bestand = { db: b, ...tools(b) };
+  const { q: bq, as: bas, su: bsu, seedUser: bseed, mkGroup: bmk } = bestand;
+  await bseed(SA, { email: 's@example.test' });
+  for (let i = 1; i <= 24; i++) await bseed(uid(500 + i), { email: `u${i}@example.test`, confirmed: i > 3 });
+  await bseed(uid(599), { anonymous: true });
+  const G1 = await bmk(uid(501), 'Eins');
+  const G2 = await bmk(uid(502), 'Zwei');
+  for (let i = 3; i <= 12; i++) { await bas(uid(500 + i)); await bq(`select * from join_playgroup($1)`, [i % 2 ? G1.invite_code : G2.invite_code]); }
+  await bsu();
+  await bq(`insert into games (playgroup_id, created_by) values ($1, $2)`, [G1.id, uid(501)]);
+  const before0 = countMap((await bq(PUBLIC_COUNTS))[0].s);
+  ok(before0.games === '1' && before0.playgroups === '2' && before0.members === '12' && before0.profiles === '26', JSON.stringify(before0));
+  const users0 = (await bq(`select count(*)::int n from auth.users`))[0].n;
+  ok(users0 === 26);
+  const codes0 = await bq(`select id, invite_code from playgroups order by id`);
+  await b.exec(fs.readFileSync(path.join(MIGRATIONS, FILE), 'utf8'));
+  // Flag
+  eq(await bq(`select id from profiles where is_superadmin`), [{ id: SA }]);
+  ok((await bq(`select count(*)::int n from profiles where not is_superadmin`))[0].n === 25);
+  // Codes 1:1, Spalte weg
+  eq(await bq(`select playgroup_id id, code invite_code from playgroup_invites order by playgroup_id`), codes0);
+  ok((await bq(`select count(*)::int n from information_schema.columns where table_schema = 'public' and table_name = 'playgroups' and column_name = 'invite_code'`))[0].n === 0);
+  // nichts gelöscht: Zeilenzahlen aller vorher vorhandenen public-Tabellen und auth.users gleich
+  const after0 = countMap((await bq(PUBLIC_COUNTS))[0].s);
+  for (const k of Object.keys(before0)) eq(after0[k], before0[k], k);
+  ok((await bq(`select count(*)::int n from auth.users`))[0].n === users0);
+  // bestehende Links bleiben gültig
+  await bas(uid(520));
+  ok((await bq(`select * from join_playgroup($1)`, [G2.invite_code]))[0]?.playgroup_id === G2.id, 'alter Link gilt weiter');
+  bestand.G1 = G1;
+});

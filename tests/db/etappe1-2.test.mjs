@@ -48,7 +48,11 @@ check('Gruppe angelegt, Name getrimmt', async () => {
   g = await mkGroup(U.A, '  Küchentisch ');
   ok(g.name === 'Küchentisch');
 });
-check('Einladungscode TTG-XXXXXX', () => ok(/^TTG-[A-HJ-NP-Z2-9]{6}$/.test(g.invite_code), g.invite_code));
+// P9 Zugang (Krit. 14): der Code steht in playgroup_invites (Admin A liest ihn dort)
+check('Einladungscode TTG-XXXXXX', async () => {
+  const [r] = await q(`select code from playgroup_invites where playgroup_id = $1`, [g.id]);
+  ok(r?.code === g.invite_code && /^TTG-[A-HJ-NP-Z2-9]{6}$/.test(r.code), r?.code);
+});
 check('A ist Admin', async () => ok((await q(`select role from members where profile_id = $1`, [U.A]))[0]?.role === 'admin'));
 check('B sieht fremde Gruppe nicht', async () => {
   await as(U.B);
@@ -90,8 +94,11 @@ check('C (Mitglied) kann Rollen nicht per RPC ändern', async () => {
   e = await err(`select * from set_member_role($1, 'admin')`, [mc.id]);
   ok(!!e, e);
 });
+// P9 Zugang (Krit. 14): statt playgroups.invite_code (Spalte entfällt) — playgroup_invites als Admin
 check('Einladungscode nicht direkt änderbar', async () => {
-  e = await err(`update playgroups set invite_code = 'TTG-AAAAAA'`);
+  await as(U.A);
+  e = await err(`update playgroup_invites set code = 'TTG-AAAAAA'`);
+  await as(U.C);
   ok(!!e, e);
 });
 check('Profil-ID nicht änderbar', async () => {
