@@ -47,6 +47,7 @@ export function openDiceTable(host, { players, onAccept }) {
   root.className = 'dt';
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
+  root.tabIndex = -1;
   root.setAttribute('aria-label', t('dice.label'));
   mount(root, html`
     <div class="dt-head"><div><small>${t('dice.eyebrow')}</small><h3>${t('dice.title')}</h3></div>
@@ -75,7 +76,12 @@ export function openDiceTable(host, { players, onAccept }) {
   function turn(i) { el[i].inner.style.transform = innerTf(rot[i]); }
 
   measure();
-  startRow(n, tray).forEach((p, i) => {
+  const row = startRow(n, tray);
+  // Enge Startreihe: Namensschilder abwechselnd hoch/tief (lesbar statt überlappend), Breite begrenzt
+  const gap = n > 1 ? row[1].x - row[0].x : 999;
+  root.classList.toggle('crowd', gap < 100);
+  root.style.setProperty('--dt-tagw', `${Math.round(Math.max(52, Math.min(140, (gap < 100 ? 2 * gap : gap) - 6)))}px`);
+  row.forEach((p, i) => {
     pos[i] = p;
     rot[i] = { rz: TILT[i % TILT.length], rx: 0, ry: 0 };
     const [rx, ry] = faceRotation((i % 6) + 1); rot[i].rx = rx; rot[i].ry = ry;
@@ -228,7 +234,6 @@ export function openDiceTable(host, { players, onAccept }) {
     else { st.winner = res.winnerSeat; st.active = []; }
     st.phase = 'done';
     paint();
-    if (st.winner != null) $('[data-dice="accept"]', root).focus({ preventScroll: true });
   }
 
   // ---------- Schließen / Übernehmen
@@ -246,6 +251,13 @@ export function openDiceTable(host, { players, onAccept }) {
   }
   function onKey(e) {
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'Tab') { // Fokus bleibt im Dialog
+      const f = $$('button:not([hidden]), [tabindex="0"]', root);
+      const at = f.indexOf(document.activeElement);
+      const next = e.shiftKey ? (at <= 0 ? f.length - 1 : at - 1) : (at + 1) % f.length;
+      e.preventDefault(); f[next]?.focus();
+      return;
+    }
     if ((e.key === 'Enter' || e.key === ' ') && e.target === felt) { e.preventDefault(); if (canThrow()) {
       measure(); // Tastatur: Wurf aus der Mitte der aktiven Würfel, wie ein Tippen
       const c = st.active.reduce((a, i) => ({ x: a.x + pos[i].x / st.active.length, y: a.y + pos[i].y / st.active.length }), { x: 0, y: 0 });
@@ -274,6 +286,6 @@ export function openDiceTable(host, { players, onAccept }) {
   window.addEventListener('resize', onResize);
   window.addEventListener('hashchange', close);
   document.addEventListener('keydown', onKey);
-  $('[data-dice="close"]', root).focus({ preventScroll: true });
+  root.focus({ preventScroll: true });
   return close;
 }

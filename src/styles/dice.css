@@ -12,7 +12,7 @@
   overflow: hidden; background: var(--dt-bg); color: var(--dt-ink);
   touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
-@media (prefers-reduced-motion: no-preference) { .dt { animation: fade .18s ease-out; } }
+.dt:focus { outline: none; }
 
 .dt-head { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px;
   padding: calc(18px + var(--safe-t)) 16px 0; }
@@ -37,8 +37,9 @@
 .dt-layer { position: absolute; inset: 0; pointer-events: none; }
 .dt-die { position: absolute; left: 0; top: 0; width: 64px; height: 64px; will-change: transform; transition: opacity .2s, filter .2s; }
 .dt-shadow { position: absolute; left: 6px; right: 6px; bottom: -7px; height: 14px; border-radius: 50%; background: rgba(0, 0, 0, .45); filter: blur(5px); }
-.dt-tag { position: absolute; left: 50%; top: -30px; transform: translateX(-50%); white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis;
+.dt-tag { position: absolute; left: 50%; top: -30px; transform: translateX(-50%); white-space: nowrap; max-width: var(--dt-tagw, 140px); overflow: hidden; text-overflow: ellipsis;
   padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; color: var(--dt-tag-ink); background: var(--dt-ink); font-variant-numeric: tabular-nums; }
+.dt.crowd[data-phase="ready"] .dt-die:nth-child(even) .dt-tag { top: -54px; }
 .dt-wrap { position: absolute; inset: 4px; perspective: 420px; }
 .dt-cube { position: absolute; inset: 0; transform-style: preserve-3d; }
 .dt-face { position: absolute; inset: 0; border-radius: 11px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
@@ -48,6 +49,7 @@
 .dt-face span i { width: 10px; height: 10px; border-radius: 50%; background: var(--dt-pip); }
 .dt-face.f1 span i { background: var(--danger); }
 .dt-die.idle { opacity: .35; filter: grayscale(.6); }
+.dt-die.win { z-index: 1; }
 .dt-die.win .dt-wrap { filter: drop-shadow(0 0 10px var(--turn)); }
 .dt-die.win .dt-tag { background: var(--turn); }
 
