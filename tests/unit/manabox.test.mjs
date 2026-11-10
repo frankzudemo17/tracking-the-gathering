@@ -96,10 +96,10 @@ test('M7 leer: \'\' ⇒ errors = [{code empty}]; nur Leerzeilen/Köpfe ebenso', 
   assert.deepEqual(codes(parseManaBox(undefined)), ['empty']);
 });
 
-test('M8 Anzahl 0 oder > 99 ⇒ code qty (Zeile übersprungen); Summe > 99 ebenso', async () => {
+test('M8 Anzahl 0 oder > 99 ⇒ code qty (Zeile übersprungen); Summe > 99 ebenso; Zeilenfehler vor der Warnung no_commander', async () => {
   const { parseManaBox } = await mb();
   const r = parseManaBox('0 Island\n100 Plains\n99 Forest\n1 Forest\n1 Sol Ring');
-  assert.deepEqual(r.errors.map((e) => [e.line, e.code]), [[1, 'qty'], [2, 'qty'], [4, 'qty']]);
+  assert.deepEqual(r.errors.map((e) => [e.line, e.code]), [[1, 'qty'], [2, 'qty'], [4, 'qty'], [0, 'no_commander']]);
   assert.deepEqual(r.main, [{ qty: 99, name: 'Forest' }, { qty: 1, name: 'Sol Ring' }]);
 });
 
@@ -123,7 +123,7 @@ test('M10 ohne Commander-Kopf ⇒ Warnung no_commander, Hauptdeck trotzdem da', 
 test('M11 Negativraum: Name leer / nur Anzahl / nur Set ⇒ syntax, kein Absturz', async () => {
   const { parseManaBox } = await mb();
   const r = parseManaBox('3\n2x\n1 (DRC) 56\n(DRC) 56\n1 Sol Ring (DRC) 56');
-  assert.deepEqual(r.errors.map((e) => [e.line, e.code]), [[1, 'syntax'], [2, 'syntax'], [3, 'syntax'], [4, 'syntax']]);
+  assert.deepEqual(r.errors.map((e) => [e.line, e.code]), [[1, 'syntax'], [2, 'syntax'], [3, 'syntax'], [4, 'syntax'], [0, 'no_commander']]);
   assert.deepEqual(r.main, [{ qty: 1, name: 'Sol Ring', set: 'DRC', number: '56' }]);
   // unpaarige Klammern im Namen ⇒ syntax; paarige (B.F.M. (Big Furry Monster)) sind ein gültiger Name
   assert.deepEqual(codes(parseManaBox('1 Sol Ring (DRC')), ['syntax']);
