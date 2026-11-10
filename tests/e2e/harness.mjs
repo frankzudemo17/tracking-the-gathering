@@ -1,46 +1,30 @@
-// E2E-Harness (Spec P6): Browser, Kontexte, Konten, Prüfzähler und Aufräumen der Testdaten.
-// Ziel laut E1 = A (WELLE.md): die Prod-Supabase aus src/config.js. Testkonten heißen
-// ttg.test.<n>.<RUN>@gmail.com und bleiben nach dem Lauf bestehen (Löschen nur nach Francos Ja,
-// Befehl druckt run.mjs). Aufgeräumt werden die DATEN des Laufs, und zwar nur als das jeweilige
-// Testkonto über die öffentliche REST-API (anon key + Login, RLS greift): eigene Testgruppen
-// (erst deren Spiele, dann die Gruppe — siehe tests/db/aufraeumen.test.mjs), eigene Decks,
-// eigene Profilbilder.
+// E2E-Harness (Spec P6, umgestellt in P9b H): Browser, Kontexte, Anmeldung mit den FESTEN Testkonten
+// A, B, C (Zugangsdaten nur aus Umgebung/lokaler Datei, nie im Repo), Prüfzähler. Ziel laut E1 = A (WELLE.md):
+// die Prod-Supabase aus src/config.js, ausschließlich in der festen Gruppe TTG-E2E-Fixture.
+// Grundzustand, Wächter und Aufbau je Testdatei: fixture-api.mjs (run.mjs ruft baseState vor jeder Datei).
+// Der Lauf löscht nie ein Konto und nie eine Gruppe. Adressen erscheinen nie in Ausgaben oder Bildschirmfotos.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
+import { Abort } from './fixture-core.mjs';
+import { ROOT, TARGET, email, password } from './fixture-api.mjs';
 
-export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+export { Abort, ROOT, TARGET };
+export {
+  prepare, ensureMember, ensurePlaceholder, ensureDeck, zugangLive, inviteCode, fixtureIds, NAMES, FIXTURE_NAME,
+  baseState, snapshot, rpc, get, signIn, api, rest, tally,
+} from './fixture-api.mjs';
 export const OUT = path.join(ROOT, 'tests', 'e2e', 'out');
-export const PW = 'Testpasswort-123';
 
-const { SUPABASE_URL, SUPABASE_ANON_KEY } = await import(pathToFileURL(path.join(ROOT, 'src', 'config.js')).href);
-export const TARGET = { url: SUPABASE_URL, key: SUPABASE_ANON_KEY };
-
-/** Abbruch aus Umgebungsgründen (Browser fehlt, Rate-Limit, Scryfall …) ⇒ Exit 2, nie „grün“. */
-export class Abort extends Error {
-  constructor(reason, msg) { super(msg); this.reason = reason; }
-}
-
-// ---------------------------------------------------------------- Lauf, Konten, Prüfzähler
-// Zeit + Zufall: zwei parallel gestartete Läufe (zwei Worktrees) bekommen nie dieselbe Kennung.
-export let RUN = Date.now().toString(36) + randomBytes(3).toString('hex');
-export const accounts = [];
-export const runFile = (run = RUN) => path.join(OUT, `${run}.json`);
-const MAIL_RE = /^ttg\.test\.([a-z0-9]+)\.([a-z0-9]+)@gmail\.com$/;
-/** Nur Konten genau dieses Laufs (harte Sperre gegen fremde Adressen, auch beim Nur-Aufräumen). */
-export const isRunMail = (email, run = RUN) => MAIL_RE.exec(email)?.[2] === run;
-export const mail = (n) => `ttg.test.${n}.${RUN}@gmail.com`;
-
-function saveRun() {
-  fs.mkdirSync(OUT, { recursive: true });
-  fs.writeFileSync(runFile(), JSON.stringify({ run: RUN, target: TARGET.url, accounts }, null, 2));
-}
-
-export const counts = { pass: 0, fail: 0 };
+// ---------------------------------------------------------------- Lauf, Prüfzähler
+export const RUN = Date.now().toString(36) + randomBytes(3).toString('hex');
+export const counts = { pass: 0, fail: 0, skip: 0 };
+export const skipped = [];
 export const ok = (n, c, info = '') => {
   if (c) { counts.pass++; console.log('  ✓', n); } else { counts.fail++; console.log('  ✗', n, info); }
 };
+/** Sichtbar übersprungener Fall (zählt weder grün noch rot, steht mit Grund im Protokoll). */
+export const skip = (n, reason) => { counts.skip++; skipped.push(`${n} — ${reason}`); console.log('  –', n, `(übersprungen: ${reason})`); };
 
 // ---------------------------------------------------------------- Browser und Seiten
 export async function launch() {
@@ -68,10 +52,12 @@ export async function ctx(browser, name) {
   const p = await c.newPage();
   p.errs = [];
   p.bad = [];
+  p.transit = []; // 404 der zwei Übergangsstellen (src/zugang/invite.js) vor dem db push — gewollt, kein Fehler
   p.on('pageerror', (e) => p.errs.push('pageerror: ' + e.message));
   p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) p.errs.push('console: ' + m.text()); });
   p.on('response', (r) => {
     const u = r.url();
+    if (r.status() === 404 && u.startsWith(TARGET.url + '/rest/v1/') && /\/rest\/v1\/(rpc\/check_invite|playgroup_invites)(\?|$)/.test(u)) { p.transit.push(u.split('?')[0]); return; }
     if (r.status() === 429 && u.startsWith(TARGET.url + '/auth/')) env.rateLimited = true;
     if (/api\.scryfall\.com/.test(u) && (r.status() === 429 || r.status() >= 500)) env.scryfallDown = true;
     if (r.status() >= 400) p.bad.push(r.status() + ' ' + u.split('?')[0] + (u.includes('grant_type=password') ? '?grant_type=password' : ''));
@@ -83,28 +69,23 @@ export async function ctx(browser, name) {
   return p;
 }
 
-export const shot = (p, n) => { fs.mkdirSync(OUT, { recursive: true }); return p.screenshot({ path: path.join(OUT, `${n}.png`) }); };
+/** Felder und Zeilen, die eine Konto-Adresse zeigen können — in jedem Bildschirmfoto abgedeckt. */
+export const MASK = ['#li-mail', '#rg-mail', 'input[type=email]', '[data-nav="account"] .sub', '[data-confirm]', '.sheet input[type=email]'];
+export const shot = (p, n, opts = {}) => { fs.mkdirSync(OUT, { recursive: true }); return p.screenshot({ path: path.join(OUT, `${n}.png`), mask: MASK.map((m) => p.locator(m)), ...opts }); };
 export const hash = (p) => new URL(p.url()).hash;
 export const waitHash = (p, h) => p.waitForFunction((x) => location.hash.startsWith(x), h, { timeout: 15000 });
 
-/** Registriert ein Testkonto über die UI. Das Konto steht VOR dem Absenden in out/<RUN>.json. */
-export async function register(p, name, email) {
-  if (!isRunMail(email)) throw new Error(`register: ${email} ist kein Testkonto dieses Laufs`);
-  if (accounts.length >= 3 && !accounts.includes(email)) throw new Error('register: höchstens 3 Konten je Lauf');
-  if (!accounts.includes(email)) { accounts.push(email); saveRun(); }
-  await p.click('text=Konto erstellen');
-  await waitHash(p, '#/registrieren');
-  await p.fill('#rg-name', name);
-  await p.fill('#rg-mail', email);
-  await p.fill('#rg-pass', PW);
-  await p.click('button[type=submit]');
+/** Seit P9b gibt es keine Konten je Lauf mehr (Registrierung nur mit Einladungscode). */
+export function register() {
+  throw new Error("register() gibt es nicht mehr (P9b): feste Testkonten — login(page, 'a'|'b'|'c') und für „A und B in einer Gruppe“ prepare({ members: ['b'] }) bzw. ensureMember('b')");
 }
 
-/** Anmelden über die UI. */
-export async function login(p, email, pw = PW) {
+/** Anmelden über die UI als festes Testkonto k ('a'|'b'|'c'). Die Adresse wird nie ausgegeben. */
+export async function login(p, k) {
+  if (!['a', 'b', 'c'].includes(k)) throw new Error("login(page, k): k ist 'a', 'b' oder 'c' (feste Testkonten)");
   await p.waitForSelector('#li-mail');
-  await p.fill('#li-mail', email);
-  await p.fill('#li-pass', pw);
+  await p.fill('#li-mail', email(k));
+  await p.fill('#li-pass', password());
   await p.click('button[type=submit]');
 }
 
@@ -120,105 +101,3 @@ export async function testImage(browser) {
   await c.close();
   return file;
 }
-
-// ---------------------------------------------------------------- Aufräumen (REST als Testkonto)
-async function api(method, url, { token, body, prefer } = {}) {
-  const r = await fetch(url, {
-    method,
-    headers: {
-      apikey: TARGET.key,
-      Authorization: `Bearer ${token ?? TARGET.key}`,
-      'Content-Type': 'application/json',
-      ...(prefer ? { Prefer: prefer } : {}),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(20000),
-  });
-  const text = await r.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  if (!r.ok) throw new Error(`${method} ${url.replace(TARGET.url, '')} → ${r.status} ${typeof data === 'string' ? data : JSON.stringify(data)}`);
-  return data;
-}
-const rest = (p) => `${TARGET.url}/rest/v1/${p}`;
-const inList = (ids) => `in.(${ids.join(',')})`;
-
-/**
- * Räumt die Daten aller Konten des Laufs ab und meldet je Konto, was übrig ist.
- * Liefert { groupsLeft, accounts, problems }. Wirft nie (läuft in finally).
- */
-export async function cleanup({ run = RUN, list = accounts } = {}) {
-  const problems = [];
-  let groupsLeft = 0;
-  let deleted = { groups: 0, games: 0, decks: 0, avatars: 0 };
-  const done = [];
-  for (const email of list) {
-    if (!isRunMail(email, run)) { problems.push(`${email}: kein Testkonto des Laufs ${run} — übersprungen`); continue; }
-    let auth;
-    try {
-      auth = await api('POST', `${TARGET.url}/auth/v1/token?grant_type=password`, { body: { email, password: PW } });
-    } catch (e) {
-      // Konto nie angelegt (Abbruch vor/bei der Registrierung) ⇒ nichts zu räumen
-      if (/400/.test(e.message)) { done.push(`${email}: nicht angemeldet (kein Konto?)`); continue; }
-      problems.push(`${email}: Anmeldung fehlgeschlagen: ${e.message}`); continue;
-    }
-    const token = auth.access_token, uid = auth.user?.id;
-    try {
-      // eigene Testgruppen: angelegt von diesem Konto (RLS lässt nur Admins löschen)
-      const groups = await api('GET', rest(`playgroups?select=id&created_by=eq.${uid}`), { token });
-      const gids = groups.map((g) => g.id);
-      const avatarPaths = [`profiles/${uid}/avatar.jpg`];
-      if (gids.length) {
-        const mem = await api('GET', rest(`members?select=id&playgroup_id=${inList(gids)}`), { token });
-        avatarPaths.push(...mem.map((m) => `members/${m.id}/avatar.jpg`));
-        // Reihenfolge: erst Spiele, dann Gruppe (FK game_players → members ohne Kaskade, Befund P6)
-        const ga = await api('DELETE', rest(`games?playgroup_id=${inList(gids)}`), { token, prefer: 'return=representation' });
-        deleted.games += ga.length;
-      }
-      try {
-        const rm = await api('DELETE', `${TARGET.url}/storage/v1/object/avatars`, { token, body: { prefixes: avatarPaths } });
-        deleted.avatars += Array.isArray(rm) ? rm.length : 0;
-      } catch (e) { problems.push(`${email}: Profilbilder: ${e.message}`); }
-      if (gids.length) {
-        const pg = await api('DELETE', rest(`playgroups?id=${inList(gids)}`), { token, prefer: 'return=representation' });
-        deleted.groups += pg.length;
-      }
-      const dk = await api('DELETE', rest(`decks?owner_profile_id=eq.${uid}`), { token, prefer: 'return=representation' });
-      deleted.decks += dk.length;
-      // Nachweis (Kriterium 3): sichtbare Gruppen dieses Kontos
-      const left = await api('GET', rest('playgroups?select=id'), { token });
-      groupsLeft += left.length;
-      done.push(`${email}: ${left.length} Gruppen sichtbar`);
-    } catch (e) {
-      problems.push(`${email}: ${e.message}`);
-    }
-  }
-  console.log(`\nAufräumen (Lauf ${run}): ${deleted.groups} Testgruppen, ${deleted.games} Spiele, ${deleted.decks} Konto-Decks, ${deleted.avatars} Profilbilder gelöscht`);
-  for (const d of done) console.log('    ' + d);
-  for (const pr of problems) console.log('    ! ' + pr);
-  console.log(`  ${groupsLeft} Testgruppen übrig${problems.length ? ` · ${problems.length} Problem(e)` : ''}`);
-  return { groupsLeft, accounts: list.length, problems };
-}
-
-/** Lösch-Befehl für die Testkonten (E1 = A: nur drucken, Franco führt ihn nach Freigabe aus). */
-export function deleteHint(run = RUN) {
-  return [
-    `Testkonten dieses Laufs bleiben bestehen (E1 = A). Löschen nur nach Francos Freigabe,`,
-    `im Supabase-Dashboard (SQL-Editor, Projekt ${new URL(TARGET.url).hostname.split('.')[0]}):`,
-    `  delete from auth.users where email like 'ttg.test.%.${run}@gmail.com';`,
-    `Rest im Storage (per RLS für niemanden löschbar): Profilbild übernommener Platzhalter`,
-    `unter avatars/members/<id>/avatar.jpg — bei Bedarf im Dashboard (Storage → avatars) entfernen.`,
-  ].join('\n');
-}
-
-/** Konten eines früheren (abgebrochenen) Laufs aus out/<RUN>.json. */
-export function loadRun(run) {
-  if (!/^[a-z0-9]+$/.test(run ?? '')) throw new Abort('Aufruf', `--nur-aufraeumen braucht eine Lauf-Kennung (z. B. ${RUN})`);
-  const f = runFile(run);
-  if (!fs.existsSync(f)) throw new Abort('Aufruf', `${path.relative(ROOT, f)} fehlt — keine gespeicherten Konten für Lauf ${run}`);
-  const data = JSON.parse(fs.readFileSync(f, 'utf8'));
-  const list = (data.accounts ?? []).filter((e) => isRunMail(e, run));
-  return list;
-}
-
-export function setRun(run) { RUN = run; }

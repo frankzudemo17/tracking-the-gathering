@@ -1,17 +1,20 @@
 // E2E Lifecounter (Spec P8, Kriterien 3–9 und Bilder zu 1).
 // Läuft nach etappe1-2.e2e.mjs und VOR setup.e2e.mjs (alphabetisch) mit den Konten aus etappe1-2:
-//   A = mail('a') „Franco Test“ (Admin, Deck Tymna + Thrasios) · B = „Luka Test“ · C = „Tim Echt“.
+//   A = 'a' „Franco Test“ (Admin, Deck Tymna + Thrasios) · B = „Luka Test“ · C = „Tim Echt“.
 // Angemeldet ist A. Damit setup.e2e unverändert gilt, legt dieser Lauf KEINE Mitglieder/Decks an,
 // ändert keine Feldfarbe und keine Pins und beendet jedes gestartete Spiel (gewertet bzw. verworfen).
 // Spiele starten über den Store der App (gleicher Weg wie das Setup, RPC start_game), alle mit Tymna.
-import { ok, ctx, hash, waitHash, login, mail } from './harness.mjs';
+// P9b: feste Testkonten (login(page, 'a'|'b'|'c')) in TTG-E2E-Fixture; run.mjs stellt vorher den Grundzustand her,
+// prepare() den Stand, den die alte Kette hier hinterließ (nach etappe1-2: A (Tymna + Thrasios, Bracket 2), B, C in der Gruppe).
+import { ok, ctx, hash, waitHash, login, prepare } from './harness.mjs';
 
 export default async function lifeE2e({ browser, base: BASE }) {
+  await prepare({ members: ['b', 'c'], decks: [['a', 'tymna']] });
   console.log('\nLifecounter: Anmelden als A (Franco Test)');
   const P = await ctx(browser, 'L');
   await P.goto(BASE);
   await waitHash(P, '#/login');
-  await login(P, mail('a'));
+  await login(P, 'a');
   await waitHash(P, '#/start');
   ok('A angemeldet (Konto aus etappe1-2)', true);
 

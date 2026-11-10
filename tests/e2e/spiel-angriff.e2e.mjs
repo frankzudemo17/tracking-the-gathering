@@ -1,17 +1,20 @@
 // E2E Angriff per Ziehen (Spec P10, Kriterien 2–7 + Nachtrag 12:00 Touch, Bilder zu 1).
 // Läuft alphabetisch NACH setup.e2e.mjs mit den Konten/Mitgliedern des Laufs:
-//   A = mail('a') „Franco Test“ (Deck Tymna + Thrasios, Partner) · B = „Luka Test“ (Deck Krenko aus setup.e2e)
+//   A = 'a' „Franco Test“ (Deck Tymna + Thrasios, Partner) · B = „Luka Test“ (Deck Krenko aus setup.e2e)
 //   C = „Tim Echt“ · Jo = Platzhalter „Jo Test“ (aus setup.e2e). Legt KEIN Konto, KEIN Mitglied, KEIN Deck an.
 // Das Spiel startet über den Store der App (RPC start_game, wie life.e2e) und wird am Ende verworfen.
 // Gezogen wird mit der Maus (page.mouse) in Bildschirmkoordinaten; Touch über CDP (Input.dispatchTouchEvent).
-import { ok, ctx, waitHash, login, mail } from './harness.mjs';
+// P9b: feste Testkonten (login(page, 'a'|'b'|'c')) in TTG-E2E-Fixture; run.mjs stellt vorher den Grundzustand her,
+// prepare() den Stand, den die alte Kette hier hinterließ (nach setup: zusätzlich Platzhalter „Jo Test“ und B mit Krenko).
+import { ok, ctx, waitHash, login, prepare } from './harness.mjs';
 
 export default async function angriffE2e({ browser, base: BASE }) {
+  await prepare({ members: ['b', 'c'], placeholders: ['Jo Test'], decks: [['a', 'tymna'], ['b', 'krenko']] });
   console.log('\nAngriff: Anmelden als A (Franco Test)');
   const P = await ctx(browser, 'X');
   await P.goto(BASE);
   await waitHash(P, '#/login');
-  await login(P, mail('a'));
+  await login(P, 'a');
   await waitHash(P, '#/start');
   ok('A angemeldet (Konto aus etappe1-2)', true);
 

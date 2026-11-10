@@ -3,14 +3,23 @@
 // Angepasst an den App-Stand seit dem Entwurf (nur Weg/Selektor, keine Prüfung geändert):
 //   · Look, Sprache und Abmelden liegen seit fd223b2 auf #/einstellungen (vorher #/profil)
 //   · Look „Burgund“ heißt seit Migration 20261110010000_lachs.sql „Lachs“ (WELLE.md)
+// P9b (feste Testkonten; Grundzustand: A allein Admin in TTG-E2E-Fixture, B und C ohne Gruppe):
+//   · Registrieren entfällt ⇒ Anmelden (login(page, 'a'|'b'|'c')); „Willkommen“ prüft jetzt B (ohne Gruppe)
+//   · „Gruppe über die Oberfläche anlegen“ entfällt (nur noch Superadmin) ⇒ Ersatz: zugang.e2e K5 (abgefangen)
+//     und tests/db/zugang.test.mjs (P9); „Gruppenname escaped“ prüft den Namen eines Platzhalters
+//   · „Admin befördert B“ entfällt (nur noch Superadmin) ⇒ Ersatz: zugang.e2e K8; hier Gegenprobe ohne Knopf
+//   · Übernahme-Link ohne Sitzung zeigt die Einladungsseite (join.js) ⇒ „Ich habe schon ein Konto“ ⇒ Login
 // 49 Prüfungen zur Laufzeit (inkl. je 2 Fehlerprüfungen für A, B, C).
-import { ok, ctx, hash, waitHash, register, mail, testImage, TARGET } from './harness.mjs';
+import { ok, ctx, hash, waitHash, login, testImage, TARGET, FIXTURE_NAME, ensurePlaceholder } from './harness.mjs';
+
+const ESC = 'Esc <b>Test</b>';
 
 export default async function etappe12({ browser, base: BASE }) {
   const IMG = await testImage(browser);
   const pages = [];
+  await ensurePlaceholder(ESC); // Platzhalter mit HTML im Namen (Escaping-Prüfung statt Gruppenname)
 
-  console.log('\nA: Registrieren, Gruppe, Platzhalter');
+  console.log('\nA: Anmelden, Gruppe, Platzhalter');
   const A = await ctx(browser, 'A'); pages.push(['A', A]);
   await A.goto(BASE);
   await waitHash(A, '#/login');
@@ -18,24 +27,17 @@ export default async function etappe12({ browser, base: BASE }) {
   await A.waitForSelector('#li-mail');
   await A.shot('01-login');
   // Falsches Passwort
-  await A.fill('#li-mail', mail('niemand')); await A.fill('#li-pass', 'falschfalsch'); await A.click('button[type=submit]');
+  await A.fill('#li-mail', 'niemand@beispiel.invalid'); await A.fill('#li-pass', 'falschfalsch'); await A.click('button[type=submit]');
   await A.waitForSelector('.error:not([hidden])');
   ok('Falsches Login zeigt deutsche Meldung', (await A.textContent('.error')).includes('stimmt nicht'), await A.textContent('.error'));
 
-  await register(A, 'Franco Test', mail('a'));
-  await waitHash(A, '#/willkommen');
-  ok('Nach Registrierung → Willkommen', true);
-  ok('Willkommen nennt Namen', (await A.textContent('h1')).includes('Franco Test'));
-  await A.shot('02-willkommen');
-
-  await A.click('[data-act="new"]');
-  await A.fill('#ng-name', 'Küchentisch <b>Test</b>');
-  await A.click('.sheet button[type=submit]');
-  await waitHash(A, '#/gruppen');
+  await login(A, 'a');
+  await waitHash(A, '#/start');
+  await A.goto(BASE + '#/gruppen');
   await A.waitForSelector('.code');
   const invite = (await A.textContent('.code')).trim();
   ok('Einladungscode sichtbar', /^TTG-[A-Z2-9]{6}$/.test(invite), invite);
-  ok('Gruppenname escaped (kein HTML)', (await A.locator('.pick b').first().textContent()).includes('<b>Test</b>'));
+  ok('Name escaped (kein HTML) — Platzhalter statt Gruppenname', (await A.locator('.list .row .title', { hasText: 'Esc' }).first().textContent()).includes('<b>Test</b>'));
   await A.shot('03-gruppen');
 
   await A.click('text=Spieler ohne Konto anlegen');
@@ -87,8 +89,11 @@ export default async function etappe12({ browser, base: BASE }) {
   const B = await ctx(browser, 'B'); pages.push(['B', B]);
   await B.goto(BASE);
   await waitHash(B, '#/login');
-  await register(B, 'Luka Test', mail('b'));
+  await login(B, 'b');
   await waitHash(B, '#/willkommen');
+  ok('B ohne Gruppe nach Anmeldung → Willkommen', true);
+  ok('Willkommen nennt Namen', (await B.textContent('h1')).includes('Luka Test'));
+  await B.shot('02-willkommen');
   await B.click('[data-act="code"]');
   await B.fill('#code-in', 'TTG-ZZZZZZ');
   await B.click('.sheet button[type=submit]');
@@ -97,7 +102,7 @@ export default async function etappe12({ browser, base: BASE }) {
   await B.fill('#code-in', invite.toLowerCase());
   await B.click('.sheet button[type=submit]');
   await waitHash(B, '#/start');
-  ok('B ist beigetreten', (await B.textContent('.group-switch')).includes('Küchentisch'));
+  ok('B ist beigetreten', (await B.textContent('.group-switch')).includes(FIXTURE_NAME));
   await B.goto(BASE + '#/gruppen');
   await B.waitForSelector('.list .row');
   const names = await B.locator('.list .row .title').allTextContents();
@@ -110,14 +115,13 @@ export default async function etappe12({ browser, base: BASE }) {
   ok('Fremdes Profil: kein Kamera-Knopf', (await B.locator('[data-act="photo"]').count()) === 0);
   await B.shot('08-fremdes-profil');
 
-  console.log('\nA: Admin befördert B');
+  console.log('\nA: Gruppen-Admin (kein Superadmin) bei B');
   await A.goto(BASE + '#/gruppen');
   await A.waitForSelector('.list .row');
   await A.click('.list .row >> text=Luka Test');
-  await A.waitForSelector('[data-act="role"]');
-  await A.click('[data-act="role"]');
-  await A.waitForSelector('text=Admin-Rechte entziehen');
-  ok('Admin kann Luka befördern', true);
+  await A.waitForSelector('.prof-head');
+  await A.waitForTimeout(300);
+  ok('Gruppen-Admin sieht kein „Zum Admin machen“ (nur Superadmin; Ersatz zugang.e2e K8)', (await A.locator('[data-act="role"]').count()) === 0);
 
   console.log('\nDecks');
   // Eigenes Partner-Deck: Tymna + Thrasios, mit Moxfield-Link
@@ -200,11 +204,14 @@ export default async function etappe12({ browser, base: BASE }) {
   console.log('\nC: Tim übernimmt per Link');
   const C = await ctx(browser, 'C'); pages.push(['C', C]);
   await C.goto(BASE + '#/code/' + timCode);
+  await C.waitForSelector('[data-act="have-account"]');
+  ok('Link ohne Login → Einladungsseite mit „Ich habe schon ein Konto“', (await C.evaluate(() => location.hash)) === '#/code/' + timCode);
+  await C.click('[data-act="have-account"]');
   await waitHash(C, '#/login');
   ok('Link ohne Login → Login mit Hinweis', (await C.textContent('.screen')).includes(timCode));
-  await register(C, 'Tim Echt', mail('c'));
+  await login(C, 'c');
   await waitHash(C, '#/start');
-  ok('Nach Registrierung automatisch übernommen → Start', (await C.textContent('.group-switch')).includes('Küchentisch'));
+  ok('Nach Anmeldung automatisch übernommen → Start', (await C.textContent('.group-switch')).includes(FIXTURE_NAME));
   await C.goto(BASE + '#/profil');
   await C.waitForSelector('.prof-head');
   ok('Übernommenes Profilbild da', (await C.locator('.prof-head .avatar[style*="background-image"]').count()) === 1);

@@ -4,11 +4,14 @@
 // das eigene Testdeck wird am Ende gelöscht, jedes gestartete Spiel abgebrochen.
 // Attrappen per addInitScript: navigator.wakeLock (zählt request/release), navigator.vibrate (zählt Aufrufe),
 // document.visibilityState (steuerbar, für „Tab verstecken/zeigen“).
-import { ok, ctx, waitHash, login, mail, hash } from './harness.mjs';
+// P9b: feste Testkonten (login(page, 'a'|'b'|'c')) in TTG-E2E-Fixture; run.mjs stellt vorher den Grundzustand her,
+// prepare() den Stand, den die alte Kette hier hinterließ (nach setup: zusätzlich Platzhalter „Jo Test“ und B mit Krenko).
+import { ok, ctx, waitHash, login, hash, prepare } from './harness.mjs';
 
 const K = (k) => k / 2 ** 32;
 
 export default async function tischE2e({ browser, base: BASE }) {
+  await prepare({ members: ['b', 'c'], placeholders: ['Jo Test'], decks: [['a', 'tymna'], ['b', 'krenko']] });
   console.log('\nTisch-Einstellungen: Anmelden als A (Franco Test)');
   const P = await ctx(browser, 'Tisch');
   await P.addInitScript(() => {
@@ -29,7 +32,7 @@ export default async function tischE2e({ browser, base: BASE }) {
   });
   await P.goto(BASE);
   await waitHash(P, '#/login');
-  await login(P, mail('a'));
+  await login(P, 'a');
   await waitHash(P, '#/start');
   ok('A angemeldet (Konto aus etappe1-2)', true);
 

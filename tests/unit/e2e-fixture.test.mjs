@@ -86,7 +86,7 @@ test('S1 Sperre: zweiter Lauf wartet und bricht nach der Wartezeit ab; verwaiste
 const tracked = () => spawnSync('git', ['-C', ROOT, 'ls-files', '-z'], { encoding: 'utf8' }).stdout.split('\0').filter(Boolean);
 const readTracked = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch { return ''; } };
 
-test('G1 tests/ und tools/: kein altes Testpasswort, keine Gmail-Adresse', () => {
+test('G1 tests/ und tools/: kein altes Passwort der Lauf-Konten, keine Gmail-Adresse', () => {
   const words = ['Testpass' + 'wort', '@' + 'gmail'];
   const hits = tracked().filter((f) => /^(tests|tools)\//.test(f)).filter((f) => words.some((w) => readTracked(f).includes(w)));
   assert.deepEqual(hits, []);

@@ -4,17 +4,20 @@
 // Variante + Spruch werden über den Testhaken window.__ttgRand (src/lib/rand.js, nur localhost) erzwungen:
 // koPick(rand) zieht randInt(3) (Variante) und randInt(8) (Spruch, bei B und 0 zusätzlich 1 + randInt(7));
 // rand() = k / 2^32 ergibt randInt(n) = k % n.
-import { ok, ctx, waitHash, login, mail } from './harness.mjs';
+// P9b: feste Testkonten (login(page, 'a'|'b'|'c')) in TTG-E2E-Fixture; run.mjs stellt vorher den Grundzustand her,
+// prepare() den Stand, den die alte Kette hier hinterließ (nach setup: zusätzlich Platzhalter „Jo Test“ und B mit Krenko).
+import { ok, ctx, waitHash, login, prepare } from './harness.mjs';
 
 const K = (k) => k / 2 ** 32;
 const LONG = 'Maximiliane Konstanze von Hohenzollern-S'; // 40 Zeichen
 
 export default async function koE2e({ browser, base: BASE }) {
+  await prepare({ members: ['b', 'c'], placeholders: ['Jo Test'], decks: [['a', 'tymna'], ['b', 'krenko']] });
   console.log('\nK.O.-Screens: Anmelden als A (Franco Test)');
   const P = await ctx(browser, 'KO');
   await P.goto(BASE);
   await waitHash(P, '#/login');
-  await login(P, mail('a'));
+  await login(P, 'a');
   await waitHash(P, '#/start');
   ok('A angemeldet (Konto aus etappe1-2)', true);
 

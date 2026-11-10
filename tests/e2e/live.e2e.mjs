@@ -1,23 +1,26 @@
 // E2E Live-UI (Spec P6, Kriterien 1–6 und 9; Welle ttg-live-feinschliff-decks, E-L = B: nur Konten der Gruppe).
 // Läuft nach life.e2e.mjs und VOR setup.e2e.mjs (alphabetisch) mit den Konten aus etappe1-2:
-//   A = mail('a') „Franco Test“ (Admin, Deck Tymna + Thrasios) · B = mail('b') „Luka Test“ · beide in „Küchentisch“.
+//   A = 'a' „Franco Test“ (Admin, Deck Tymna + Thrasios) · B = 'b' „Luka Test“ · beide in „Küchentisch“.
 // Anmelden nur über die Harness-Helfer (login). Dieser Lauf legt KEINE Konten, Mitglieder, Decks, Pins
 // oder Feldfarben an und beendet jedes gestartete Spiel (verworfen), damit setup.e2e unverändert gilt.
 // Zwei Browser-Kontexte (A, B) = zwei Handys. Messungen aus dem Negativraum stehen als „MESSUNG“ im
 // Protokoll (kein ok(), sie entscheiden nicht über Grün).
-import { ok, ctx, waitHash, login, mail } from './harness.mjs';
+// P9b: feste Testkonten (login(page, 'a'|'b'|'c')) in TTG-E2E-Fixture; run.mjs stellt vorher den Grundzustand her,
+// prepare() den Stand, den die alte Kette hier hinterließ (nach etappe1-2: A (Tymna + Thrasios, Bracket 2), B, C in der Gruppe).
+import { ok, ctx, waitHash, login, prepare } from './harness.mjs';
 
 const LOOKS = ['nacht', 'arktis', 'lachs'];
 const NIL_GAME = '00000000-0000-4000-8000-0000000000aa';
 
 export default async function liveE2e({ browser, base: BASE }) {
+  await prepare({ members: ['b', 'c'], decks: [['a', 'tymna']] });
   // ---------------------------------------------------------------- zwei Handys, angemeldet
   console.log('\nLive: zwei Handys (A = Franco Test, B = Luka Test)');
   const PA = await ctx(browser, 'VA');
   const PB = await ctx(browser, 'VB');
   for (const P of [PA, PB]) await P.setViewportSize({ width: 375, height: 812 });
-  await PA.goto(BASE); await waitHash(PA, '#/login'); await login(PA, mail('a')); await waitHash(PA, '#/start');
-  await PB.goto(BASE); await waitHash(PB, '#/login'); await login(PB, mail('b')); await waitHash(PB, '#/start');
+  await PA.goto(BASE); await waitHash(PA, '#/login'); await login(PA, 'a'); await waitHash(PA, '#/start');
+  await PB.goto(BASE); await waitHash(PB, '#/login'); await login(PB, 'b'); await waitHash(PB, '#/start');
   ok('A und B angemeldet (Konten aus etappe1-2)', true);
 
   const db = (P, fn, arg) => P.evaluate(async ([src, a]) => {
