@@ -19,6 +19,11 @@ export default {
     aborted: 'The game was discarded on another phone.',
     toStart: 'To home',
   },
+  missing: {
+    title: 'Game not found',
+    text: 'This game no longer exists or belongs to another group.',
+    toStart: 'Back to home',
+  },
   undoes: 'Takes back: {what}',
   // Home screen "Join game"
   none: 'No game is running in this group right now.',

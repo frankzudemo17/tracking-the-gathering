@@ -74,7 +74,12 @@ export default async function life(el, { params, isStale }) {
   const back = html`<div class="head"><a class="icon-btn" href="#/start" aria-label="${t('common.back')}">${icon('back', 20)}</a></div>`;
   let g;
   try { g = await store.loadGame(id); } catch (ex) {
-    if (!isStale()) mount(el, html`${back}${empty('warn', t('common.error'), errText(ex))}`);
+    if (isStale()) return;
+    // 0 Zeilen auf games (PGRST116): Spiel gibt es nicht oder RLS verbirgt es (fremde Gruppe) —
+    // klarer Hinweis statt „Bitte versuch es nochmal“; andere Ladefehler (Netz) wie bisher.
+    if (ex?.code === 'PGRST116') {
+      mount(el, html`${back}${empty('warn', t('live.missing.title'), t('live.missing.text'))}<a class="btn block" href="#/start" data-live-missing>${t('live.missing.toStart')}</a>`);
+    } else mount(el, html`${back}${empty('warn', t('common.error'), errText(ex))}`);
     return;
   }
   // Anzeigenamen wie überall in der App (Profilname bei Konten), nicht members.display_name
@@ -227,6 +232,9 @@ export default async function life(el, { params, isStale }) {
 
   function doAct(action) {
     if (stopped) return false;
+    // Während der Geste geparkter Fremd-Zustand zuerst übernehmen (Befund B1): die eigene Aktion
+    // rechnet auf dem aktuellen Stand, der Schnappschuss kann sie danach nicht mehr überschreiben.
+    takePending();
     const prev = s;
     let r;
     try { r = act(s, action, { actor }); } catch (ex) { console.error(ex); toast(errText(ex)); return false; }
@@ -271,6 +279,7 @@ export default async function life(el, { params, isStale }) {
 
   on(el, 'click', '[data-act]', (e, b) => {
     if (stopped || sheetOpen()) return; // Tippen bei offenem Sheet: wirkungslos
+    takePending(); // Prüfungen unten (ausgeschieden, beendet) auf dem aktuellen Stand
     const a = b.dataset.act; const mid = b.dataset.pid;
     if (a === 'tap') {
       const p = pl(mid);
@@ -608,11 +617,17 @@ export default async function life(el, { params, isStale }) {
     applyRemote(next);
   }
 
+  /** Geparkten Fremd-Zustand übernehmen (vor jeder eigenen Aktion; der Schnappschuss enthält die
+   *  eigenen ungesendeten Zeilen bis dahin, aber nie eine danach eingetragene). */
+  function takePending() { if (remotePending) applyRemote(remotePending); }
+
   function release() {
     if (!gesture) return;
     gesture = false;
-    // erst nach dem click dieses Fingers neu zeichnen (sonst verschluckt ein ersetzter Knopf das Tippen)
-    if (remotePending) setTimeout(() => { if (!gesture && remotePending) applyRemote(remotePending); }, 0);
+    // Geste ohne click (Ziehen, Wischen): nach dem click-Zeitpunkt nachziehen. Mit click hat doAct
+    // den Stand schon übernommen (remotePending leer) — ein später Schnappschuss ohne den eigenen
+    // Tipp kann s so nicht mehr überschreiben (Befund B1).
+    if (remotePending) setTimeout(() => { if (!gesture) takePending(); }, 0);
   }
   const onNet = () => menu?.live();
   const onHash = () => { if (!location.hash.startsWith(`#/spiel/${id}`)) stop(); };

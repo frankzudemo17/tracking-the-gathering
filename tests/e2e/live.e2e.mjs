@@ -193,6 +193,58 @@ export default async function liveE2e({ browser, base: BASE }) {
       await closeSheets(PA);
     });
 
+    // -------------------------------------------------------------- B1 (Review P6): eigener Tipp während eines Fremd-Ereignisses
+    // Finger auf „+“ bei X (B), A tippt „−“ bei Y: der Fremd-Stand wird geparkt; nach dem Loslassen
+    // muss B den eigenen Tipp sofort und dauerhaft zeigen (vorher: geparkter Schnappschuss ohne ihn).
+    await step('B1', async () => {
+      const X = MB, Y = MC;
+      const ev0 = await events(g1);
+      const x0 = await lifeOf(PB, X), y0 = await lifeOf(PB, Y);
+      const box = await PB.locator(`${field(X)} .lc-tap.plus`).boundingBox();
+      const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+      // (1) Finger unten, A tippt, ≥ 1 s warten, loslassen
+      await PB.mouse.move(cx, cy);
+      await PB.mouse.down();
+      await tap(PA, Y, -1);
+      await until(async () => (await events(g1)).length >= ev0.length + 1, 5000);
+      await PB.waitForTimeout(1200);
+      const yDuring = await lifeOf(PB, Y);
+      await PB.mouse.up();
+      const t0 = Date.now();
+      const samples = [];
+      for (const at of [30, 100, 400, 1000]) {
+        const wait = at - (Date.now() - t0);
+        if (wait > 0) await PB.waitForTimeout(wait);
+        samples.push({ ms: Date.now() - t0, x: await lifeOf(PB, X), y: await lifeOf(PB, Y) });
+      }
+      const sTxt = samples.map((v) => `${v.ms}ms X=${v.x} Y=${v.y}`).join(' | ');
+      ok('B1 während Finger unten: Fremd-Tipp aufgeschoben (Y unverändert)', yDuring === y0, `Y ${y0} → ${yDuring}`);
+      ok('B1 nach Loslassen: eigener Tipp ohne Lücke (erste Messung ≤ 100 ms, alle X+1, Y−1)',
+        samples[0].ms <= 100 && samples.every((v) => v.x === x0 + 1 && v.y === y0 - 1), `X0=${x0} Y0=${y0} · ${sTxt}`);
+      // (2) noch einmal: Finger unten, A tippt, loslassen, sofort noch ein Tipp auf B
+      await PB.mouse.move(cx, cy);
+      await PB.mouse.down();
+      await tap(PA, Y, -1);
+      await until(async () => (await events(g1)).length >= ev0.length + 3, 5000);
+      await PB.waitForTimeout(800);
+      await PB.mouse.up();
+      await PB.waitForTimeout(20);
+      await PB.click(`${field(X)} .lc-tap.plus`);
+      const ev = await until(async () => { const e = await events(g1); return e.length >= ev0.length + 5 ? e : null; }, 10000);
+      const same = await until(async () => {
+        const a = await lifes(PA, ALL); const b = await lifes(PB, ALL);
+        return JSON.stringify(a) === JSON.stringify(b) && a[1] === x0 + 3 && a[2] === y0 - 2 ? a : null;
+      }, 8000);
+      ok('B1 beide Geräte enden gleich (X+3, Y−2)', !!same, `X0=${x0} Y0=${y0} · A ${await lifes(PA, ALL)} · B ${await lifes(PB, ALL)}`);
+      const rows = ev || [];
+      const lifeSum = (id) => 40 + rows.filter((e) => e.type === 'life' && e.target === id).reduce((n, e) => n + e.amount, 0);
+      const shown = await lifes(PB, ALL);
+      const seqs = rows.map((e) => e.seq);
+      ok('B1 DB +5 Zeilen, seq eindeutig, DB-Summe = Anzeige',
+        rows.length === ev0.length + 5 && new Set(seqs).size === seqs.length && ALL.every((id, i) => lifeSum(id) === shown[i]),
+        `${ev0.length} → ${rows.length} · DB ${ALL.map(lifeSum)} · Anzeige ${shown} · seq ${seqs.join(',')}`);
+    });
+
     // -------------------------------------------------------------- Negativraum: zwei Geräte drücken gleichzeitig „Zug beenden“
     try {
       const evBefore = await events(g1);
@@ -254,17 +306,25 @@ export default async function liveE2e({ browser, base: BASE }) {
       ok('K4/K5 nach Spielende kein offener Realtime-Kanal auf B', n === 'leer', String(await channels(PB)));
     });
 
-    // -------------------------------------------------------------- Negativraum: Spiel-Link ohne Zugriff
-    // RLS liefert für ein Spiel einer fremden Gruppe genau dasselbe wie für ein unbekanntes (0 Zeilen):
-    // gemessen wird der Pfad mit einer unbekannten Spiel-ID (kein Konto außerhalb der Gruppe in diesem Lauf).
-    try {
-      const before = PB.bad.length;
+    // -------------------------------------------------------------- B2 (Review P6): Spiel-Link ohne Zugriff
+    // RLS liefert für ein Spiel einer fremden Gruppe genau dasselbe wie für ein unbekanntes (0 Zeilen,
+    // PGRST116): gemessen wird der Pfad mit einer unbekannten Spiel-ID.
+    await step('B2', async () => {
       await PB.goto(BASE + '#/spiel/' + NIL_GAME);
       await PB.waitForSelector('.empty, .lc-field', { timeout: 10000 });
       const fieldN = await PB.locator('.lc-field').count();
-      const view = (await text(PB, '#view')).replace(/\s+/g, ' ').slice(0, 160);
-      console.log(`  MESSUNG Spiel-Link ohne Zugriff: Lifecounter-Felder ${fieldN} · Anzeige „${view}“ · HTTP ≥ 400 neu: ${PB.bad.slice(before).join(', ') || 'keine'}`);
-    } catch (e) { console.log('  MESSUNG Spiel-Link ohne Zugriff nicht möglich:', e.message.split('\n')[0]); }
+      const view = (await text(PB, '#view')).replace(/s+/g, ' ');
+      ok('B2 unbekanntes Spiel ⇒ „Spiel nicht gefunden“ + Erklärung, kein Lifecounter, kein „nochmal“',
+        fieldN === 0 && /Spiel nicht gefunden/.test(view) && /Dieses Spiel gibt es nicht mehr oder es gehört zu einer anderen Gruppe./.test(view) && !/nochmal/.test(view),
+        `Felder ${fieldN} · „${view.slice(0, 200)}“`);
+      ok('B2 Knopf „Zur Startseite“ vorhanden', (await PB.locator('[data-live-missing][href="#/start"]').count()) === 1 && /Zur Startseite/.test(await text(PB, '[data-live-missing]')));
+      await looks(PB, 'nicht-gefunden');
+      await PB.click('[data-live-missing]');
+      await waitHash(PB, '#/start');
+      const n = await until(async () => ((await channels(PB)) === 0 ? 'leer' : ''), 6000);
+      ok('B2 Knopf führt zu #/start, kein offener Realtime-Kanal', (await PB.evaluate(() => location.hash)) === '#/start' && n === 'leer',
+        `${await PB.evaluate(() => location.hash)} · Kanäle ${await channels(PB)}`);
+    });
   } finally {
     // Kein laufendes Spiel zurücklassen (setup.e2e und Startseiten-Prüfungen danach)
     for (const id of started) { try { const r = await abort(id); if (r !== 'schon zu') console.log(`  Aufräumen: Spiel ${id} ${r}`); } catch (e) { console.log(`  Aufräumen: Spiel ${id} nicht verworfen: ${e.message}`); } }

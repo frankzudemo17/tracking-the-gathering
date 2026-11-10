@@ -19,6 +19,11 @@ export default {
     aborted: 'Das Spiel wurde auf einem anderen Handy verworfen.',
     toStart: 'Zur Startseite',
   },
+  missing: {
+    title: 'Spiel nicht gefunden',
+    text: 'Dieses Spiel gibt es nicht mehr oder es gehört zu einer anderen Gruppe.',
+    toStart: 'Zur Startseite',
+  },
   undoes: 'Nimmt zurück: {what}',
   // Startseite „Spiel beitreten“
   none: 'Gerade läuft kein Spiel in dieser Gruppe.',
