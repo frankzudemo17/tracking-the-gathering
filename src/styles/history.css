@@ -1,2 +1,119 @@
 /* Styles „history“ · Besitzer: P16 (Historie + Spieldetail). Naht aus P13 (eingebunden in index.html, SHELL in sw.js).
-   Nur Token-Farben aus tokens.css, keine Hex-Werte (WELLE ttg-ende-statistik, UI-Regel 1). */
+   Nur Token-Farben aus tokens.css, keine Hex-Werte (WELLE ttg-ende-statistik, UI-Regel 1).
+   Commander-Bilder ungetönt: oben frei, unten Verlauf in die Fläche (--sf), Text steht auf der Fläche. */
+
+/* ================= Historie ================= */
+.hist-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.hist-chip { min-height: var(--tap); padding: 0 16px; border-radius: 999px; border: 0; background: var(--sf); color: var(--mu);
+  font-size: 14px; font-weight: 650; box-shadow: inset 0 0 0 1px var(--ln); }
+.hist-chip[aria-pressed="true"] { background: var(--act); color: var(--act-ink); box-shadow: none; }
+.hist-chip:active { transform: scale(.97); }
+
+.hist-list { display: flex; flex-direction: column; gap: 26px; }
+.hist-evening { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.hist-ev-head { display: flex; align-items: center; gap: 12px; min-height: var(--tap); padding: 4px 4px 4px 2px; border-radius: var(--r-sm);
+  color: var(--ink); text-decoration: none; min-width: 0; }
+a.hist-ev-head:active { background: var(--sf2); }
+.hist-ev-head .chev { color: var(--mu); flex-shrink: 0; display: grid; }
+.hist-ev-date { font-family: var(--f-display); font-size: 18px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-ev-meta { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--mu); max-width: 100%; min-width: 0; }
+.hist-ev-loc { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.hist-ev-loc > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-ev-loc svg { flex-shrink: 0; }
+.hist-ev-meta > span + span::before { content: "·"; margin-right: 10px; }
+.hist-king { position: relative; display: grid; flex-shrink: 0; padding: 4px; }
+.hist-king-ic { position: absolute; right: -2px; bottom: -2px; width: 18px; height: 18px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--hi); color: var(--bg); box-shadow: 0 0 0 2px var(--bg); }
+
+.hist-games { display: flex; flex-direction: column; gap: 12px; }
+.hist-game { display: flex; flex-direction: column; border-radius: var(--r-lg); overflow: hidden; background: var(--sf); color: var(--ink);
+  text-decoration: none; min-width: 0; }
+.hist-game:active { transform: scale(.985); }
+.hist-art { position: relative; display: block; height: 148px; background: var(--art, none) center 24% / cover, var(--art-fb, none) center / cover, var(--sf2); }
+.hist-art::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, transparent 55%, color-mix(in srgb, var(--sf) 70%, transparent) 85%, var(--sf) 100%); }
+.hist-photo-mark { position: absolute; top: 10px; right: 10px; z-index: 1; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--sf); color: var(--ink); box-shadow: 0 1px 6px rgba(var(--scrim), .35); }
+.hist-game-body { display: flex; flex-direction: column; gap: 12px; padding: 2px 16px 14px; margin-top: -8px; position: relative; min-width: 0; }
+.hist-win { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.hist-winner { display: flex; align-items: center; gap: 6px; font-family: var(--f-display); font-size: 19px; font-weight: 700; letter-spacing: -.02em; min-width: 0; }
+.hist-winner svg { color: var(--hi); flex-shrink: 0; }
+.hist-winner > span, .hist-deck { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-deck { font-size: 13px; color: var(--mu); }
+.hist-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.hist-avs { display: flex; flex-shrink: 0; }
+.hist-avs .avatar { font-size: 10px; box-shadow: 0 0 0 2px var(--sf); background-color: var(--sf2); }
+.hist-avs .avatar.ring { box-shadow: 0 0 0 2px var(--sf), 0 0 0 3.5px var(--hi); }
+.hist-avs .avatar + .avatar { margin-left: -3px; }
+.hist-facts { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--mu); white-space: nowrap; min-width: 0; overflow: hidden; }
+.hist-salt { display: inline-flex; align-items: center; gap: 3px; color: var(--ink); font-weight: 650; }
+.hist-salt svg { color: var(--mu); }
+.hist-empty .btn { margin-top: 2px; }
+
+/* ================= Spieldetail ================= */
+.gd-hero { position: relative; display: flex; flex-direction: column; border-radius: var(--r-xl); overflow: hidden; background: var(--sf); }
+.gd-hero-art { display: block; height: 220px; position: relative; background: var(--art, none) center 22% / cover, var(--art-fb, none) center / cover, var(--sf2); }
+.gd-hero-art::after { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 50%, color-mix(in srgb, var(--sf) 72%, transparent) 84%, var(--sf) 100%); }
+.gd-hero-text { display: flex; flex-direction: column; gap: 6px; padding: 0 18px 18px; margin-top: -18px; position: relative; min-width: 0; }
+.gd-hero-text h2 { font-size: 28px; letter-spacing: -.035em; line-height: 1.04; overflow-wrap: anywhere; }
+.gd-hero-deck { font-size: 14px; color: var(--mu); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-when { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--mu); }
+.gd-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; min-width: 0; }
+.gd-tag { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 12px; border-radius: 999px; background: var(--sf2);
+  font-size: 13px; font-weight: 600; color: var(--ink); max-width: 100%; }
+.gd-tag svg { color: var(--mu); flex-shrink: 0; }
+.gd-loc > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-stats .stat b { font-size: 20px; color: var(--ink); }
+.gd-ic-num { display: inline-flex; align-items: center; gap: 4px; }
+.gd-ic-num svg { color: var(--mu); flex-shrink: 0; }
+
+.gd-place { align-items: center; min-height: 76px; }
+.gd-disc { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--sf2);
+  font-family: var(--f-display); font-weight: 700; font-size: 15px; color: var(--mu); }
+.gd-place.win .gd-disc { background: color-mix(in srgb, var(--hi) 22%, transparent); color: var(--hi); }
+.gd-deck { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); min-width: 0; max-width: 100%; }
+.gd-deck > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-thumb { width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0; background: var(--art, none) center 25% / cover, var(--art-fb, none) center / cover, var(--sf2); }
+.gd-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; font-size: 12px; color: var(--mu); }
+.gd-side b { font-family: var(--f-display); font-size: 16px; font-weight: 700; color: var(--ink); }
+
+.gd-card { gap: 14px; }
+.gd-none { text-align: center; padding: 6px 0; }
+.gd-matrix-wrap { max-width: 100%; overflow-x: auto; margin: -4px; padding: 4px; }
+.gd-matrix { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 3px; font-size: 13px; }
+.gd-matrix th { font-weight: 600; color: var(--mu); font-size: 12px; text-align: center; padding: 0 0 4px; }
+.gd-matrix th.gd-corner { width: 74px; }
+.gd-matrix tbody th { text-align: left; padding: 0 4px 0 0; }
+.gd-colhead { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; }
+.gd-ini { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.gd-rowhead { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--ink); }
+.gd-rowhead > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.gd-matrix td { height: 50px; border-radius: 10px; background: var(--sf2); text-align: center; vertical-align: middle; padding: 4px 2px; }
+.gd-matrix td b { display: block; font-family: var(--f-display); font-size: 17px; font-weight: 700; line-height: 1.1; color: var(--ink); }
+.gd-matrix td.zero { color: var(--mu); background: color-mix(in srgb, var(--sf2) 55%, transparent); }
+.gd-matrix td.self { background: transparent; box-shadow: inset 0 0 0 1px var(--ln); }
+.gd-extra { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--mu); margin: 1px 2px 0; }
+
+.gd-potg-win { display: flex; align-items: center; gap: 12px; }
+.gd-potg-win b { font-size: 16px; }
+.gd-medal { color: var(--hi); display: grid; flex-shrink: 0; }
+.gd-quote { margin: 0; display: grid; grid-template-columns: 22px 1fr; column-gap: 10px; row-gap: 4px; padding-top: 12px; box-shadow: inset 0 1px 0 var(--ln); }
+.gd-quote-ic { color: var(--mu); grid-row: span 2; padding-top: 2px; }
+.gd-quote blockquote { margin: 0; font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }
+.gd-quote figcaption { font-size: 12px; color: var(--mu); }
+
+.gd-note { flex-direction: row; align-items: flex-start; gap: 12px; }
+.gd-note-ic { color: var(--mu); display: grid; padding-top: 2px; flex-shrink: 0; }
+.gd-note p { font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; min-width: 0; }
+
+.gd-photo { display: block; width: 100%; padding: 0; border: 0; border-radius: var(--r-lg); overflow: hidden; background: var(--sf2); }
+.gd-photo img { width: 100%; height: 200px; object-fit: cover; }
+.gd-actions { display: flex; flex-direction: column; gap: 8px; }
+
+.gd-full { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: calc(64px + var(--safe-t)) 12px calc(24px + var(--safe-b));
+  background: rgba(var(--scrim), .94); }
+.gd-full img { max-width: 100%; max-height: 100%; border-radius: var(--r-md); object-fit: contain; }
+.gd-full-close { position: absolute; top: calc(12px + var(--safe-t)); right: 12px; }
