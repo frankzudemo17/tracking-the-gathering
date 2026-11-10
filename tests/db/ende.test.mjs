@@ -13,7 +13,7 @@ import { freshDb, tools, U, MIGRATIONS } from './harness.mjs';
 
 const FILE = '20261113000000_ende.sql';
 const EXPECTED = 52;
-let db, as, su, q, err;
+let db, as, su, q, err, seedUser, mkGroup;
 let ran = 0;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
 const ok = (cond, info = '') => assert.ok(cond, info === '' ? undefined : String(info));
@@ -28,7 +28,7 @@ const NOBODY = '00000000-0000-4000-8000-0000000000ff';
 
 before(async () => {
   db = await freshDb();
-  ({ as, su, q, err } = tools(db));
+  ({ as, su, q, err, seedUser, mkGroup } = tools(db));
 });
 after(async () => {
   await db?.close();
@@ -66,10 +66,9 @@ const potgRows = async (game, voter) => { await su(); return q(`select voted_for
 // ---------------------------------------------------------------- Aufbau
 check('Aufbau: Gruppen X/Y, Mitglieder, Platzhalter, Decks, Spiele s1/s2/s3/sY', async () => {
   await su();
-  await db.query(`insert into auth.users (id, email) values ($1,'a@x.de'), ($2,'b@x.de'), ($3,'c@x.de'), ($4,'d@x.de'), ($5, null)`,
-    [U.A, U.B, U.C, U.D, U.G]);
+  for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de'], [U.C, 'c@x.de'], [U.D, 'd@x.de'], [U.G, null]]) await seedUser(id, { email });
   await as(U.A);
-  [X] = await q(`select * from create_playgroup('X')`);
+  X = await mkGroup(U.A, 'X');
   [{ id: mP }] = await q(`select * from create_placeholder($1, 'P')`, [X.id]);
   mA = (await q(`select my_member_id($1) id`, [X.id]))[0].id;
   await as(U.B);
@@ -77,7 +76,7 @@ check('Aufbau: Gruppen X/Y, Mitglieder, Platzhalter, Decks, Spiele s1/s2/s3/sY',
   await as(U.C);
   [{ id: mC }] = await q(`select * from join_playgroup($1)`, [X.invite_code]);
   await as(U.D);
-  [Y] = await q(`select * from create_playgroup('Y')`);
+  Y = await mkGroup(U.D, 'Y');
   mD = (await q(`select my_member_id($1) id`, [Y.id]))[0].id;
   await as(U.A);
   [{ id: mAY }] = await q(`select * from join_playgroup($1)`, [Y.invite_code]);

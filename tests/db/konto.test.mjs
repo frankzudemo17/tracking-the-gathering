@@ -24,7 +24,7 @@ import { freshDb, tools, U, MIGRATIONS } from './harness.mjs';
 const FILE = '20261112000000_konto.sql';
 const EXPECTED = 28;
 const F = 'ffffffff-0000-4000-8000-000000000006';
-let db, as, su, q, err;
+let db, as, su, q, err, seedUser, mkGroup;
 let ran = 0;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
 const ok = (cond, info = '') => assert.ok(cond, info === '' ? undefined : String(info));
@@ -33,7 +33,7 @@ const J = (x) => JSON.stringify(x);
 
 before(async () => {
   db = await freshDb();
-  ({ as, su, q, err } = tools(db));
+  ({ as, su, q, err, seedUser, mkGroup } = tools(db));
 });
 after(async () => {
   await db?.close();
@@ -78,11 +78,10 @@ let before_G, before_H;
 // ---------------------------------------------------------------- Aufbau
 check('Aufbau: Gruppen G/H/S/X, Konto F, Spiele, Ereignisse, Bewertungen, Speicher-Objekte', async () => {
   await su();
-  await db.query(`insert into auth.users (id, email) values ($1,'a@x.de'), ($2,'b@x.de'), ($3,'c@x.de'), ($4,'d@x.de'), ($5, null), ($6, 'f@x.de')`,
-    [U.A, U.B, U.C, U.D, U.G, F]);
+  for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de'], [U.C, 'c@x.de'], [U.D, 'd@x.de'], [U.G, null], [F, 'f@x.de']]) await seedUser(id, { email });
   // G
   await as(U.A);
-  [g] = await q(`select * from create_playgroup('G')`);
+  g = await mkGroup(U.A, 'G');
   [tim] = await q(`select * from create_placeholder($1, 'Tim')`, [g.id]);
   mA = (await q(`select my_member_id($1) id`, [g.id]))[0].id;
   D.A1 = await deck('owner_profile_id', U.A, 'A1');
@@ -104,7 +103,7 @@ check('Aufbau: Gruppen G/H/S/X, Konto F, Spiele, Ereignisse, Bewertungen, Speich
   await finish(g2.id, [R(tim.id, 1), R(mA, 2, tim.id), R(mB, 3, tim.id)]);
   // H
   await as(U.C);
-  [h] = await q(`select * from create_playgroup('H')`);
+  h = await mkGroup(U.C, 'H');
   mC = (await q(`select my_member_id($1) id`, [h.id]))[0].id;
   D.C1 = await deck('owner_profile_id', U.C, 'C1');
   await as(U.A);
@@ -127,7 +126,7 @@ check('Aufbau: Gruppen G/H/S/X, Konto F, Spiele, Ereignisse, Bewertungen, Speich
   await ev(hLive.id, 'damage', mAH, mAH, mC, 5, 1);
   // S
   await as(U.A);
-  [s] = await q(`select * from create_playgroup('S')`);
+  s = await mkGroup(U.A, 'S');
   [tom] = await q(`select * from create_placeholder($1, 'Tom')`, [s.id]);
   D.O1 = await deck('owner_member_id', tom.id, 'O1');
   D.A4 = await deck('owner_profile_id', U.A, 'A4');
@@ -138,7 +137,7 @@ check('Aufbau: Gruppen G/H/S/X, Konto F, Spiele, Ereignisse, Bewertungen, Speich
   await su(); await q(`insert into player_ratings (game_id, member_id, salt) values ($1, $2, 5)`, [s1.id, mAS]); await as(U.A);
   // X: D allein, nicht Admin (z. B. nachdem der Admin entfernt wurde)
   await as(U.D);
-  [x] = await q(`select * from create_playgroup('X')`);
+  x = await mkGroup(U.D, 'X');
   mD = (await q(`select my_member_id($1) id`, [x.id]))[0].id;
   [xph] = await q(`select * from create_placeholder($1, 'Xaver')`, [x.id]);
   D.D1 = await deck('owner_profile_id', U.D, 'D1');
@@ -389,18 +388,17 @@ let mBefore;
 check('B1 Aufbau M: Decks von A in S, G4, G1, G2 gespielt; G5 mit übernommenem Platzhalter', async () => {
   const mdb = await freshDb();
   m2 = { db: mdb, ...tools(mdb) };
-  const { as: mas, su: msu } = m2;
+  const { as: mas, su: msu, seedUser: mseed, mkGroup: mmk } = m2;
   await msu();
-  await mq(`insert into auth.users (id, email) values ($1,'a@x.de'), ($2,'b@x.de'), ($3,'c@x.de'), ($4,'d@x.de'), ($5,'e@x.de')`,
-    [U.A, U.B, U.C, U.D, E]);
+  for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de'], [U.C, 'c@x.de'], [U.D, 'd@x.de'], [E, 'e@x.de']]) await mseed(id, { email });
   const mid = async (gid) => (await mq(`select my_member_id($1) id`, [gid]))[0].id;
   // Gruppen und Mitgliedschaften
   await mas(U.A);
-  [M.S] = await mq(`select * from create_playgroup('S')`); M.aS = await mid(M.S.id);
+  M.S = await mmk(U.A, 'S'); M.aS = await mid(M.S.id);
   const [sTom] = await mq(`select * from create_placeholder($1, 'Tom')`, [M.S.id]);
   M.sTomDeck = (await mq(`insert into decks (owner_member_id, commander_name, short_name) values ($1,'TT','TT') returning id`, [sTom.id]))[0].id;
-  [M.G1] = await mq(`select * from create_playgroup('G1')`); M.a1 = await mid(M.G1.id);
-  [M.G5] = await mq(`select * from create_playgroup('G5')`); M.a5 = await mid(M.G5.id);
+  M.G1 = await mmk(U.A, 'G1'); M.a1 = await mid(M.G1.id);
+  M.G5 = await mmk(U.A, 'G5'); M.a5 = await mid(M.G5.id);
   [M.pia] = await mq(`select * from create_placeholder($1, 'Pia')`, [M.G5.id]);
   M.AD = await mdeck(U.A, 'AD'); M.AE = await mdeck(U.A, 'AE'); M.AF = await mdeck(U.A, 'AF'); M.AS = await mdeck(U.A, 'AS');
   await mas(U.B);
@@ -411,10 +409,10 @@ check('B1 Aufbau M: Decks von A in S, G4, G1, G2 gespielt; G5 mit übernommenem 
   const [claimed] = await mq(`select * from claim_member($1)`, [M.pia.claim_code]);
   ok(claimed.id === M.pia.id, 'E übernimmt Pia');
   await mas(U.C);
-  [M.G2] = await mq(`select * from create_playgroup('G2')`); M.c2 = await mid(M.G2.id);
+  M.G2 = await mmk(U.C, 'G2'); M.c2 = await mid(M.G2.id);
   M.CD = await mdeck(U.C, 'CD');
   await mas(U.D);
-  [M.G4] = await mq(`select * from create_playgroup('G4')`); M.d4 = await mid(M.G4.id);
+  M.G4 = await mmk(U.D, 'G4'); M.d4 = await mid(M.G4.id);
   M.DD = await mdeck(U.D, 'DD');
   await mas(U.A);
   [{ id: M.a2 }] = await mq(`select * from join_playgroup($1)`, [M.G2.invite_code]);

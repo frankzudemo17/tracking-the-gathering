@@ -11,14 +11,14 @@ import assert from 'node:assert/strict';
 import { freshDb, tools, U } from './harness.mjs';
 
 const EXPECTED = 5;
-let db, as, su, q, err;
+let db, as, su, q, err, seedUser, mkGroup;
 let ran = 0;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
 const ok = (cond, info = '') => assert.ok(cond, info === '' ? undefined : String(info));
 
 before(async () => {
   db = await freshDb();
-  ({ as, su, q, err } = tools(db));
+  ({ as, su, q, err, seedUser, mkGroup } = tools(db));
 });
 after(async () => {
   await db?.close();
@@ -50,9 +50,9 @@ async function rest(group) {
 
 check('Aufbau: Gruppe G mit Spiel, Spielern, Ereignissen, Platzhalter-Deck, Session; fremde Gruppe H', async () => {
   await su();
-  await db.query(`insert into auth.users (id, email) values ($1,'a@x.de'), ($2,'b@x.de'), ($3,'c@x.de')`, [U.A, U.B, U.C]);
+  for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de'], [U.C, 'c@x.de']]) await seedUser(id, { email });
   await as(U.A);
-  [g] = await q(`select * from create_playgroup('G')`);
+  g = await mkGroup(U.A, 'G');
   [tim] = await q(`select * from create_placeholder($1, 'Tim')`, [g.id]);
   mA = (await q(`select my_member_id($1) id`, [g.id]))[0].id;
   const deck = async (col, owner, name) =>
@@ -67,7 +67,7 @@ check('Aufbau: Gruppe G mit Spiel, Spielern, Ereignissen, Platzhalter-Deck, Sess
   await q(EV, [game.id, 'damage', mA, mA, tim.id, 7, 1]);
   await q(EV, [game.id, 'damage', mA, tim.id, mC, 3, 2]);
   await as(U.B);
-  [h] = await q(`select * from create_playgroup('H')`);
+  h = await mkGroup(U.B, 'H');
   mB = (await q(`select my_member_id($1) id`, [h.id]))[0].id;
   D.B1 = await deck('owner_profile_id', U.B, 'B1');
   const [bob] = await q(`select * from create_placeholder($1, 'Bob')`, [h.id]);
