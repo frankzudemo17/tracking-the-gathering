@@ -7,6 +7,37 @@
 --    schließen Entfernte von selbst aus. Die Spaltenfreigabe aus 20261109000000_sicherheit.sql
 --    (update display_name, avatar_path) bleibt ⇒ die neuen Spalten setzt nur eine Funktion.
 --    Index game_players(deck_id) für den neuen Zweig in can_see_deck.
+-- B. Regel „löschen oder markieren“: kein einziger Verweis ⇒ Zeile wirklich löschen (samt
+--    Decks und deck_cards); irgendein Verweis ⇒ markieren (removed_at), Historie unberührt.
+--    Der Modus kommt aus einem Löschversuch im Unterblock (zurückgerollt), nicht aus einer
+--    Liste: eine später hinzugefügte Tabelle mit Verweis führt so nie zu einem Löschen mit
+--    Historie. Fremdschlüssel auf members (9, alle ohne on delete): game_players.member_id,
+--    .eliminated_by, game_events.actor/.source/.target, player_ratings.member_id,
+--    deck_salt_ratings.rater_id, potg_votes.voter_id/.voted_for; dazu decks.owner_member_id
+--    (cascade). Auf decks (4): deck_cards.deck_id (cascade), game_players.deck_id,
+--    deck_salt_ratings.deck_id, decks.version_of. Der DB-Test vergleicht die Liste (Stolperdraht).
+-- C. Trigger before insert on game_players: entfernte Mitglieder und Decks entfernter
+--    Platzhalter kommen in kein neues Spiel; laufende Spiele bleiben unberührt.
+-- D. mem_update, can_write_avatar, can_edit_deck: entfernte Zeilen eingefroren. can_see_deck:
+--    in einem Spiel einer meiner Gruppen gespielte Decks bleiben sichtbar.
+-- E. member_removal_check, remove_member, restore_member (Gruppen-Admin oder Superadmin).
+-- F. leave_playgroup, list_all_playgroups, enter_playgroup; join_playgroup reaktiviert eine
+--    frühere Zeile (gleiche ID, Historie hängt wieder am Konto).
+-- Block K (E-K = ja, Franco 10.11.): Mitglieder mit Konto entfernen (nicht Admins, nie den
+--    Superadmin, nie sich selbst), Austreten für alle (letzter Admin außer Superadmin nicht),
+--    Entfernen ist kein Bann (Code bringt das Konto zurück), delete_my_account erbt an frühere
+--    Zeilen, direktes delete auf members geschlossen.
+-- Fremdschlüssel auf profiles (fortgeschrieben aus 20261112000000_konto.sql 2d und
+--    20261116000000_zugang.sql, vollständig aus allen Migrationen erhoben):
+--    app_settings.updated_by (set null), decks.owner_profile_id (cascade), games.created_by,
+--    members.created_by, members.profile_id (set null), playgroup_invites.renewed_by (set null),
+--    playgroups.created_by, sessions.created_by; NEU members.removed_by (set null),
+--    members.former_profile_id (set null).
+-- Rückwärts-Block (am Ende): stellt mem_update, mem_delete, die vier D-Funktionen,
+--    join_playgroup und delete_my_account wortgleich wieder her, entfernt Trigger, Funktionen,
+--    Indizes und Spalten. Preis (Risiko 2): Markierungen gehen verloren — markierte Zeilen sind
+--    danach wieder aktiv, umgewandelte Zeilen bleiben als Platzhalter ohne Konto zurück.
+--    Gefahrlos nur vor dem ersten echten Entfernen.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
