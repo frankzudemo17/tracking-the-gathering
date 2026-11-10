@@ -15,7 +15,7 @@
 // Ablauf: Stufen 0–9 nach Main.dc.html:1897–1903 (data-stage + Klassen ko-s1…ko-sN am Wurzelelement,
 // Aussehen je Stufe in ko.css), Wackeln in Stufen 3–8 (Main.dc.html:2549–2550, Klasse ko-shake).
 // prefers-reduced-motion: sofort Stufe 9, kein Blitz, kein Wackeln. Knöpfe erst ab Stufe 9.
-import { html, raw, mount, $, initials } from '../lib/dom.js';
+import { html, raw, mount, initials } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { sheet } from '../lib/ui.js';
 import { fieldColors } from '../lib/field-color.js';
@@ -93,7 +93,7 @@ function variantA(v) {
         <span class="ko-tag">${t('ko.title')}</span>
         <span class="ko-name" style="--nl:${Math.max(1, len(v.name))}">${v.name}</span>
         <span class="ko-line">${sub}</span>
-        <div class="ko-bubble"><span data-ko-quote>„${v.quote}“</span></div>
+        <div class="ko-bubble"><svg class="ko-tail" width="26" height="20" viewBox="0 0 26 20" aria-hidden="true"><path d="M2 20 L14 2 L22 20" style="fill: #FBF7EE; stroke: #16191D; stroke-width: 3; stroke-linejoin: round"></path><rect x="0" y="17" width="26" height="6" style="fill: #FBF7EE"></rect></svg><span data-ko-quote>„${v.quote}“</span></div>
       </div>
       ${buttons(v, false)}
     </div>
@@ -106,7 +106,7 @@ function variantB(v) {
   const { stripes, pips } = cardColors(fieldColors(d));
   const arts = [d?.image_url, d?.partner_image_url].filter(Boolean);
   const aw = 130 / Math.max(1, arts.length);
-  const line1 = cut(cmdLine(d) || v.name, 34);
+  const line1 = cut(cmdLine(d) || v.name, 30);
   const line2 = v.by != null ? t('ko.bDamage', { n: v.byDamage, name: cut(v.byName, 16) }) : t('ko.noCause') + '.';
   const title = t('ko.bTitle', { name: v.name });
   const sub = [v.by != null ? t('ko.bBy', { name: v.byName }) : '', t('ko.place', { n: v.place })].filter(Boolean).join(' · ');
@@ -207,6 +207,16 @@ function pickerHtml(player, candidates) {
     <button type="button" class="btn soft" data-ko="back">${t('ko.back')}</button></div>`;
 }
 
+/** Kurzer, unsichtbarer Klick-Schild nach dem Schließen: der zweite Tipp eines Doppeltipps auf
+ *  „Ausscheiden“/„Doch nicht“ landet sonst auf dem Lifecounter darunter (Leben ändern, Feld antippen). */
+function shield() {
+  const s = document.createElement('div');
+  s.className = 'ko-shield';
+  s.setAttribute('aria-hidden', 'true');
+  document.body.append(s);
+  setTimeout(() => s.remove(), 350);
+}
+
 export function showKo(host, { player, deck = null, by = null, pick = null, candidates = [], onEliminate, onCancel }) {
   loadKoFonts();
   const v = viewModel({ player, deck, by, pick, candidates });
@@ -241,10 +251,6 @@ export function showKo(host, { player, deck = null, by = null, pick = null, cand
     const [sx, sy] = shaking ? SHAKE[(n - 3) % SHAKE.length] : [0, 0];
     root.style.setProperty('--sx', `${sx}px`);
     root.style.setProperty('--sy', `${sy}px`);
-    if (n === 9) {
-      const first = $('[data-ko="cancel"]', root);
-      if (document.activeElement === root || !root.contains(document.activeElement)) first?.focus({ preventScroll: true });
-    }
   };
 
   const teardown = () => {
@@ -261,6 +267,7 @@ export function showKo(host, { player, deck = null, by = null, pick = null, cand
     if (done) return;
     done = true;
     teardown();
+    shield();
     fn?.(arg);
   };
   const cancel = () => finish(onCancel);
@@ -312,6 +319,6 @@ export function showKo(host, { player, deck = null, by = null, pick = null, cand
   window.addEventListener('hashchange', onLeave);
   window.addEventListener('resize', fit);
   if (!reduce) for (const [ms, n] of PLAN) timers.push(setTimeout(() => { if (!done) setStage(n); }, ms));
-  if (document.activeElement !== root && stage < 9) root.focus({ preventScroll: true });
+  root.focus({ preventScroll: true }); // Tab führt zu den Knöpfen; kein Fokus auf „Ausscheiden“ (Enter scheidet nicht aus Versehen aus)
   return cancel;
 }
