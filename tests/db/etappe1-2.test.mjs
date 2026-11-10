@@ -10,14 +10,14 @@ import assert from 'node:assert/strict';
 import { freshDb, tools, U } from './harness.mjs';
 
 const EXPECTED = 64;
-let db, as, su, q, err;
+let db, as, su, q, err, seedUser, mkGroup;
 let ran = 0;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
 const ok = (cond, info = '') => assert.ok(cond, info === '' ? undefined : String(info));
 
 before(async () => {
   db = await freshDb();
-  ({ as, su, q, err } = tools(db));
+  ({ as, su, q, err, seedUser, mkGroup } = tools(db));
 });
 after(async () => {
   await db?.close();
@@ -31,10 +31,10 @@ let profs, g, mc, tim, oe, x, deckA, game, game2, meA, meB, claimed, res, merged
 // ---------------------------------------------------------------- Profile
 check('5 Profile per Trigger', async () => {
   await su();
-  await db.query(`insert into auth.users (id, email, raw_user_meta_data) values
-    ($1,'franco@x.de','{"display_name":"Franco"}'), ($2,'luka@x.de','{}'), ($3,'marie@x.de','{"display_name":"   "}'),
-    ($4,'tim@x.de','{"display_name":"Tim der sehr sehr lange Name der viel zu lang ist für alles"}'), ($5,null,'{}')`,
-  [U.A, U.B, U.C, U.D, U.G]);
+  for (const [id, email, meta] of [
+    [U.A, 'franco@x.de', { display_name: 'Franco' }], [U.B, 'luka@x.de', {}], [U.C, 'marie@x.de', { display_name: '   ' }],
+    [U.D, 'tim@x.de', { display_name: 'Tim der sehr sehr lange Name der viel zu lang ist für alles' }], [U.G, null, {}],
+  ]) await seedUser(id, { email, meta });
   profs = await q(`select id, display_name from profiles order by id`);
   ok(profs.length === 5);
 });
@@ -45,7 +45,7 @@ check('Ohne E-Mail → Gast', () => ok(profs.find((p) => p.id === U.G).display_n
 // ---------------------------------------------------------------- Gruppen
 check('Gruppe angelegt, Name getrimmt', async () => {
   await as(U.A);
-  [g] = await q(`select * from create_playgroup('  Küchentisch ')`);
+  g = await mkGroup(U.A, '  Küchentisch ');
   ok(g.name === 'Küchentisch');
 });
 check('Einladungscode TTG-XXXXXX', () => ok(/^TTG-[A-HJ-NP-Z2-9]{6}$/.test(g.invite_code), g.invite_code));
@@ -175,7 +175,7 @@ check('Fremdes Mitglied nicht in eigenes Spiel setzbar', async () => {
   await q(`update games set status = 'finished' where id = $1`, [game.id]);
   // fremde Gruppe: B legt eigene Gruppe an; A darf B's Mitglied nicht in eigenes Spiel setzen
   await as(U.B);
-  await q(`select * from create_playgroup('Laden')`); // Versuchsbremse betrifft nur Codes, Anlegen geht
+  await mkGroup(U.B, 'Laden'); // Versuchsbremse betrifft nur Codes, Anlegen geht
   meB = (await q(`select id from members where profile_id = $1`, [U.B]))[0].id;
   await as(U.A);
   [game2] = await q(`insert into games (playgroup_id, created_by) values ($1, $2) returning *`, [g.id, U.A]);

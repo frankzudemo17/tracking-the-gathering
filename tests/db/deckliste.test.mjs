@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { freshDb, tools, U } from './harness.mjs';
 
 const EXPECTED = 17;
-let db, as, su, q, err;
+let db, as, su, q, err, seedUser, mkGroup;
 let ran = 0;
 const check = (name, fn) => test(name, async (t) => { ran++; await fn(t); });
 const ok = (cond, info = '') => assert.ok(cond, info === '' ? undefined : String(info));
@@ -34,7 +34,7 @@ const visible = async (deck) => (await q(`select count(*)::int n from deck_cards
 
 before(async () => {
   db = await freshDb();
-  ({ as, su, q, err } = tools(db));
+  ({ as, su, q, err, seedUser, mkGroup } = tools(db));
 });
 after(async () => {
   await db?.close();
@@ -62,15 +62,14 @@ check('K1 Migration geladen: Tabelle, Spalten, RLS an, Funktion vorhanden', asyn
 
 check('Aufbau: Gruppen G/H, Mitglieder, Platzhalter, Gast, Decks', async () => {
   await su();
-  await db.query(`insert into auth.users (id, email) values ($1,'a@x.de'), ($2,'b@x.de'), ($3,'c@x.de'), ($4,'d@x.de'), ($5, null)`,
-    [U.A, U.B, U.C, U.D, U.G]);
+  for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de'], [U.C, 'c@x.de'], [U.D, 'd@x.de'], [U.G, null]]) await seedUser(id, { email });
   await as(U.A);
-  [g] = await q(`select * from create_playgroup('G')`);
+  g = await mkGroup(U.A, 'G');
   [tim] = await q(`select * from create_placeholder($1, 'Tim')`, [g.id]);
   await as(U.B);
   await q(`select * from join_playgroup($1)`, [g.invite_code]);
   await as(U.C);
-  [h] = await q(`select * from create_playgroup('H')`);
+  h = await mkGroup(U.C, 'H');
   const deck = async (col, owner, name) =>
     (await q(`insert into decks (${col}, commander_name, short_name) values ($1, $2, $2) returning id`, [owner, name]))[0].id;
   await as(U.A);
@@ -278,7 +277,7 @@ check('K5c delete_my_account (E3-P12) ⇒ ungespieltes Deck samt Karten weg', as
   // auf diesem Stand evtl. nicht vorhanden (E3-P12 noch nicht gemergt) ⇒ sichtbar übersprungen, im Bericht „nicht geprüft“
   if (!has) { t.skip('delete_my_account() fehlt auf diesem Stand (E3-P12 nicht gemergt)'); return; }
   const E = 'ffffffff-0000-4000-8000-000000000006'; // eigenes Konto ohne Gruppe, damit Gruppenregeln nicht greifen
-  await q(`insert into auth.users (id, email) values ($1, 'e@x.de')`, [E]);
+  await seedUser(E, { email: 'e@x.de' });
   await as(E);
   const [{ id }] = await q(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'DE', 'DE') returning id`, [E]);
   assert.equal(await replace(id, [row(1, { section: 'commander' }), row(2)]), 2);
