@@ -66,7 +66,8 @@ export default async function setup(el, { isStale }) {
     if (LAYOUTS.includes(draft.layout)) s.layout = draft.layout;
     s.life = clampLife(draft.life);
     s.start = Number.isInteger(draft.start) && draft.start < s.sel.length ? draft.start : null;
-  } else if (me && byId.has(me)) {
+  }
+  if (!s.sel.length && me && byId.has(me)) { // kein oder abgelaufener Entwurf ⇒ eigenes Mitglied vorausgewählt
     s.sel = [me];
     s.deck[me] = ownDecks(me)[0]?.id || null;
   }
