@@ -10,6 +10,9 @@
 --    Spec-Nachtrag „Gelöschte Konten“: members.had_account (je zu einem Konto gehört, nie wieder false;
 --    gesetzt in _member_detach und delete_my_account, Bestand per update) + Check members_had_account_no_code;
 --    restore_member lehnt solche Zeilen ab ⇒ die Historie eines gelöschten Kontos wird nie übernehmbar.
+--    Zusatz B4: Trigger ttg_members_had_account (before update of profile_id) setzt had_account bei jedem
+--    Wechsel profile_id Wert → leer, auf jedem Weg — auch die Fremdschlüssel-Aktion on delete set null beim
+--    Löschen des Profils (Dashboard, Auth-Admin-API = delete from auth.users), nicht nur die App-Funktionen.
 -- B. Regel „löschen oder markieren“: kein einziger Verweis ⇒ Zeile wirklich löschen (samt
 --    Decks und deck_cards); irgendein Verweis ⇒ markieren (removed_at), Historie unberührt.
 --    Der Modus kommt aus einem Löschversuch im Unterblock (zurückgerollt), nicht aus einer
@@ -37,8 +40,8 @@
 --    playgroups.created_by, sessions.created_by; NEU members.removed_by (set null),
 --    members.former_profile_id (set null).
 -- Rückwärts-Block (am Ende): stellt mem_update, mem_delete, die vier D-Funktionen,
---    join_playgroup und delete_my_account wortgleich wieder her, entfernt Trigger, Funktionen,
---    Indizes, Checks und Spalten (auch had_account). Preis (Risiko 2): Markierungen gehen verloren — markierte Zeilen sind
+--    join_playgroup und delete_my_account wortgleich wieder her, entfernt Trigger (auch
+--    ttg_members_had_account), Funktionen, Indizes, Checks und Spalten (auch had_account). Preis (Risiko 2): Markierungen gehen verloren — markierte Zeilen sind
 --    danach wieder aktiv, umgewandelte Zeilen bleiben als Platzhalter ohne Konto zurück.
 --    Gefahrlos nur vor dem ersten echten Entfernen.
 -- ============================================================================
@@ -69,6 +72,22 @@ update public.members set had_account = true where profile_id is null and claim_
 -- Stolperdraht: nie zugleich had_account, kein Konto und ein Code
 alter table public.members
   add constraint members_had_account_no_code check (not (had_account and profile_id is null and claim_code is not null));
+-- Zusatz B4 (Spec-Nachtrag „Gelöschte Konten“): had_account wird gesetzt, sobald profile_id von einem Wert auf
+-- leer wechselt — gleich auf welchem Weg. Deckt auch die Fremdschlüssel-Aktion members.profile_id on delete set null
+-- ab (Konto am App-Weg vorbei gelöscht: Dashboard, Auth-Admin-API); die referenzielle Aktion ist ein UPDATE der
+-- Spalte profile_id und löst den Trigger aus. Die ausdrücklichen Setzungen in _member_detach/delete_my_account
+-- bleiben. Ein BEFORE-Trigger läuft vor den Checks ⇒ members_had_account_no_code prüft die neue Zeile mit
+-- had_account = true (bricht nur, wenn die Zeile mit Konto zugleich einen Code trägt — kein App-Weg erzeugt das).
+create or replace function public.members_mark_had_account()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if old.profile_id is not null and new.profile_id is null then
+    new.had_account := true;
+  end if;
+  return new;
+end $$;
+create trigger ttg_members_had_account before update of profile_id on public.members
+  for each row execute function public.members_mark_had_account();
 create index game_players_deck_id_idx on public.game_players (deck_id);
 
 -- ---------------------------------------------------------------------------
@@ -541,7 +560,7 @@ grant execute on function public.leave_playgroup(uuid), public.list_all_playgrou
 -- interne Hilfen: für keine Client-Rolle
 revoke execute on function public._member_delete(uuid), public._member_deletable(uuid), public._member_detach(uuid),
   public._member_account_guard(public.members),
-  public.gp_member_active() from public, anon, authenticated;
+  public.gp_member_active(), public.members_mark_had_account() from public, anon, authenticated;
 
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen):
@@ -716,6 +735,8 @@ revoke execute on function public._member_delete(uuid), public._member_deletable
 -- );
 -- drop index public.game_players_deck_id_idx;
 -- drop index public.members_group_former_profile_idx;
+-- drop trigger ttg_members_had_account on public.members;
+-- drop function public.members_mark_had_account();
 -- alter table public.members drop constraint members_had_account_no_code;
 -- alter table public.members drop column had_account;
 -- alter table public.members drop constraint members_former_no_account, drop constraint members_removed_no_account;

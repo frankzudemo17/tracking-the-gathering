@@ -13,6 +13,8 @@
 //                         (der Check members_had_account_no_code hält den Code dann noch auf, aber mit
 //                         anderer Meldung — die Fälle prüfen ausdrücklich member_has_account)
 //   GEGENPROBE=check    ⇒ Check members_had_account_no_code abgeschaltet ⇒ „Gelöschte Konten“ (f) rot
+//   GEGENPROBE=b4       ⇒ Trigger ttg_members_had_account im Test entfernt ⇒ „Zusatz B4“ (a)/(b) rot
+//                         (had_account bleibt nach der Betreiber-Löschung false)
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -23,7 +25,7 @@ import { probeMembers, membersCleanup } from '../e2e/fixture-members.mjs';
 
 const FILE = '20261117000000_mitglieder.sql';
 const GEGEN = process.env.GEGENPROBE || '';
-const EXPECTED = 25;
+const EXPECTED = 27;
 let ran = 0;
 let gegenDir = null;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
@@ -112,6 +114,10 @@ check('K1 Bestand: Migration löscht und ändert nichts; neue Spalten leer, vom 
     // Spec-Nachtrag „Frühere Zeilen“: (playgroup_id, former_profile_id) mit Index, aber NICHT eindeutig
     const fi = await q(`select indexname, indexdef from pg_indexes where tablename = 'members' and indexdef like '%former_profile_id%'`);
     ok(fi.length === 1 && fi[0].indexname === 'members_group_former_profile_idx' && !/UNIQUE/i.test(fi[0].indexdef), J(fi));
+    // Zusatz B4: Trigger setzt had_account bei profile_id Wert → leer (je Zeile, vor dem Update, nur Spalte profile_id)
+    const tg = await q(`select tgname, pg_get_triggerdef(oid) def from pg_trigger where tgrelid = 'public.members'::regclass and not tgisinternal`);
+    eq(tg.map((r) => r.tgname), ['ttg_members_had_account'], J(tg));
+    ok(/BEFORE UPDATE OF profile_id ON public\.members FOR EACH ROW EXECUTE FUNCTION members_mark_had_account\(\)/.test(tg[0].def), tg[0].def);
   } finally {
     await d.close();
   }
@@ -853,6 +859,101 @@ check('Gelöschte Konten (e) Bestand: Zeilen gelöschter Konten (vor P10) ⇒ ha
   }
 });
 
+// ================================================================ Zusatz B4: Konto am App-Weg vorbei gelöscht (eigene Datenbanken)
+// Betreiber-Löschung = delete from auth.users als Eigentümer der Test-DB (wie Dashboard / Auth-Admin-API):
+// profiles kaskadiert, members.profile_id wird per Fremdschlüssel on delete set null geleert — nicht über
+// delete_my_account. Der Trigger ttg_members_had_account muss had_account dabei setzen.
+const B4_ROW = `select id, profile_id, former_profile_id, removed_at, had_account, claim_code, display_name from members where id = $1`;
+async function b4Prepare(d) {
+  if (GEGEN === 'b4') await d.exec('drop trigger ttg_members_had_account on public.members;');
+}
+check('Zusatz B4 (a): Konto übernimmt Platzhalter (nur fremde Decks), Betreiber löscht das Konto ⇒ had_account; remove ⇒ restore abgelehnt; nie ein Code', async () => {
+  const d = await freshDb({ migrations: migrations() });
+  const t = tools(d);
+  const tq = t.q, terr = t.err;
+  try {
+    await b4Prepare(d);
+    for (const [id, email] of [[U.A, 'a@x.de'], [U.C, 'c@x.de']]) await t.seedUser(id, { email });
+    const Xg = await t.mkGroup(U.A, 'X');
+    await t.as(U.A);
+    const a = (await tq(`select my_member_id($1) id`, [Xg.id]))[0].id;
+    const dA = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'A1', 'A1') returning id`, [U.A]))[0].id;
+    const dA2 = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'A2', 'A2') returning id`, [U.A]))[0].id;
+    const [dora] = await tq(`select * from create_placeholder($1, 'Dora')`, [Xg.id]);
+    ok(CODE_RE.test(dora.claim_code || ''), `Platzhalter mit Code: ${J(dora)}`);
+    // Dora spielt mit einem geliehenen Deck (As Deck), A startet das Spiel
+    const [g1] = await tq(START, [Xg.id, J([P(a, dA, 0), P(dora.id, dA2, 1)])]);
+    await tq(`select * from finish_game($1, 'finished', 2, $2::jsonb)`, [g1.id, J([R(a, 1), R(dora.id, 2, a)])]);
+    // C übernimmt Dora per Code (nie per Einladungscode beigetreten)
+    await t.as(U.C);
+    const [cl] = await tq(`select * from claim_member($1)`, [dora.claim_code]);
+    ok(cl.id === dora.id && cl.profile_id === U.C && cl.claim_code === null && cl.had_account === false, `übernommen: ${J(cl)}`);
+    // Betreiber-Löschung am App-Weg vorbei
+    await t.su();
+    eq(await terr(`delete from auth.users where id = $1`, [U.C]), null, 'Betreiber-Löschung gelingt');
+    eq((await tq(`select count(*)::int n from profiles where id = $1`, [U.C]))[0].n, 0, 'Profil weg');
+    const r1 = (await tq(B4_ROW, [dora.id]))[0];
+    ok(r1.profile_id === null && r1.removed_at === null && r1.claim_code === null && r1.display_name === 'Dora', `nach Löschung: ${J(r1)}`);
+    ok(r1.had_account === true, `(a) Fremdschlüssel-Aktion setzt had_account: ${J(r1)}`);
+    // Admin entfernt (mark: Spiel verweist) ⇒ wiederherstellen abgelehnt
+    await t.as(U.A);
+    eq((await tq(`select remove_member($1, 'mark') r`, [dora.id]))[0].r, { result: 'marked' });
+    await t.su();
+    const r2 = (await tq(B4_ROW, [dora.id]))[0];
+    ok(r2.removed_at !== null && r2.had_account === true && r2.claim_code === null, `markiert: ${J(r2)}`);
+    await t.as(U.A);
+    const e = await terr(`select * from restore_member($1)`, [dora.id]);
+    ok(/member_has_account/.test(e || ''), `(a) restore_member: ${e}`);
+    await t.su();
+    eq((await tq(B4_ROW, [dora.id]))[0], r2, '(a) nichts geändert, kein Code');
+  } finally {
+    await d.close();
+  }
+});
+
+check('Zusatz B4 (b): per Einladungscode beigetretene Konto-Zeile, Betreiber löscht das Konto ⇒ had_account; remove ⇒ restore abgelehnt; nie ein Code', async () => {
+  const d = await freshDb({ migrations: migrations() });
+  const t = tools(d);
+  const tq = t.q, terr = t.err;
+  try {
+    await b4Prepare(d);
+    for (const [id, email] of [[U.A, 'a@x.de'], [U.C, 'c@x.de']]) await t.seedUser(id, { email });
+    const Xg = await t.mkGroup(U.A, 'X');
+    await t.as(U.A);
+    const a = (await tq(`select my_member_id($1) id`, [Xg.id]))[0].id;
+    const dA = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'A1', 'A1') returning id`, [U.A]))[0].id;
+    const dA2 = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'A2', 'A2') returning id`, [U.A]))[0].id;
+    await t.as(U.C);
+    const [mC] = await tq(`select * from join_playgroup($1)`, [Xg.invite_code]);
+    ok(mC.profile_id === U.C && mC.claim_code === null && mC.had_account === false, `beigetreten: ${J(mC)}`);
+    await t.as(U.A);
+    const [g1] = await tq(START, [Xg.id, J([P(a, dA, 0), P(mC.id, dA2, 1)])]);
+    await tq(`select * from finish_game($1, 'finished', 2, $2::jsonb)`, [g1.id, J([R(a, 1), R(mC.id, 2, a)])]);
+    // Die eigene Zeile nennt C als created_by (join_playgroup), Fremdschlüssel ohne on delete ⇒ die bloße
+    // Betreiber-Löschung bricht ab (gemessen); der Betreiber löst created_by vorher wie delete_my_account 2d.
+    await t.su();
+    ok(/foreign key/.test(await terr(`delete from auth.users where id = $1`, [U.C]) || ''), 'ohne Vorschritt: Fremdschlüssel created_by hält');
+    eq((await tq(`select count(*)::int n from profiles where id = $1`, [U.C]))[0].n, 1, 'Profil noch da');
+    await tq(`update members set created_by = null where created_by = $1`, [U.C]);
+    eq(await terr(`delete from auth.users where id = $1`, [U.C]), null, 'Betreiber-Löschung gelingt');
+    const r1 = (await tq(B4_ROW, [mC.id]))[0];
+    ok(r1.profile_id === null && r1.removed_at === null && r1.claim_code === null, `nach Löschung: ${J(r1)}`);
+    ok(r1.had_account === true, `(b) Fremdschlüssel-Aktion setzt had_account: ${J(r1)}`);
+    await t.as(U.A);
+    eq((await tq(`select remove_member($1, 'mark') r`, [mC.id]))[0].r, { result: 'marked' });
+    await t.su();
+    const r2 = (await tq(B4_ROW, [mC.id]))[0];
+    ok(r2.removed_at !== null && r2.had_account === true && r2.claim_code === null, `markiert: ${J(r2)}`);
+    await t.as(U.A);
+    const e = await terr(`select * from restore_member($1)`, [mC.id]);
+    ok(/member_has_account/.test(e || ''), `(b) restore_member: ${e}`);
+    await t.su();
+    eq((await tq(B4_ROW, [mC.id]))[0], r2, '(b) nichts geändert, kein Code');
+  } finally {
+    await d.close();
+  }
+});
+
 // ================================================================ Übergang 2: E2E-Grundzustand (tests/e2e/fixture-members.mjs)
 // Gleiche Aufruffolge wie harness.mjs baseState, hier gegen PGlite mit RLS als A (B/C nur beim Beitritt per Code).
 // io wie in Prod: members = select als A, deleteGames = delete games als A (Kaskade), rejoin = join_playgroup(Code)
@@ -1040,6 +1141,7 @@ check('K13 Ausführungsrechte: RPCs nur authenticated, interne Hilfen für keine
     'member_removal_check(uuid)': [false, true], 'remove_member(uuid,text)': [false, true], 'restore_member(uuid)': [false, true],
     'leave_playgroup(uuid)': [false, true], 'list_all_playgroups()': [false, true], 'enter_playgroup(uuid)': [false, true], 'join_playgroup(text)': [false, true],
     '_member_delete(uuid)': [false, false], '_member_deletable(uuid)': [false, false], 'gp_member_active()': [false, false], '_member_detach(uuid)': [false, false], '_member_account_guard(public.members)': [false, false],
+    'members_mark_had_account()': [false, false],
   };
   const got = {};
   for (const sig of Object.keys(want)) {
