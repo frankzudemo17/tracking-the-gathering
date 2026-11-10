@@ -121,8 +121,11 @@ check('Aufbau: Gruppen X (A Admin, B, Tim) und Y (C Admin, B, Ole), Spiele, Erei
   await ev(G.x1.id, 'damage', mA, mA, mB, 7, 1);
   await ev(G.x1.id, 'cmd_damage', mB, mB, tim.id, 21, 2);
   await finish(G.x1.id, [R(mA, 1), R(mB, 2, mA), R(tim.id, 3, mB)]);
+  // Bewertungen als Superuser: seit 20261113000000_ende.sql gibt es kein direktes Schreibrecht mehr (nur rate_game).
+  await su();
   await q(`insert into player_ratings (game_id, member_id, salt, fun) values ($1, $2, 2, 5), ($1, $3, 4, 3)`, [G.x1.id, mA, mB]);
   await q(`insert into deck_salt_ratings (game_id, rater_id, deck_id, salt) values ($1, $2, $3, 5), ($1, $2, $4, 2)`, [G.x1.id, mB, D.A1, D.T1]);
+  await as(U.A);
   G.x2 = await start(x.id, [P(mA, D.A1, 0), P(tim.id, D.T1, 1)]);
   await ev(G.x2.id, 'poison', tim.id, tim.id, mA, 10, 1);
   await finish(G.x2.id, [R(tim.id, 1), R(mA, 2, tim.id)]);
@@ -141,6 +144,7 @@ check('Aufbau: Gruppen X (A Admin, B, Tim) und Y (C Admin, B, Ole), Spiele, Erei
   G.y1 = await start(y.id, [P(mC, D.C1, 0), P(mBY, D.B1, 1), P(ole.id, D.O1, 2)]);
   await ev(G.y1.id, 'damage', mBY, mBY, mC, 40, 1);
   await finish(G.y1.id, [R(mBY, 1), R(mC, 2, mBY), R(ole.id, 3, mBY)]);
+  await su();
   await q(`insert into player_ratings (game_id, member_id, salt) values ($1, $2, 5)`, [G.y1.id, mC]);
   // Speicher: Profilbilder (bleiben immer), Bilder der Spieler ohne Konto, Spielfotos
   await su();
