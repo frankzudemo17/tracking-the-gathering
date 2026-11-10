@@ -12,6 +12,7 @@ import { groupData } from '../lib/data.js';
 import { deckProfile, gameSummary } from '../lib/stats.js';
 import { fmtAvg, fmtPct } from '../lib/format.js';
 import { kpis, section, iconScale, fmtDay } from './stats-ui.js';
+import { renderDeckList } from './deck-list.js';
 
 export default async function deckView(el, { params, isStale }) {
   const d = await sb.from('decks').select('*').eq('id', params.id).maybeSingle().then(must);
@@ -52,6 +53,7 @@ export default async function deckView(el, { params, isStale }) {
 
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('decks.list')}</h3></div>
+      <div class="dl-slot" data-decklist></div>
       <div class="card">
         ${link ? html`
           <div class="set-row"><span class="grow-col"><b>${link.label}</b><span class="tiny muted" style="overflow-wrap:anywhere">${d.list_url}</span></span></div>
@@ -69,6 +71,9 @@ export default async function deckView(el, { params, isStale }) {
       <button type="button" class="btn soft" data-act="bracket">${t('decks.changeBracket')}</button>
       <button type="button" class="btn danger" data-act="remove">${icon('trash', 18)}${t('decks.remove')}</button>
     </div>` : ''}`);
+
+  // Deckliste (P5): Import, Kennzahlen, Kartenbild, Bracket-Prüfung — eigene Datei deck-list.js
+  renderDeckList(el.querySelector('[data-decklist]'), { deck: d, canEdit }).catch((ex) => console.warn('Deckliste', ex));
 
   const rerender = () => go(location.hash.slice(1));
   const update = async (patch) => { await sb.from('decks').update(patch).eq('id', d.id).select('id').single().then(must); };
