@@ -1,2 +1,77 @@
 /* Styles „stats“ · Besitzer: P18 (Profil- + Deck-Statistik). Naht aus P13 (eingebunden in index.html, SHELL in sw.js).
-   Nur Token-Farben aus tokens.css, keine Hex-Werte (WELLE ttg-ende-statistik, UI-Regel 1). */
+   Nur Token-Farben aus tokens.css, keine Hex-Werte (WELLE ttg-ende-statistik, UI-Regel 1).
+   Diagramme in --acc2 (Kontrast gegen --sf: Nacht 7,0:1 · Arktis 3,5:1 · Lachs 3,4:1), keine Spielerfarben. */
+
+/* Kennzahlen: fünf Kacheln in der bestehenden .stats-Reihe */
+.stats.st-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.stats.st-5 .stat { padding: 10px 6px 9px; align-items: center; text-align: center; }
+.stats.st-5 .stat b { font-size: 19px; white-space: nowrap; }
+.stats.st-5 .stat span { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+.st-sec { margin-top: 2px; }
+.st-err { padding: 4px 2px; }
+.st-ic { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; flex-shrink: 0;
+  background: color-mix(in srgb, var(--acc2) 16%, transparent); color: var(--acc2); }
+.st-val { font-family: var(--f-display); font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; min-width: 2.4em; text-align: right; }
+
+/* Stimmung: Icon · Bezeichnung · Wert, darunter dünner Balken (Breite = Wert/5) */
+.st-moods { gap: 14px; }
+.st-mood { display: grid; grid-template-columns: 36px 1fr auto; grid-template-rows: auto auto; column-gap: 12px; row-gap: 6px; align-items: center; }
+.st-mood .st-ic { grid-row: 1 / span 2; }
+.st-mood-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 15px; font-weight: 600; }
+.st-mood-txt .tiny { font-weight: 500; }
+.st-bar { grid-column: 2 / span 2; height: 6px; border-radius: 3px; background: var(--sf2); overflow: hidden; }
+.st-bar i { display: block; height: 100%; width: calc(var(--v) / 5 * 100%); max-width: 100%; border-radius: 3px; background: var(--acc2); }
+
+/* Salz-Verlauf: Balken 1–5, Höhe = Wert/5 */
+.st-salt-bars { display: flex; align-items: flex-end; gap: 8px; height: 104px; padding-top: 2px; }
+.st-sb { flex: 1 1 0; max-width: 40px; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.st-sb-n { font-size: 12px; font-weight: 700; color: var(--mu); font-variant-numeric: tabular-nums; }
+.st-sb-track { flex: 1; width: 100%; display: flex; align-items: flex-end; border-radius: 8px; background: var(--sf2); overflow: hidden; }
+.st-sb-track i { display: block; width: 100%; height: calc(var(--v) / 5 * 100%); max-height: 100%; border-radius: 8px; background: var(--acc2); }
+
+/* Punkte-Verlauf (inline-SVG, skaliert über viewBox) */
+.st-line svg { display: block; width: 100%; height: auto; overflow: visible; }
+.st-line .st-base { stroke: var(--ln); stroke-width: 1.5; }
+.st-line .st-area { fill: color-mix(in srgb, var(--acc2) 14%, transparent); stroke: none; }
+.st-line .st-poly { fill: none; stroke: var(--acc2); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.st-line .st-dot { fill: var(--acc2); stroke: var(--sf); stroke-width: 2; }
+.st-line .st-end { fill: var(--ink); font-family: var(--f-display); font-weight: 700; font-size: 17px; }
+
+/* Tempo */
+.st-tempo { flex-direction: row; align-items: center; gap: 12px; }
+.st-tempo b { font-size: 16px; font-variant-numeric: tabular-nums; }
+
+/* Highlights */
+.st-hls { display: flex; flex-direction: column; gap: 6px; }
+.st-hl { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 12px; border-radius: var(--r-md); background: var(--sf); color: var(--ink); text-decoration: none; }
+a.st-hl:active { transform: scale(.99); }
+.st-hl-media { flex-shrink: 0; display: grid; place-items: center; }
+.st-hl-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.st-hl-txt b { font-size: 15px; font-weight: 700; line-height: 1.3; }
+.st-hl-go { color: var(--mu); display: grid; place-items: center; flex-shrink: 0; }
+.st-thumb { width: 44px; height: 44px; border-radius: 12px; background: var(--sf2) center 25% / cover no-repeat; display: grid; place-items: center;
+  font-family: var(--f-display); font-weight: 700; font-size: 14px; color: var(--mu); }
+.st-disc { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--acc2) 16%, transparent); color: var(--acc2); }
+
+/* Deckliste im Profil: Spiele · Siegquote */
+.deck-card .info .st-deck-line { font-weight: 500; }
+
+/* Deck: Bewertung mit Symbol-Skalen */
+.st-rate { gap: 14px; }
+.st-rate-row { display: flex; align-items: center; gap: 10px; }
+.st-rate-row .st-mood-txt { flex: 1; }
+.st-scale { position: relative; display: inline-flex; flex-shrink: 0; line-height: 0; }
+.st-scale-off, .st-scale-on { display: inline-flex; white-space: nowrap; }
+.st-scale svg { flex-shrink: 0; }
+.st-scale-off { color: var(--ln); }
+.st-scale-on { position: absolute; inset: 0 auto 0 0; width: calc(var(--v) / 5 * 100%); max-width: 100%; overflow: hidden; color: var(--acc2); }
+
+/* Deck: letzte Spiele */
+.st-games { padding: 6px; gap: 2px; }
+.st-game { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 8px; border-radius: var(--r-sm); color: var(--ink); text-decoration: none; }
+.st-game + .st-game { box-shadow: 0 -1px 0 var(--ln); }
+.st-game b { font-size: 15px; }
+.st-place { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--sf2);
+  font-family: var(--f-display); font-weight: 700; font-variant-numeric: tabular-nums; }
+.st-place.win { background: color-mix(in srgb, var(--hi) 22%, transparent); color: var(--hi); }
