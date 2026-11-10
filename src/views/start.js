@@ -1,26 +1,32 @@
 // Startseite: Gruppe, Einladung zur nächsten Runde, eure Runde, Rangliste
-// Live-Anzeigetafel laufender Spiele (P8); letzte Spiele kommen mit Etappe 4.
+// Live-Anzeigetafel laufender Spiele (P8); Rangliste Top 3 und „Zuletzt gespielt“ (P20).
 import { sb, must, avatarUrls } from '../supabase.js';
 import { state, currentGroup } from '../state.js';
 import { html, mount, on } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { avatar, empty, memberName, memberAvatarPath } from '../lib/parts.js';
 import { toast } from '../lib/ui.js';
-import { t } from '../i18n/index.js';
+import { t, getLang } from '../i18n/index.js';
 import { MEMBER_SELECT } from './groups.js';
 import { latestDeckByMember } from '../lib/decks.js';
 import { createStore } from '../lib/game-store.js';
 import { critical } from './life-ui.js';
+import { groupData } from '../lib/data.js';
+import { playerTable } from '../lib/stats.js';
+import { deckArt } from './history-ui.js';
+import { recentGames, fmtShortDate } from './result-ui.js';
 
 export default async function start(el, { isStale }) {
   const g = currentGroup();
   const me = state.profile;
   const members = await sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', state.groupId).order('created_at').then(must);
-  const [urls, latest, live] = await Promise.all([
+  const [urls, latest, live, stats] = await Promise.all([
     avatarUrls([me?.avatar_path, ...members.map(memberAvatarPath)]),
     latestDeckByMember(members),
     // Anzeigetafel: ein Fehler hier lässt die Startseite unverändert
     createStore(sb).liveGames(state.groupId).catch((e) => { console.warn('Laufende Spiele', e); return []; }),
+    // Rangliste + Zuletzt gespielt (P20): ein Fehler hier lässt den bestehenden Leerzustand stehen
+    groupData.loadGroup(state.groupId).catch((e) => { console.warn('Gruppendaten', e); return null; }),
   ]);
   if (isStale()) return;
   const mine = members.find((m) => m.profile_id === me?.id);
@@ -48,6 +54,17 @@ export default async function start(el, { isStale }) {
           <span class="n num" data-life>${sp ? sp.life : '–'}</span><span class="nm">${nameOf.get(p.member_id) || p.name}</span></div>`;
       })}</div></a>`;
   };
+
+  // Rangliste Top 3 + letzte 3 Spiele (P20): Zahlen nur aus stats.js, Daten nur über groupData
+  const dbMember = new Map(members.map((m) => [m.id, m]));
+  const statMembers = new Map((stats?.members || []).map((m) => [m.id, m]));
+  const statName = (mid) => statMembers.get(mid)?.name || (dbMember.get(mid) ? memberName(dbMember.get(mid)) : '–');
+  const top = stats?.games?.length ? playerTable(stats).slice(0, 3) : [];
+  const statDecks = new Map((stats?.decks || []).map((d) => [d.id, d]));
+  const recent = recentGames(stats?.games).map((gm) => {
+    const w = (stats?.players || []).find((p) => p.gameId === gm.id && p.place === 1);
+    return { id: gm.id, winner: w ? statName(w.memberId) : '–', deck: statDecks.get(w?.deckId ?? '') || null, date: fmtShortDate(gm.startedAt, getLang()) };
+  });
 
   // eigenes Profil zuerst, dann alphabetisch
   members.sort((a, b) => (b.profile_id === me?.id) - (a.profile_id === me?.id) || memberName(a).localeCompare(memberName(b), 'de'));
@@ -80,9 +97,24 @@ export default async function start(el, { isStale }) {
     </div>
 
     <div class="section">
-      <div class="section-head"><h3 class="section-title">${t('home.leaderboard')}</h3></div>
-      <div class="card">${empty('trophy', t('home.noGames'), t('home.noGamesSub'))}</div>
-    </div>`);
+      <div class="section-head"><h3 class="section-title">${t('home.leaderboard')}</h3>${top.length ? html`<a class="home-all" href="#/rangliste">${t('result.homeAll')}</a>` : ''}</div>
+      ${top.length ? html`<div class="card home-top">${top.map((r) => {
+        const m = dbMember.get(r.memberId);
+        return html`<a class="home-top-row" href="#/profil/${encodeURIComponent(r.memberId)}" data-top="${r.memberId}">
+          <span class="home-rank num" aria-label="${t('result.homeRank', { n: r.rank })}">${r.rank}</span>
+          ${m ? personAv(m, 36) : avatar({ name: statName(r.memberId), url: null, size: 36 })}
+          <span class="rs-name">${statName(r.memberId)}</span>
+          <b class="home-pts num">${t('result.homePoints', { n: r.points })}</b></a>`;
+      })}</div>` : html`<div class="card">${empty('trophy', t('home.noGames'), t('home.noGamesSub'))}</div>`}
+    </div>
+
+    ${recent.length ? html`<div class="section">
+      <div class="section-head"><h3 class="section-title">${t('result.homeRecent')}</h3></div>
+      <div class="card home-recent">${recent.map((r) => html`<a class="home-recent-row" href="#/partie/${encodeURIComponent(r.id)}" data-recent="${r.id}" aria-label="${t('result.homeRecentOpen', { date: r.date, name: r.winner })}">
+        <span class="home-thumb" style="${deckArt(r.deck)}" aria-hidden="true"></span>
+        <span class="rs-grow"><span class="rs-name">${t('result.homeWins', { name: r.winner })}</span><span class="rs-sub">${r.date}</span></span>
+        <span class="chev">${icon('chevRight', 18)}</span></a>`)}</div>
+    </div>` : ''}`);
 
   on(el, 'click', '[data-act="live"]', () => toast(t('home.joinSoon')));
 }

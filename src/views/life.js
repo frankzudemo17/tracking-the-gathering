@@ -500,7 +500,7 @@ export default async function life(el, { params, isStale }) {
             stop();
             close();
             toast(t(how === 'finished' ? 'life.end.finished' : 'life.end.discarded'));
-            go('/start', { replace: true });
+            go(how === 'finished' ? `/spiel/${encodeURIComponent(id)}/ende` : '/start', { replace: true });
           } catch (ex) { err.textContent = errText(ex); err.hidden = false; }
         });
       });

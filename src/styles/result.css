@@ -1,2 +1,123 @@
 /* Styles „result“ · Besitzer: P20 (Ergebnis + Bewerten). Naht aus P13 (eingebunden in index.html, SHELL in sw.js).
-   Nur Token-Farben aus tokens.css, keine Hex-Werte (WELLE ttg-ende-statistik, UI-Regel 1). */
+   Nur Token-Farben aus tokens.css, keine Hex-Werte (WELLE ttg-ende-statistik, UI-Regel 1).
+   Commander-Bilder ungetönt: oben frei, unten Verlauf in die Fläche (--sf), Text steht auf der Fläche. */
+
+/* ================= Ergebnis ================= */
+.rs { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.rs-grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rs-card { background: var(--sf); border-radius: var(--r-lg); min-width: 0; }
+.rs-pad { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.rs-rows { display: flex; flex-direction: column; overflow: hidden; }
+.rs-rows > * + * { box-shadow: inset 0 1px 0 var(--ln); }
+.rs-card-head { display: flex; flex-direction: column; gap: 2px; }
+.rs-card-title { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-display); font-size: 18px; font-weight: 700;
+  letter-spacing: -.02em; color: var(--ink); }
+.rs-card-title svg { color: var(--mu); flex-shrink: 0; }
+.rs-hint { font-size: 13px; color: var(--mu); line-height: 1.45; }
+.rs-none { font-size: 14px; color: var(--mu); padding: 14px 16px; }
+.rs-name { font-weight: 700; font-size: 15px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-deckname { font-weight: 600; color: var(--mu); }
+.rs-sub { font-size: 12.5px; color: var(--mu); line-height: 1.35; }
+
+/* 1 Sieger-Kopf */
+.rs-hero { position: relative; display: flex; flex-direction: column; border-radius: var(--r-xl); overflow: hidden; background: var(--sf); }
+.rs-hero-art { display: block; height: 236px; position: relative; background: var(--art, none) center 22% / cover, var(--art-fb, none) center / cover, var(--sf2); }
+.rs-hero-art::after { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 48%, color-mix(in srgb, var(--sf) 72%, transparent) 82%, var(--sf) 100%); }
+.rs-hero-text { display: flex; flex-direction: column; gap: 4px; padding: 0 18px 18px; margin-top: -22px; position: relative; min-width: 0; }
+.rs-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--mu); }
+.rs-label svg { color: var(--hi); }
+.rs-hero-text h2 { font-size: 30px; letter-spacing: -.035em; line-height: 1.04; overflow-wrap: anywhere; }
+.rs-hero-deck { font-size: 14px; color: var(--mu); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-hero-life { font-size: 15px; font-weight: 650; color: var(--ink); margin-top: 6px; }
+.rs-hero-meta { font-size: 13px; color: var(--mu); }
+
+/* 2 Platzierung */
+.rs-place { display: flex; align-items: center; gap: 12px; padding: 12px 16px; min-height: 64px; }
+.rs-disc { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--sf2);
+  font-family: var(--f-display); font-weight: 700; font-size: 15px; color: var(--mu); }
+.rs-place.win .rs-disc { background: color-mix(in srgb, var(--hi) 22%, transparent); color: var(--hi); }
+.rs-pts { flex-shrink: 0; font-size: 14px; color: var(--ink); }
+
+/* 3 Schaden */
+.rs-dmg { display: flex; align-items: center; gap: 12px; padding: 11px 16px; min-height: 56px; }
+.rs-pair { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.rs-pair > span:not(.rs-dot) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 1.5px var(--sf); }
+.rs-dmg-n { flex-shrink: 0; font-family: var(--f-display); font-size: 22px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* Chips (Siegbedingung, POTG, Salzigstes Deck) */
+.rs-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.rs-chip { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 16px; border-radius: 999px; border: 0;
+  background: var(--sf); color: var(--ink); font-size: 14px; font-weight: 650; box-shadow: inset 0 0 0 1px var(--ln); cursor: pointer; max-width: 100%; }
+.rs-pad .rs-chip { background: var(--sf2); box-shadow: none; }
+.rs-chip svg { color: var(--mu); flex-shrink: 0; }
+.rs-chip[aria-pressed="true"] { background: var(--act); color: var(--act-ink); box-shadow: none; }
+.rs-chip[aria-pressed="true"] svg { color: currentColor; }
+.rs-chip:active { transform: scale(.97); }
+.rs-you { font-weight: 500; opacity: .75; }
+
+/* 5 Bewertung */
+.rs-q { display: flex; flex-direction: column; gap: 8px; }
+.rs-q-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; min-width: 0; }
+.rs-q-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; color: var(--ink); min-width: 0; }
+.rs-q-label svg { color: var(--mu); flex-shrink: 0; }
+.rs-q-deck { font-weight: 600; color: var(--mu); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-word { font-size: 13px; font-weight: 700; color: var(--acc2); white-space: nowrap; flex-shrink: 0; }
+.rs-scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.rs-score { min-height: var(--tap); border-radius: var(--r-sm); border: 0; background: var(--sf2); color: var(--ink);
+  font-family: var(--f-display); font-weight: 700; font-size: 16px; cursor: pointer; }
+.rs-score.fill { background: color-mix(in srgb, var(--act) 22%, var(--sf2)); }
+.rs-score[aria-pressed="true"] { background: var(--act); color: var(--act-ink); }
+.rs-stars { display: flex; gap: 2px; }
+.rs-star { width: var(--tap); height: var(--tap); border: 0; padding: 0; background: transparent; color: var(--hi); display: grid; place-items: center;
+  border-radius: var(--r-sm); cursor: pointer; }
+.rs-star .on, .rs-star.fill .off { display: none; }
+.rs-star.fill .on, .rs-star .off { display: grid; }
+.rs-star .off { color: var(--mu); }
+
+/* 6 Deck-Salz */
+.rs-ds { padding-top: 14px; box-shadow: inset 0 1px 0 var(--ln); }
+.rs-ds-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rs-ds-thumb { width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0; background: var(--art, none) center 25% / cover, var(--art-fb, none) center / cover, var(--sf2); }
+.rs-ds-row .rs-name { font-size: 14px; }
+.rs-salts { display: flex; flex-shrink: 0; }
+.rs-salt { width: 32px; height: var(--tap); border: 0; padding: 0; background: transparent; color: var(--mu); opacity: .45; display: grid; place-items: center;
+  border-radius: var(--r-sm); cursor: pointer; }
+.rs-salt.fill { color: var(--ink); opacity: 1; }
+.rs-saltiest { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+
+/* 7 POTG + 8 Notiz/Foto */
+.rs-potg .field label, .rs-lbl { font-size: 13px; font-weight: 600; color: var(--mu); }
+.rs-lbl { font-family: inherit; letter-spacing: 0; }
+.rs-pad .input { background: var(--sf2); border-color: transparent; }
+.rs-pad .input:focus { border-color: var(--hi); }
+.rs-note { min-height: 96px; padding: 14px 16px; resize: vertical; line-height: 1.45; }
+.rs-count { align-self: flex-end; font-size: 12px; color: var(--mu); font-variant-numeric: tabular-nums; }
+.rs-count.bad { color: var(--danger); font-weight: 650; }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+.rs-photo { display: flex; flex-direction: column; gap: 10px; }
+.rs-photo [data-photo] { display: flex; flex-direction: column; gap: 10px; }
+.rs-photo-img { display: block; width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--r-md); background: var(--sf2); }
+.rs-photo-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.rs-file { position: relative; min-height: var(--tap); padding: 0 14px; border-radius: var(--r-sm); font-size: 14px; background: var(--sf2); cursor: pointer; }
+.rs-file input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.rs-file:focus-within { outline: 2px solid var(--hi); outline-offset: 2px; }
+
+.rs-actions { display: flex; flex-direction: column; gap: 10px; padding-bottom: calc(8px + var(--safe-b, 0px)); }
+.rs-actions .btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* ================= Startseite: Rangliste + Zuletzt gespielt ================= */
+.card.home-top { padding: 4px 0; gap: 0; overflow: hidden; }
+.home-top-row, .home-recent-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 16px; color: var(--ink); text-decoration: none; min-width: 0; }
+.home-top-row + .home-top-row, .home-recent-row + .home-recent-row { box-shadow: inset 0 1px 0 var(--ln); }
+a.home-top-row:active, a.home-recent-row:active { background: var(--sf2); }
+.home-rank { width: 22px; flex-shrink: 0; text-align: center; font-family: var(--f-display); font-weight: 700; font-size: 15px; color: var(--mu); }
+.home-top-row:first-child .home-rank { color: var(--hi); }
+.home-top-row .rs-name, .home-recent-row .rs-name { flex: 1; min-width: 0; }
+.home-pts { flex-shrink: 0; font-weight: 700; font-size: 14px; }
+.card.home-recent { padding: 4px 0; gap: 0; overflow: hidden; }
+.home-thumb { width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0; background: var(--art, none) center 25% / cover, var(--art-fb, none) center / cover, var(--sf2); }
+.home-recent-row .rs-grow { flex: 1; }
+.home-recent-row .chev { color: var(--mu); display: grid; flex-shrink: 0; }
+.section-head a.home-all { display: inline-flex; align-items: center; min-height: var(--tap); min-width: var(--tap); justify-content: flex-end; }
