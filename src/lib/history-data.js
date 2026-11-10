@@ -124,9 +124,11 @@ const uniq = (xs) => [...new Set(xs.filter((x) => x != null))];
 
 /**
  * @param {any} sb Supabase-Client (oder Attrappe)
+ * @param {{ cache?: { load: (key: string|null, loader: () => Promise<any>, opts?: { force?: boolean }) => Promise<any>, drop: (key: string) => number }, key?: (groupId: string) => string|null }} [store]
+ *   P12: übergebener Speicher (src/lib/cache.js) + Schlüssel je Gruppe (Konto|Gruppe|group). Ohne ⇒ eigener Speicher wie bisher.
  * @returns {{ loadGroup: (groupId: string, opts?: { force?: boolean }) => Promise<GroupData>, loadGame: (gameId: string) => Promise<GameData|null>, invalidate: (groupId: string) => void }}
  */
-export function createHistoryData(sb) {
+export function createHistoryData(sb, { cache: shared, key } = {}) {
   /** @type {Map<string, Promise<GroupData>>} */
   const cache = new Map();
 
@@ -231,6 +233,20 @@ export function createHistoryData(sb) {
       turns: turns.map(toTurn),
       game,
       damage: damage.map(toDamage),
+    };
+  }
+
+  if (shared && key) {
+    return {
+      /** P12: im geteilten Speicher je Konto + Gruppe; ohne Schlüssel (kein Konto/keine Gruppe) wird geladen, nichts gemerkt. */
+      loadGroup(groupId, { force = false } = {}) {
+        return shared.load(key(groupId), () => fetchGroup(groupId), { force });
+      },
+      loadGame,
+      invalidate(groupId) {
+        const k = key(groupId);
+        if (k) shared.drop(k);
+      },
     };
   }
 

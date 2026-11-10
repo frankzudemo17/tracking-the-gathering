@@ -274,3 +274,61 @@ test('P10 toMember: removed/formerProfileId aus removed_at/former_profile_id; fe
     ['m1', true, 'p7'], ['m2', true, null], ['m3', false, null], ['m4', false, null],
   ]);
 });
+
+// ---------------------------------------------------------------------------
+// P12: geteilter Speicher (src/lib/cache.js) je Konto + Gruppe — Spec-Tests H1–H4 (H5 = die K13-Fälle oben, unverändert)
+
+const loadCache = () => import('../../src/lib/cache.js');
+
+test('P12 H1 Kontowechsel ⇒ eigene Ladung je Konto, Schlüssel a|G|group und b|G|group', async () => {
+  const { createHistoryData } = await load();
+  const { createCache, cacheKey } = await loadCache();
+  const cache = createCache();
+  let konto = 'a';
+  const sb = fakeSb({ games: [gameRow('g1')] });
+  const data = createHistoryData(sb, { cache, key: (g) => cacheKey(konto, g, 'group') });
+  await data.loadGroup(GID);
+  konto = 'b';
+  await data.loadGroup(GID);
+  assert.equal(sb.of('games').length, 2);
+  assert.deepEqual(cache.keys().sort(), [`a|${GID}|group`, `b|${GID}|group`]);
+});
+
+test('P12 H2 Schlüssel null ⇒ jede Ladung geht ans Netz, nichts gemerkt', async () => {
+  const { createHistoryData } = await load();
+  const { createCache } = await loadCache();
+  const cache = createCache();
+  const sb = fakeSb({ games: [gameRow('g1')] });
+  const data = createHistoryData(sb, { cache, key: () => null });
+  await data.loadGroup(GID);
+  await data.loadGroup(GID);
+  assert.equal(sb.of('games').length, 2);
+  assert.deepEqual(cache.keys(), []);
+});
+
+test('P12 H3 clear während der Ladung ⇒ die Antwort schreibt nicht', async () => {
+  const { createHistoryData } = await load();
+  const { createCache, cacheKey } = await loadCache();
+  const cache = createCache();
+  const sb = fakeSb({ games: [gameRow('g1')] });
+  const data = createHistoryData(sb, { cache, key: (g) => cacheKey('a', g, 'group') });
+  const p = data.loadGroup(GID);
+  cache.clear();
+  await p;
+  assert.deepEqual(cache.keys(), []);
+});
+
+test('P12 H4 invalidate entfernt Konto|Gruppe|group; nächste Ladung geht ans Netz', async () => {
+  const { createHistoryData } = await load();
+  const { createCache, cacheKey } = await loadCache();
+  const cache = createCache();
+  const sb = fakeSb({ games: [gameRow('g1')] });
+  const k = cacheKey('a', GID, 'group');
+  const data = createHistoryData(sb, { cache, key: (g) => cacheKey('a', g, 'group') });
+  await data.loadGroup(GID);
+  assert.ok(cache.peek(k));
+  data.invalidate(GID);
+  assert.equal(cache.peek(k), undefined);
+  await data.loadGroup(GID);
+  assert.equal(sb.of('games').length, 2);
+});
