@@ -461,6 +461,13 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- Block K6: direktes Löschen von members schließen. Entfernen nur über remove_member /
+-- leave_playgroup; ganze Gruppen über delete_playgroup/purge_playgroup (security definer).
+-- ---------------------------------------------------------------------------
+drop policy mem_delete on public.members;
+revoke delete on public.members from anon, authenticated;
+
+-- ---------------------------------------------------------------------------
 -- Ausführungsrechte (neue Funktionen bekommen per Default-Privileges anon + authenticated)
 -- ---------------------------------------------------------------------------
 revoke execute on function public.member_removal_check(uuid), public.remove_member(uuid, text),
@@ -479,6 +486,8 @@ revoke execute on function public._member_delete(uuid), public._member_deletable
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen):
 -- RÜCKWÄRTS-BEGINN
+-- grant delete on public.members to anon, authenticated;
+-- create policy mem_delete on public.members for delete using (public.is_group_admin(playgroup_id));
 -- create or replace function public.delete_my_account()
 -- returns void language plpgsql security definer set search_path = public as $$
 -- declare
