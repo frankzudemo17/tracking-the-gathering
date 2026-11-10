@@ -46,6 +46,10 @@
 .atk-kinds button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 0; padding: 0 6px; }
 .atk-kinds button svg { flex-shrink: 0; }
 .atk-kinds button span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Partner (vier Arten): Schaden und Gift nie kürzen, die beiden Commander-Namen teilen sich den Rest (Mockup 6b) */
+.atk-kinds:has(> :nth-child(4)) { display: flex; }
+.atk-kinds:has(> :nth-child(4)) button { flex: 0 0 auto; }
+.atk-kinds:has(> :nth-child(4)) button[data-k^="cmd"] { flex: 1 1 0; }
 .atk-amt { display: flex; align-items: center; justify-content: center; gap: 18px; }
 .atk-amt button { width: 54px; height: 54px; border-radius: 16px; border: 0; background: var(--sf2); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
 .atk-amt button:disabled { opacity: .4; cursor: default; }
