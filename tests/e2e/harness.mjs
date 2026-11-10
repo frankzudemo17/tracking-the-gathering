@@ -8,14 +8,81 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { Abort } from './fixture-core.mjs';
-import { ROOT, TARGET, email, password } from './fixture-api.mjs';
+import { Abort, checkGuard } from './fixture-core.mjs';
+import {
+  ROOT, TARGET, email, password, baseState as baseStateRest, fixtureIds, signIn, rpc, get, api, rest, ensureMember,
+} from './fixture-api.mjs';
 
 export { Abort, ROOT, TARGET };
 export {
   prepare, ensureMember, ensurePlaceholder, ensureDeck, zugangLive, inviteCode, fixtureIds, NAMES, FIXTURE_NAME,
-  baseState, snapshot, rpc, get, signIn, api, rest, tally,
+  snapshot, rpc, get, signIn, api, rest, tally,
 } from './fixture-api.mjs';
+
+// ---------------------------------------------------------------- P10 Mitglieder: Probe + Grundzustand über RPC
+let mLive = null;
+/** Gibt es member_removal_check in der Ziel-Datenbank (P10-Migration in Prod)? Einmal je Lauf, als Konto A. */
+export async function mitgliederLive() {
+  if (mLive !== null) return mLive;
+  try {
+    await rpc('a', 'member_removal_check', { p_member: '00000000-0000-4000-8000-000000000000' });
+    mLive = true; // unbekannte ID gibt es nicht; ein Erfolg hieße trotzdem: Funktion da
+  } catch (e) {
+    if (e instanceof Abort) throw e;
+    if (e.code === 'PGRST202') mLive = false;
+    else if (/not_group_admin/.test(e.message)) mLive = true;
+    else throw new Abort('Mitglieder-Probe', `member_removal_check antwortet unerwartet: ${e.message}`);
+  }
+  return mLive;
+}
+
+/**
+ * Block K6 schließt direktes delete auf members (Policy mem_delete weg). Nach dem db push nimmt der Grundzustand
+ * Platzhalter und B/C deshalb über remove_member (Spiele vorher weg ⇒ Modus delete ⇒ Zeile wirklich weg).
+ * Frühere Zeilen von B/C (former_profile_id) kommen über join_playgroup zurück und werden dann entfernt;
+ * markierte Platzhalter werden wiederhergestellt und dann gelöscht. Danach läuft der bisherige Grundzustand
+ * (fixture-api.mjs, unverändert) und findet keine Zeile mehr, die er per REST löschen müsste.
+ */
+async function membersViaRpc(log) {
+  const fx = fixtureIds();
+  if (!fx) throw new Abort('Fixture', 'tests/e2e/fixture-ids.json fehlt — node tests/e2e/fixture.mjs --pruefen');
+  const me = await signIn('a');
+  if (me.uid !== fx.a) throw new Abort('Wächter', 'Konto A passt nicht zu fixture-ids.json — nichts gelöscht');
+  const read = async () => {
+    const groups = await get('a', `playgroups?select=id,name,created_by&id=eq.${fx.group}`);
+    const members = await get('a', `members?select=*&playgroup_id=eq.${fx.group}`);
+    checkGuard({ fixture: fx, group: groups[0] ?? null, members });
+    return members;
+  };
+  let ms = await read();
+  const n = { games: 0, rejoined: 0, restored: 0, deleted: 0, marked: 0, files: 0 };
+  // Spiele zuerst (Kaskade): danach verweist nichts mehr auf die Zeilen
+  n.games = (await api('DELETE', rest(`games?playgroup_id=eq.${fx.group}`), { token: me.token, prefer: 'return=representation' })).length;
+  for (const m of ms.filter((x) => x.former_profile_id)) {
+    const k = m.former_profile_id === fx.b ? 'b' : m.former_profile_id === fx.c ? 'c' : null;
+    if (k) { await ensureMember(k); n.rejoined++; }
+  }
+  for (const m of ms.filter((x) => x.removed_at && !x.former_profile_id)) { await rpc('a', 'restore_member', { p_member: m.id }); n.restored++; }
+  if (n.rejoined || n.restored) ms = await read();
+  for (const m of ms.filter((x) => x.profile_id !== fx.a && !x.removed_at)) {
+    if (m.role === 'admin') await rpc('a', 'set_member_role', { p_member: m.id, p_role: 'member' });
+    const c = await rpc('a', 'member_removal_check', { p_member: m.id });
+    if (c.mode === 'already') continue;
+    if (c.files?.length) {
+      const rm = await api('DELETE', `${TARGET.url}/storage/v1/object/avatars`, { token: me.token, body: { prefixes: c.files } });
+      n.files += Array.isArray(rm) ? rm.length : 0;
+    }
+    const r = await rpc('a', 'remove_member', { p_member: m.id, p_expect: c.mode });
+    if (r?.result === 'deleted') n.deleted++; else if (r?.result === 'marked') n.marked++;
+  }
+  log(`Grundzustand P10 (RPC): ${n.games} Spiele, ${n.rejoined} frühere Zeile(n) zurückgeholt, ${n.restored} wiederhergestellt, ${n.deleted} Zeile(n) entfernt (gelöscht), ${n.marked} markiert, ${n.files} Bild(er)`);
+}
+
+/** Grundzustand: nach dem db push zuerst über RPC (K6), dann wie bisher (fixture-api.mjs). */
+export async function baseState(opts = {}) {
+  if (await mitgliederLive()) await membersViaRpc(opts.log || (() => {}));
+  return baseStateRest(opts);
+}
 export const OUT = path.join(ROOT, 'tests', 'e2e', 'out');
 
 // ---------------------------------------------------------------- Lauf, Prüfzähler
