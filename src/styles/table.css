@@ -1,2 +1,62 @@
-/* table.css · gehört P7 der Welle ttg-live-feinschliff-decks (Tisch-Einstellungen).
-   Naht aus P3: eingebunden in index.html und sw.js (SHELL); nur dieses Paket schreibt hier. */
+/* table.css · P7 der Welle ttg-live-feinschliff-decks: Tisch-Einstellungen, Spiel-Standards, Bracket-Hinweis.
+   Eingebunden in index.html und sw.js (SHELL, Naht P3). Farben nur aus tokens.css (keine Spielerfarben). */
+
+/* ---------- Einstellungen: Einhängepunkt in settings.js, Abschnitte reihen sich in den .screen-Abstand ein */
+[data-slot="table"] { display: contents; }
+.tb-row { align-items: center; }
+.tb-row .sub { white-space: normal; }
+.tb-stack { flex-wrap: wrap; row-gap: 10px; }
+.tb-stack .grow { flex: 1 1 calc(100% - 44px); }
+.tb-seg { display: flex; width: 100%; }
+.tb-seg button { flex: 1 1 0; min-width: 0; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Schalter (role="switch") */
+.tb-switch { position: relative; flex-shrink: 0; width: 52px; height: 32px; border-radius: 16px; border: 0; padding: 0;
+  background: var(--sf2); box-shadow: inset 0 0 0 1px var(--ln); cursor: pointer; transition: background .18s ease-out; }
+.tb-switch i { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: var(--mu);
+  transition: transform .18s ease-out, background .18s ease-out; }
+.tb-switch[aria-checked="true"] { background: var(--act); box-shadow: none; }
+.tb-switch[aria-checked="true"] i { transform: translateX(20px); background: var(--act-ink); }
+.tb-switch:disabled { opacity: .45; cursor: default; }
+.tb-switch:focus-visible, .tb-check:focus-visible, .tb-chip:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+
+/* K.O.-Varianten als Häkchenliste (nur bei „Einzelne“) */
+.tb-checks { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.tb-check { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px;
+  background: var(--sf2); color: var(--ink); font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.tb-check[aria-disabled="true"] { cursor: default; }
+.tb-box { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; box-shadow: inset 0 0 0 1.5px var(--mu); flex-shrink: 0; }
+.tb-check[aria-checked="true"] .tb-box { background: var(--act); color: var(--act-ink); box-shadow: none; }
+.tb-letter { font-family: var(--f-display); font-weight: 700; color: var(--mu); width: 12px; }
+
+/* Standard-Pins als Chips */
+.tb-chips { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.tb-chip { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 0 12px; border: 0; border-radius: 999px;
+  background: var(--sf2); color: var(--mu); font-size: 13px; font-weight: 700; cursor: pointer; }
+.tb-chip[aria-pressed="true"] { background: var(--act); color: var(--act-ink); }
+
+/* ---------- Setup: Bracket-Hinweis über dem Start-Knopf (unaufdringlich, blockiert nie) */
+.tb-hint { display: flex; align-items: flex-start; justify-content: center; gap: 8px; margin: 0; padding: 10px 14px; border-radius: 14px;
+  background: var(--sf); color: var(--mu); font-size: 13px; line-height: 1.35; }
+.tb-hint svg { flex-shrink: 0; margin-top: 1px; color: var(--hi); }
+.tb-hint > span { display: flex; flex-direction: column; gap: 2px; }
+
+/* ---------- Lifecounter: „Zugzeit anzeigen“ aus (html[data-turntime="off"], main.js boot()) — ohne life.js zu ändern.
+   Der Chip „Am Zug · 01:23“ fällt ganz weg (der Ring am Feld und „Zug beenden“ zeigen weiter, wer dran ist);
+   im Menü verschwindet die Kachel mit der Zugzeit, Runde und Gesamtzeit bleiben. */
+html[data-turntime="off"] .lc-turnchip { display: none; }
+html[data-turntime="off"] .lc-stats3 > div:has([data-clock="turn"]) { display: none; }
+html[data-turntime="off"] .lc-stats3:has([data-clock="turn"]) { grid-template-columns: repeat(2, 1fr); }
+
+/* ---------- „Weniger Bewegung: An“ (html[data-motion="reduce"]): dieselben Regeln wie die Media-Queries
+   prefers-reduced-motion in base.css:32, ko.css:146 (K.O.-Screens, E3-P11), dice.css:67 (Würfeltisch, E3-P9),
+   attack.css:86, decklist.css:116, life.css:203. ko.js/dice.js prüfen dazu reducedMotion() (Stufe 9 sofort, kein Flug). */
+html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-motion="reduce"] *::after {
+  animation-duration: .001ms !important; transition-duration: .001ms !important; }
+html[data-motion="reduce"] .ko, html[data-motion="reduce"] .ko * { transition: none !important; animation: none !important; }
+html[data-motion="reduce"] .dt, html[data-motion="reduce"] .dt * { animation: none !important; transition: none !important; }
+html[data-motion="reduce"] .atk-c1, html[data-motion="reduce"] .atk-c2, html[data-motion="reduce"] .atk-bar i,
+html[data-motion="reduce"] .lc-hub.atk-drag, html[data-motion="reduce"] .lc-field.atk-from .lc-inner { transition: none; }
+html[data-motion="reduce"] .dl-chev { transition: none; }
+html[data-motion="reduce"] .dl-zoom { animation: none; }
+html[data-motion="reduce"] .lc-field::after { transition: none; }

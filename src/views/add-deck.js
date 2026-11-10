@@ -10,6 +10,7 @@ import { BRACKETS, sortColors, normalizeLink } from '../lib/decks.js';
 import { t } from '../i18n/index.js';
 import { go } from '../router.js';
 import { MEMBER_SELECT } from './groups.js';
+import { getPrefs } from '../lib/prefs.js';
 
 // Rückweg ins Setup (Spec P7): #/…?zurueck=setup — der Router ignoriert den Query-Teil.
 const fromSetup = () => new URLSearchParams(location.hash.split('?')[1] || '').get('zurueck') === 'setup';
@@ -145,6 +146,7 @@ export default async function addDeck(el, { params, isStale }) {
       color_identity: sortColors(cards.flatMap((c) => c.color_identity)),
       bracket: s.bracket,
       list_url: link || null,
+      counter_pins: getPrefs().defaultPins, // Standard-Pins dieses Geräts (P7, Spiel-Standards)
     };
     await busy(btn, async () => {
       try {
