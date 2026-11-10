@@ -8,11 +8,14 @@ const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './src/styles/fonts.css', './src/styles/tokens.css', './src/styles/base.css', './src/styles/components.css',
   './src/styles/setup.css', './src/styles/life.css', './src/styles/dice.css', './src/styles/attack.css', './src/styles/ko.css',
+  './src/styles/decklist.css', './src/styles/live.css', './src/styles/table.css', // Naht P3 (Welle ttg-live-feinschliff-decks)
   './assets/fonts/bricolage-grotesque-latin-opsz.woff2', './assets/fonts/geist-latin-wght.woff2', './assets/fonts/unbounded-latin-wght.woff2',
   './src/main.js', './src/router.js', './src/state.js', './src/supabase.js', './src/config.js', './src/version.js',
   './src/i18n/index.js', './src/i18n/de.js', './src/i18n/en.js',
   './src/i18n/de-setup.js', './src/i18n/en-setup.js', './src/i18n/de-life.js', './src/i18n/en-life.js', './src/i18n/de-dice.js', './src/i18n/en-dice.js', './src/i18n/de-attack.js', './src/i18n/en-attack.js', './src/i18n/de-ko.js', './src/i18n/en-ko.js',
+  './src/i18n/de-decklist.js', './src/i18n/en-decklist.js', './src/i18n/de-live.js', './src/i18n/en-live.js', './src/i18n/de-table.js', './src/i18n/en-table.js', // Naht P3
   './src/lib/dom.js', './src/lib/icons.js', './src/lib/ui.js', './src/lib/parts.js', './src/lib/avatar.js', './src/lib/group-actions.js', './src/lib/scryfall.js', './src/lib/decks.js', './src/lib/game-store.js', './src/lib/field-color.js', './src/lib/rand.js',
+  './src/lib/prefs.js', // Naht P3 (Stub für P7)
   './src/game/engine.js', './src/game/layouts.js', './src/game/rng.js', './src/game/ko.js',
   './assets/icons/logo-light.png', './assets/icons/logo-dark.png', './assets/icons/favicon.png', './assets/icons/icon-192.png',
 ];
