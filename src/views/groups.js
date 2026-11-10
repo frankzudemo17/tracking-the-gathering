@@ -1,12 +1,14 @@
 // Playgroups: wechseln, anlegen, Code einlösen, einladen, Mitglieder, Gruppe löschen (nur Admin)
-import { sb, must, avatarUrls, appUrl } from '../supabase.js';
-import { state, setGroup, currentGroup, isAdmin, loadMe } from '../state.js';
+import { sb, must, avatarUrls } from '../supabase.js';
+import { state, setGroup, currentGroup, isAdmin, isSuperadmin, loadMe } from '../state.js';
 import { html, mount, on, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { avatar, backHead, roleChip, memberName, memberAvatarPath } from '../lib/parts.js';
 import { copyText, sheet, toast, errText } from '../lib/ui.js';
 import { openNewGroup, openEnterCode } from '../lib/group-actions.js';
 import { groupNameMatches, runGroupDeletion } from './group-delete.js';
+import { inviteCode } from '../zugang/invite.js';
+import { shareInvite, openInviteQr, openRenew } from '../zugang/invite-ui.js';
 import { t } from '../i18n/index.js';
 import { go } from '../router.js';
 
@@ -82,6 +84,8 @@ export default async function groups(el, { isStale }) {
     state.groupId ? sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', state.groupId).order('created_at').then(must) : [],
   ]);
   const urls = await avatarUrls(members.map(memberAvatarPath));
+  // Einladungscode nur für Admins der Gruppe und den Superadmin (Mitglieder fragen gar nicht erst)
+  const code = currentGroup() && (isAdmin() || isSuperadmin()) ? await inviteCode(sb, currentGroup()) : null;
   if (isStale()) return;
 
   const sub = (gid) => {
@@ -102,22 +106,28 @@ export default async function groups(el, { isStale }) {
           <span class="grow-col"><b>${m.playgroups.name}</b><span class="tiny muted">${sub(m.playgroup_id)}</span></span>
           ${m.playgroup_id === state.groupId ? html`<span class="ok">${icon('check', 22)}</span>` : ''}
         </button>`)}
-      <div class="two">
-        <button type="button" class="btn soft" data-act="new">${icon('plus', 18)}${t('groups.newGroup')}</button>
-        <button type="button" class="btn soft" data-act="code">${icon('key', 18)}${t('groups.enterCode')}</button>
+      <div class="${isSuperadmin() ? 'two' : ''}">
+        ${isSuperadmin() ? html`<button type="button" class="btn soft" data-act="new">${icon('plus', 18)}${t('groups.newGroup')}</button>` : ''}
+        <button type="button" class="btn soft${isSuperadmin() ? '' : ' block'}" data-act="code">${icon('key', 18)}${t('groups.enterCode')}</button>
       </div>
     </div>
 
     ${g ? html`
-    <div class="card">
+    ${code ? html`
+    <div class="card invite-card" data-invite>
       <h3 class="section-title">${t('groups.invite')}</h3>
       <div class="code-row">
-        <span class="code">${g.invite_code}</span>
+        <span class="code">${code}</span>
         <button type="button" class="btn soft small" data-act="copy" style="background:var(--sf2)">${icon('copy', 16)}${t('groups.copy')}</button>
       </div>
-      <button type="button" class="btn small" data-act="share">${icon('share', 18)}${t('groups.copyLink')}</button>
+      <div class="two">
+        <button type="button" class="btn small" data-act="share">${icon('share', 18)}${t('groups.shareLink')}</button>
+        <button type="button" class="btn small soft" data-act="qr">${icon('qrCode', 18)}${t('groups.qr')}</button>
+      </div>
       <span class="hint">${t('groups.inviteHint')}</span>
-    </div>
+      <button type="button" class="btn small ghost" data-act="renew">${icon('arrowCounterClockwise', 16)}${t('groups.renew')}</button>
+    </div>` : html`
+    <p class="hint invite-none" data-invite-none>${icon('lock', 16)}<span>${t('groups.inviteAdminsOnly')}</span></p>`}
 
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('groups.members')}</h3><span class="tiny muted">${members.length}</span></div>
@@ -140,15 +150,12 @@ export default async function groups(el, { isStale }) {
     </div>` : ''}` : ''}`);
 
   on(el, 'click', '[data-group]', (e, b) => { setGroup(b.dataset.group); go('/gruppen'); });
-  on(el, 'click', '[data-act="new"]', () => openNewGroup());
+  on(el, 'click', '[data-act="new"]', () => { if (isSuperadmin()) openNewGroup(); });
   on(el, 'click', '[data-act="code"]', () => openEnterCode());
-  on(el, 'click', '[data-act="copy"]', () => copyText(g.invite_code));
-  on(el, 'click', '[data-act="share"]', async () => {
-    const url = appUrl(`#/code/${g.invite_code}`);
-    const text = t('groups.shareText', { name: g.name });
-    if (navigator.share) { try { await navigator.share({ title: 'Tracking the Gathering', text, url }); return; } catch (e) { if (e.name === 'AbortError') return; } }
-    copyText(url);
-  });
+  on(el, 'click', '[data-act="copy"]', () => copyText(code));
+  on(el, 'click', '[data-act="share"]', () => shareInvite(g, code));
+  on(el, 'click', '[data-act="qr"]', () => openInviteQr(g, code));
+  on(el, 'click', '[data-act="renew"]', () => openRenew(g));
   on(el, 'click', '[data-act="delete-group"]', async (e, b) => {
     if (!isAdmin()) return;
     await busy(b, async () => {

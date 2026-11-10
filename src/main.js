@@ -15,7 +15,7 @@ route('/login', v('login'), { public: true, swap: true });
 route('/registrieren', v('register'), { public: true });
 route('/passwort-vergessen', v('forgot'), { public: true });
 route('/passwort-neu', v('newpass'));
-route('/code/:code', v('code'), { public: true });
+route('/code/:code', v('join'), { public: true });
 route('/willkommen', v('welcome'));
 // Spielende, Historie, Statistik (Etappe 4/5, Naht P13).
 route('/historie', v('history'), { nav: 'history', group: true, arg: 'history', swap: true });
@@ -30,6 +30,7 @@ route('/profil/:memberId', v('profile'), { nav: 'me', group: true, swap: true })
 route('/gruppen', v('groups'), { swap: true });
 route('/einstellungen', v('settings'), { nav: 'me', swap: true });
 route('/einstellungen/konto', v('settings-account'), { nav: 'me' });
+route('/einstellungen/verwaltung', v('admin'), { nav: 'me' });
 // Rechtliches und Datenschutz auch ohne Anmeldung lesbar (ohne Navigationsleiste)
 route('/einstellungen/rechtliches', v('legal'), { public: true, swap: true });
 route('/datenschutz', v('legal'), { public: true, arg: 'privacy', swap: true });

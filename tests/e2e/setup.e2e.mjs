@@ -1,17 +1,20 @@
 // E2E Setup „Neues Spiel“ (Spec P7, Kriterien 1–6 und 8).
 // Läuft nach etappe1-2.e2e.mjs im selben Lauf und nutzt dessen Konten (Harness: höchstens 3 je Lauf):
-//   A = mail('a') „Franco Test“ (Admin, Deck Tymna + Thrasios) · B = mail('b') „Luka Test“ (ohne Deck)
-//   C = mail('c') „Tim Echt“ (ohne Deck), alle in „Küchentisch <b>Test</b>“.
+//   A = 'a' „Franco Test“ (Admin, Deck Tymna + Thrasios) · B = 'b' „Luka Test“ (ohne Deck)
+//   C = 'c' „Tim Echt“ (ohne Deck), alle in „Küchentisch <b>Test</b>“.
 // Angemeldet ist B. Datenbank-Abfragen laufen im Browser über den Supabase-Client der App
 // (gleiche Sitzung, RLS greift) — also „als Testkonto“.
-import { ok, ctx, hash, waitHash, login, mail } from './harness.mjs';
+// P9b: feste Testkonten (login(page, 'a'|'b'|'c')) in TTG-E2E-Fixture; run.mjs stellt vorher den Grundzustand her,
+// prepare() den Stand, den die alte Kette hier hinterließ (nach etappe1-2: A (Tymna + Thrasios, Bracket 2), B und C ohne Deck; Krenko und Jo legt diese Datei selbst an).
+import { ok, ctx, hash, waitHash, login, prepare } from './harness.mjs';
 
 export default async function setupE2e({ browser, base: BASE }) {
+  await prepare({ members: ['b', 'c'], decks: [['a', 'tymna']] });
   console.log('\nSetup: Anmelden als B (Luka Test)');
   const S = await ctx(browser, 'S');
   await S.goto(BASE);
   await waitHash(S, '#/login');
-  await login(S, mail('b'));
+  await login(S, 'b');
   await waitHash(S, '#/start');
   ok('B angemeldet (Konto aus etappe1-2)', true);
 

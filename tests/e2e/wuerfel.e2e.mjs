@@ -6,14 +6,17 @@
 // B1 (Endlage frei): gemessen am Tisch des Setups (390 px) und an einem direkt geöffneten Tisch
 // (375 × 667, 4 und 6 Spieler, Flug und reduzierte Bewegung, je Look) — Bilder D-wuerfel-B1-….png.
 // B2 (Wurf im Entwurf): Umweg „+ Commander“, Neuladen, Gegenfälle Sitz-Tausch — je ein gestartetes Spiel.
-import { ok, ctx, hash, waitHash, login, mail } from './harness.mjs';
+// P9b: feste Testkonten (login(page, 'a'|'b'|'c')) in TTG-E2E-Fixture; run.mjs stellt vorher den Grundzustand her,
+// prepare() den Stand, den die alte Kette hier hinterließ (nach setup: zusätzlich Platzhalter „Jo Test“ und B mit Krenko).
+import { ok, ctx, hash, waitHash, login, prepare } from './harness.mjs';
 
 export default async function diceE2e({ browser, base: BASE }) {
+  await prepare({ members: ['b', 'c'], placeholders: ['Jo Test'], decks: [['a', 'tymna'], ['b', 'krenko']] });
   console.log('\nWürfeltisch: Anmelden als B (Luka Test)');
   const S = await ctx(browser, 'D');
   await S.goto(BASE);
   await waitHash(S, '#/login');
-  await login(S, mail('b'));
+  await login(S, 'b');
   await waitHash(S, '#/start');
 
   const db = (fn, arg) => S.evaluate(async ([src, a]) => {

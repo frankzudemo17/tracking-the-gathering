@@ -20,7 +20,8 @@ export default {
     login: 'Anmelden', register: 'Konto erstellen', forgot: 'Passwort vergessen', haveAccount: 'Ich habe schon ein Konto',
     noAccount: 'Noch kein Konto?', haveAccountQ: 'Schon ein Konto?', showPw: 'Passwort anzeigen', hidePw: 'Passwort verbergen',
     pwHint: 'Mindestens 8 Zeichen.',
-    registerTitle: 'Konto erstellen', registerSub: 'Danach legst du eine Playgroup an oder trittst mit einem Code bei.',
+    registerTitle: 'Konto erstellen', registerSub: 'Mit dem Einladungscode deiner Gruppe bist du gleich dabei.',
+    inviteCode: 'Einladungscode', inviteCodeHint: 'Den Code bekommst du von deiner Gruppe.', joining: 'Du trittst „{name}“ bei.',
     forgotTitle: 'Passwort vergessen', forgotSub: 'Wir schicken dir einen Link, mit dem du ein neues Passwort setzt.',
     sendLink: 'Link schicken', linkSent: 'Falls es ein Konto mit dieser Adresse gibt, ist der Link unterwegs.',
     newPwTitle: 'Neues Passwort', newPwSave: 'Passwort speichern', newPwDone: 'Passwort geändert.',
@@ -41,11 +42,20 @@ export default {
       generic: 'Das hat nicht geklappt. Bitte versuch es nochmal.',
       offline: 'Keine Verbindung. Bitte prüfe dein Internet.',
       'A user with this email address has already been registered': 'Mit dieser E-Mail gibt es schon ein Konto.',
+      // Kennwörter aus dem P9-Vertrag (Datenbank)
+      superadmin_only: 'Das darf nur der Betreiber der App.',
+      superadmin_cannot_delete: 'Das Verwaltungskonto lässt sich nicht löschen.',
+      not_group_admin: 'Das dürfen nur die Admins dieser Gruppe.',
+      max_accounts_range: 'Bitte eine ganze Zahl von 1 bis 1000.',
+      signup_code_required: 'Bitte gib den Einladungscode deiner Gruppe ein.',
+      signup_code_invalid: 'Diesen Code kennen wir nicht (mehr). Bitte frag in deiner Gruppe nach einem neuen.',
+      signup_full: 'Zurzeit sind alle Plätze vergeben.',
+      signup_anonymous_disabled: 'Ohne Konto geht es hier nicht. Bitte registriere dich mit einem Einladungscode.',
     },
   },
 
   welcome: {
-    title: 'Hallo {name}', sub: 'Leg deine erste Playgroup an oder tritt einer bei. Den Code bekommst du von jemandem aus der Gruppe.',
+    title: 'Hallo {name}', sub: 'Du brauchst einen Einladungslink von deiner Gruppe.',
     create: 'Playgroup anlegen', join: 'Code eingeben',
   },
 
@@ -89,6 +99,11 @@ export default {
     deleteDeckElsewhere: 'Löschen geht nicht: Ein Deck eines Spielers ohne Konto aus dieser Gruppe kommt in Spielen einer anderen Playgroup vor. Deren Historie bleibt geschützt.',
     deleteMemberElsewhere: 'Löschen geht nicht: Spiele einer anderen Playgroup verweisen auf Mitglieder dieser Gruppe. Deren Historie bleibt geschützt.',
     joinLiveSoon: 'Live-Beitritt kommt gleich', joinLiveSoonSub: 'Bald trittst du hier mit Code oder Link einem laufenden Spiel bei.',
+    shareLink: 'Link teilen', qr: 'QR-Code', qrTitle: 'Einladung zu „{name}“', qrAlt: 'QR-Code mit dem Einladungslink für „{name}“',
+    qrHint: 'Mit der Handykamera scannen. Der Code führt zum selben Link wie „Link teilen“.',
+    renew: 'Link erneuern', renewTitle: 'Link erneuern?', renewText: 'Der bisherige Link und QR-Code gelten dann nicht mehr.',
+    renewYes: 'Neuen Link erstellen', renewed: 'Neuer Link ist aktiv.',
+    inviteAdminsOnly: 'Einladen können die Admins dieser Gruppe.',
   },
 
   addPlayer: {
@@ -136,6 +151,22 @@ export default {
   settings: {
     account: 'Konto', accountSub: 'Passwort, E-Mail, Konto löschen', about: 'Über die App',
     legal: 'Rechtliches & Credits', legalSub: 'Fan-Content-Hinweis, Impressum, Lizenzen', privacy: 'Datenschutz', version: 'Version',
+  },
+
+  // Zugang (P9b): Einladung, Registrierung mit Code, Verwaltung
+  access: {
+    joinTitle: 'Einladung', enterTitle: 'Gruppe beitreten', enterSub: 'Gib den Code oder Link ein, den du von deiner Gruppe bekommen hast.',
+    codeLabel: 'Code oder Link', next: 'Weiter',
+    invited: 'Du wurdest in die Gruppe „{name}“ eingeladen', invitedNoName: 'Du wurdest in eine Gruppe eingeladen',
+    invitedSub: 'Erstell ein Konto oder melde dich an, um beizutreten.',
+    invalid: 'Diesen Link kennen wir nicht (mehr). Bitte frag in deiner Gruppe nach einem neuen.',
+    full: 'Zurzeit sind alle Plätze vergeben.', fullSub: 'Hast du schon ein Konto, kannst du trotzdem beitreten.',
+    adminTitle: 'Verwaltung', adminSub: 'Konten-Deckel, Gruppen erstellen',
+    accountsTitle: 'Konten', accounts: '{n} von {max} Konten', unconfirmed: 'davon {n} noch nicht bestätigt',
+    locked: 'Neue Registrierungen sind gesperrt.',
+    capLabel: 'Höchstzahl an Konten', capHint: '1 bis 1000. Bestehende Konten bleiben bestehen.',
+    capSave: 'Speichern', capSaved: 'Deckel gespeichert.',
+    groupsTitle: 'Gruppen', createGroup: 'Gruppe erstellen', groupsHint: 'Einladungslinks findest du bei der jeweiligen Gruppe.',
   },
 
   account: {

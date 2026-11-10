@@ -1,19 +1,22 @@
 // E2E Spielende: Ergebnis-Screen + Bewerten (Spec P20, Kriterien 1, 4, 7, 9; Bilder 375 px).
 // Läuft alphabetisch NACH setup.e2e.mjs (und spiel-angriff.e2e.mjs) mit den Konten/Mitgliedern des Laufs:
-//   A = mail('a') „Franco Test“ (Deck Tymna) · B = mail('b') „Luka Test“ (Deck Krenko aus setup.e2e)
+//   A = 'a' „Franco Test“ (Deck Tymna) · B = 'b' „Luka Test“ (Deck Krenko aus setup.e2e)
 //   Jo = Platzhalter „Jo Test“ (aus setup.e2e, leiht Krenko). Legt KEIN Konto, KEIN Mitglied, KEIN Deck an.
 // Dateiname statt spec „ende.e2e.mjs“: „ende“ liefe alphabetisch vor etappe1-2 (keine Konten, keine Decks).
 // Das Spiel startet über den Store der App (RPC start_game, wie life.e2e), endet über „Werten und beenden“.
 // Das Testfoto wird am Ende entfernt (der Harness räumt Spiele/Gruppe, aber keine game-photos-Objekte).
-import { ok, ctx, waitHash, login, mail, testImage } from './harness.mjs';
+// P9b: feste Testkonten (login(page, 'a'|'b'|'c')) in TTG-E2E-Fixture; run.mjs stellt vorher den Grundzustand her,
+// prepare() den Stand, den die alte Kette hier hinterließ (nach setup: zusätzlich Platzhalter „Jo Test“ und B mit Krenko).
+import { ok, ctx, waitHash, login, testImage, prepare } from './harness.mjs';
 
 export default async function spielEndeE2e({ browser, base: BASE }) {
+  await prepare({ members: ['b', 'c'], placeholders: ['Jo Test'], decks: [['a', 'tymna'], ['b', 'krenko']] });
   console.log('\nSpielende: Anmelden als A (Franco Test)');
   const P = await ctx(browser, 'E');
   await P.setViewportSize({ width: 375, height: 812 });
   await P.goto(BASE);
   await waitHash(P, '#/login');
-  await login(P, mail('a'));
+  await login(P, 'a');
   await waitHash(P, '#/start');
   ok('A angemeldet', true);
 
@@ -143,7 +146,7 @@ export default async function spielEndeE2e({ browser, base: BASE }) {
   await Q.setViewportSize({ width: 375, height: 812 });
   await Q.goto(BASE);
   await waitHash(Q, '#/login');
-  await login(Q, mail('b'));
+  await login(Q, 'b');
   await waitHash(Q, '#/start');
   await Q.goto(BASE + '#/partie/' + g);
   await Q.waitForSelector(`a.btn[href="#/spiel/${g}/ende"]`);

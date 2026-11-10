@@ -20,7 +20,8 @@ export default {
     login: 'Sign in', register: 'Create account', forgot: 'Forgot password', haveAccount: 'I already have an account',
     noAccount: 'No account yet?', haveAccountQ: 'Already have an account?', showPw: 'Show password', hidePw: 'Hide password',
     pwHint: 'At least 8 characters.',
-    registerTitle: 'Create account', registerSub: 'Afterwards you create a playgroup or join one with a code.',
+    registerTitle: 'Create account', registerSub: 'With your group’s invite code you are in right away.',
+    inviteCode: 'Invite code', inviteCodeHint: 'Your group gives you the code.', joining: 'You are joining “{name}”.',
     forgotTitle: 'Forgot password', forgotSub: 'We will send you a link to set a new password.',
     sendLink: 'Send link', linkSent: 'If an account with this address exists, the link is on its way.',
     newPwTitle: 'New password', newPwSave: 'Save password', newPwDone: 'Password changed.',
@@ -41,11 +42,20 @@ export default {
       generic: 'That did not work. Please try again.',
       offline: 'No connection. Please check your internet.',
       'A user with this email address has already been registered': 'An account with this email already exists.',
+      // Keywords from the P9 contract (database)
+      superadmin_only: 'Only the operator of the app may do this.',
+      superadmin_cannot_delete: 'The admin account of the app cannot be deleted.',
+      not_group_admin: 'Only the admins of this group may do this.',
+      max_accounts_range: 'Please enter a whole number from 1 to 1000.',
+      signup_code_required: 'Please enter your group’s invite code.',
+      signup_code_invalid: 'We don’t know this code (anymore). Please ask your group for a new one.',
+      signup_full: 'All places are taken at the moment.',
+      signup_anonymous_disabled: 'This app needs an account. Please sign up with an invite code.',
     },
   },
 
   welcome: {
-    title: 'Hi {name}', sub: 'Create your first playgroup or join one. Someone in the group can give you the code.',
+    title: 'Hi {name}', sub: 'You need an invite link from your group.',
     create: 'Create playgroup', join: 'Enter code',
   },
 
@@ -89,6 +99,11 @@ export default {
     deleteDeckElsewhere: 'Cannot delete: a deck of a player without an account from this group appears in games of another playgroup. Its history stays protected.',
     deleteMemberElsewhere: 'Cannot delete: games of another playgroup refer to members of this group. Their history stays protected.',
     joinLiveSoon: 'Joining live is coming soon', joinLiveSoonSub: 'Soon you will join a running game here with a code or link.',
+    shareLink: 'Share link', qr: 'QR code', qrTitle: 'Invite to “{name}”', qrAlt: 'QR code with the invite link for “{name}”',
+    qrHint: 'Scan with the phone camera. It leads to the same link as “Share link”.',
+    renew: 'Renew link', renewTitle: 'Renew link?', renewText: 'The current link and QR code will stop working.',
+    renewYes: 'Create new link', renewed: 'New link is active.',
+    inviteAdminsOnly: 'The admins of this group can invite people.',
   },
 
   addPlayer: {
@@ -136,6 +151,22 @@ export default {
   settings: {
     account: 'Account', accountSub: 'Password, email, delete account', about: 'About the app',
     legal: 'Legal & credits', legalSub: 'Fan content notice, imprint, licenses', privacy: 'Privacy', version: 'Version',
+  },
+
+  // Access (P9b): invitation, sign-up with code, administration
+  access: {
+    joinTitle: 'Invitation', enterTitle: 'Join a group', enterSub: 'Enter the code or link you got from your group.',
+    codeLabel: 'Code or link', next: 'Continue',
+    invited: 'You were invited to the group “{name}”', invitedNoName: 'You were invited to a group',
+    invitedSub: 'Create an account or log in to join.',
+    invalid: 'We don’t know this link (anymore). Please ask your group for a new one.',
+    full: 'All places are taken at the moment.', fullSub: 'If you already have an account, you can still join.',
+    adminTitle: 'Administration', adminSub: 'Account cap, create groups',
+    accountsTitle: 'Accounts', accounts: '{n} of {max} accounts', unconfirmed: '{n} of them not confirmed yet',
+    locked: 'New sign-ups are closed.',
+    capLabel: 'Maximum number of accounts', capHint: '1 to 1000. Existing accounts stay.',
+    capSave: 'Save', capSaved: 'Cap saved.',
+    groupsTitle: 'Groups', createGroup: 'Create group', groupsHint: 'Invite links are on each group’s page.',
   },
 
   account: {

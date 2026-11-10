@@ -45,6 +45,7 @@ export function setGroup(id) { state.groupId = id; store(GROUP_KEY, id); }
 export const currentMembership = () => state.memberships.find((m) => m.playgroup_id === state.groupId) || null;
 export const currentGroup = () => currentMembership()?.playgroups || null;
 export const isAdmin = () => currentMembership()?.role === 'admin';
+export const isSuperadmin = () => state.profile?.is_superadmin === true;
 
 export async function updateProfile(patch) {
   const row = await sb.from('profiles').update(patch).eq('id', state.profile.id).select().single().then(must);

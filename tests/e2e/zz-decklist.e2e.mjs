@@ -2,17 +2,20 @@
 // Dateiname mit „zz-“: run.mjs führt die Dateien alphabetisch aus und die Konten entstehen erst in
 // etappe1-2.e2e.mjs (Harness: höchstens 3 je Lauf). Als letzte Datei stören die zwei neuen Decks von A
 // keine andere Prüfung (setup.e2e zählt auf A genau ein Deck Tymna). Spec-Name war decklist.e2e.mjs.
-// Konten: A = mail('a') „Franco Test“ (Admin, Deck Tymna + Thrasios) · C = mail('c') „Tim Echt“ (Mitglied, ohne Recht auf A-Decks).
+// Konten: A = 'a' „Franco Test“ (Admin, Deck Tymna + Thrasios) · C = 'c' „Tim Echt“ (Mitglied, ohne Recht auf A-Decks).
 // Erster Live-Beleg der Edge Function `spellbook` mit echtem Nutzer-Token: Status + Antwort werden protokolliert.
+// P9b: feste Testkonten (login(page, 'a'|'b'|'c')) in TTG-E2E-Fixture; run.mjs stellt vorher den Grundzustand her,
+// prepare() den Stand, den die alte Kette hier hinterließ (nach setup: zusätzlich Platzhalter „Jo Test“ und B mit Krenko).
 import fs from 'node:fs';
 import path from 'node:path';
-import { ok, ctx, waitHash, login, mail, ROOT, TARGET } from './harness.mjs';
+import { ok, ctx, waitHash, login, ROOT, TARGET, prepare } from './harness.mjs';
 
 const FIXTURE = fs.readFileSync(path.join(ROOT, 'tests', 'unit', 'fixtures', 'manabox-export-light-paws.txt'), 'utf8');
 const TASIGUR = "// COMMANDER\n1 Tasigur, the Golden Fang\n\n1 Thassa's Oracle\n1 Demonic Consultation\n";
 const SPELLBOOK = `${TARGET.url}/functions/v1/spellbook`;
 
 export default async function decklistE2e({ browser, base: BASE }) {
+  await prepare({ members: ['b', 'c'], placeholders: ['Jo Test'], decks: [['a', 'tymna'], ['b', 'krenko']] });
   console.log('\nDeckliste: A legt zwei Decks an (Light-Paws, Tasigur — beide Bracket 2)');
   const A = await ctx(browser, 'DA');
   const calls = [];
@@ -25,7 +28,7 @@ export default async function decklistE2e({ browser, base: BASE }) {
   });
   await A.goto(BASE);
   await waitHash(A, '#/login');
-  await login(A, mail('a'));
+  await login(A, 'a');
   await waitHash(A, '#/start');
   const db = (fn, arg) => A.evaluate(async ([src, a]) => {
     const { sb } = await import('/src/supabase.js');
@@ -139,7 +142,7 @@ export default async function decklistE2e({ browser, base: BASE }) {
   const C = await ctx(browser, 'DC');
   await C.goto(BASE);
   await waitHash(C, '#/login');
-  await login(C, mail('c'));
+  await login(C, 'c');
   await waitHash(C, '#/start');
   await C.goto(BASE + '#/deck/' + ids.lp);
   await C.waitForSelector('[data-dl-count]', { timeout: 15000 });
