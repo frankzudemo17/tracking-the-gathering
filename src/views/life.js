@@ -245,7 +245,9 @@ export default async function life(el, { params, isStale }) {
       if (!p || p.out || s.finished || (!force && !isLethal(p))) continue;
       closeSheets();
       koOpen = true;
-      const candidates = killerCandidates(s, mid).filter((c) => !pl(c.id)?.out).map((c) => ({ ...c, name: nm(c.id) }));
+      // Ausgeschiedene nicht anbieten (Main.dc.html:2455); Spitzenreiter erst danach markieren
+      const candidates = killerCandidates(s, mid).filter((c) => !pl(c.id)?.out)
+        .map((c, i) => ({ ...c, name: nm(c.id), top: i === 0 && (c.damage > 0 || c.poison > 0) }));
       showKo(el, {
         player: { id: mid, name: nm(mid) }, deck: deckOf(mid), by, pick: koPick(appRand), candidates,
         onEliminate: (byId) => { koOpen = false; doAct({ type: 'eliminate', target: mid, by: byId ?? null }); },
