@@ -523,7 +523,15 @@ export default async function life(el, { params, isStale }) {
     for (const c of document.querySelectorAll('[data-clock="turn"]')) c.textContent = turnTxt;
     for (const c of document.querySelectorAll('[data-clock="total"]')) c.textContent = totalTxt;
   }, 1000);
-  const unsub = rec.onStatus(() => menu?.live());
+  // Nach Offline/Fehler wieder „Gespeichert“: Anzeigetafel nachziehen (publish versucht es sonst
+  // erst bei der nächsten Aktion erneut)
+  let lastState = rec.status.state;
+  const unsub = rec.onStatus((st) => {
+    const cur = st?.state ?? rec.status.state;
+    if (cur === 'saved' && lastState !== 'saved' && !stopped) store.publish(id, s);
+    lastState = cur;
+    menu?.live();
+  });
   window.addEventListener('resize', clearHub);
 
   el.classList.add('lc-screen');
