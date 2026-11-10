@@ -228,11 +228,15 @@ export default async function lifeE2e({ browser, base: BASE }) {
 
   // ---------------------------------------------------------------- Kriterium 6: werten
   await P.click('[data-sheet="end"] [data-e="finished"]');
-  await waitHash(P, '#/start');
+  // P20 (spec-p20-ende „Naht zu Etappe 3“): gewertet ⇒ Ergebnis-Screen statt Startseite
+  await waitHash(P, `#/spiel/${g1}/ende`);
+  ok('P20 K1 „Werten und beenden“ ⇒ #/spiel/<id>/ende', hash(P) === `#/spiel/${g1}/ende`, hash(P));
   const fin = await poll("const g = await sb.from('games').select('status').eq('id', a).single(); const p = await sb.from('game_players').select('member_id, place, eliminated_by').eq('game_id', a); return { st: g.data?.status, p: p.data };", g1, (v) => v?.st === 'finished');
   const place = Object.fromEntries((fin?.p || []).map((x) => [x.member_id, x.place]));
   ok('K6 „Werten und beenden“ ⇒ finished, Plätze A1 · C2 · B3', fin?.st === 'finished' && place[A] === 1 && place[C] === 2 && place[B] === 3, JSON.stringify(fin));
   ok('K6 C durch A ausgeschieden (eliminated_by)', fin?.p?.find((x) => x.member_id === C)?.eliminated_by === A);
+  await P.waitForSelector('.rs-hero');
+  await P.goto(BASE + '#/start');
   await P.waitForSelector('.art-hero');
   ok('K7 Karte nach Spielende weg', (await P.locator(`[data-live-game="${g1}"]`).count()) === 0);
 
