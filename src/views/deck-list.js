@@ -108,29 +108,29 @@ export async function renderDeckList(slot, { deck, canEdit }) {
     const cMax = Math.max(1, ...CURVE.map((k) => sum.curve[k] || 0));
     const cols = COLORS.filter((c) => sum.colors[c]);
     const curveLabel = CURVE.map((k) => `${k}: ${sum.curve[k] || 0}`).join(', ');
-    return html`<div class="dl-stats">
-      <div class="dl-stat" data-dl-types>
-        <h4 class="dl-stat-t">${t('decklist.stats.types')}</h4>
-        <div class="dl-types">${tKeys.map((k) => html`<div class="dl-type" data-type="${k}" data-n="${types[k]}">
+    return html`<div class="dl-groups dl-stats">
+      <details class="dl-group dl-fold" data-dl-types>
+        <summary><span class="dl-group-t">${t('decklist.stats.types')}</span><span class="dl-chev">${icon('chevDown', 16)}</span></summary>
+        <div class="dl-types dl-fold-body">${tKeys.map((k) => html`<div class="dl-type" data-type="${k}" data-n="${types[k]}">
           <span class="dl-type-l">${t(`decklist.types.${k}`)}</span>
           <span class="dl-bar" aria-hidden="true"><i style="--v:${types[k] / tMax}"></i></span>
           <b class="dl-num">${types[k]}</b></div>`)}</div>
-      </div>
-      <div class="dl-stat" data-dl-curve>
-        <h4 class="dl-stat-t">${t('decklist.stats.curve')}<span class="dl-stat-h">${t('decklist.stats.curveHint')}</span></h4>
-        <div class="dl-curve" role="img" aria-label="${t('decklist.stats.curve')}: ${curveLabel}">${CURVE.map((k) => {
+      </details>
+      <details class="dl-group dl-fold" data-dl-curve>
+        <summary><span class="dl-group-t">${t('decklist.stats.curve')}<span class="dl-stat-h">${t('decklist.stats.curveHint')}</span></span><span class="dl-chev">${icon('chevDown', 16)}</span></summary>
+        <div class="dl-curve dl-fold-body" role="img" aria-label="${t('decklist.stats.curve')}: ${curveLabel}">${CURVE.map((k) => {
           const n = sum.curve[k] || 0;
           return html`<div class="dl-col" data-mv="${k}" data-n="${n}" aria-hidden="true">
             <span class="dl-col-n">${n || ''}</span>
             <span class="dl-col-track"><i style="--v:${n / cMax}"></i></span>
             <span class="dl-col-k">${k}</span></div>`;
         })}</div>
-      </div>
-      ${cols.length ? html`<div class="dl-stat" data-dl-colors>
-        <h4 class="dl-stat-t">${t('decklist.stats.colors')}<span class="dl-stat-h">${t('decklist.stats.colorsHint')}</span></h4>
-        <div class="dl-colors">${cols.map((c) => html`<span class="dl-color" data-color="${c}" data-n="${sum.colors[c]}">
+      </details>
+      ${cols.length ? html`<details class="dl-group dl-fold" data-dl-colors>
+        <summary><span class="dl-group-t">${t('decklist.stats.colors')}<span class="dl-stat-h">${t('decklist.stats.colorsHint')}</span></span><span class="dl-chev">${icon('chevDown', 16)}</span></summary>
+        <div class="dl-colors dl-fold-body">${cols.map((c) => html`<span class="dl-color" data-color="${c}" data-n="${sum.colors[c]}">
           <span class="pip dl-pip ${c}" aria-hidden="true"></span><b class="dl-num">${sum.colors[c]}</b><span class="sr-only">${t(`decklist.colors.${c}`)}</span></span>`)}</div>
-      </div>` : ''}
+      </details>` : ''}
     </div>`;
   }
 
@@ -140,7 +140,7 @@ export async function renderDeckList(slot, { deck, canEdit }) {
     return GROUPS.filter((g) => by.get(g).length).map((g) => {
       const rows = by.get(g).sort((a, b) => a.r.name.localeCompare(b.r.name, 'en'));
       const n = sumQty(rows.map((x) => x.r));
-      return html`<details class="dl-group" data-group="${g}" ${g === 'land' ? '' : 'open'}>
+      return html`<details class="dl-group" data-group="${g}">
         <summary><span class="dl-group-t">${t(`decklist.types.${g}`)}</span><span class="dl-group-n">${n}</span><span class="dl-chev">${icon('chevDown', 16)}</span></summary>
         <ul class="dl-rows">${rows.map(({ r, i }) => html`<li><button type="button" class="dl-card" data-act="dl-card" data-i="${i}" data-name="${r.name}" data-qty="${r.qty}">
           <span class="dl-q">${r.qty}</span><span class="dl-dot" aria-hidden="true">·</span><span class="dl-nm">${r.name}</span>
@@ -172,17 +172,16 @@ export async function renderDeckList(slot, { deck, canEdit }) {
     return s === k ? t('decklist.bracket.hintCodes.other') : s;
   }
 
+  /** Nur das, was das Bracket begründet (Franco, 10.11.2026): Gründe mit Karten. Kombo-Listen, „fast fertige“ Kombos,
+   *  Tutoren/Mana-Hinweise und die Spellbook-Einstufung zeigt die Karte nicht mehr. Bleiben: gebannte und unbekannte Karten,
+   *  weil sie sagen, wie belastbar das Ergebnis ist. */
   function resultBlock(c) {
     const floor = Number(c.floor) || 1;
     const cmp = compareBracket(st.deck.bracket, floor);
     const reasons = list(c.reasons);
-    const hints = [...list(c.hints)];
-    if (list(c.banned).length) hints.push({ code: 'banned', cards: c.banned });
-    const combos = list(c.combos);
-    const almost = list(c.almost);
-    const title = floor <= 1 ? t('decklist.bracket.result12') : t('decklist.bracket.result', { n: floor, name: bracketName(floor) });
+    const notes = list(c.hints).filter((h) => h.code === 'unknown_cards');
+    if (list(c.banned).length) notes.push({ code: 'banned', cards: c.banned });
     return html`<div class="dl-bk-res" data-floor="${floor}">
-      <b class="dl-bk-title" data-dl-result>${title}</b>
       ${isOutdated(c) ? html`<p class="dl-bk-note" data-dl-stale>${icon('warn', 16)}<span>${t('decklist.bracket.stale')}</span></p>` : ''}
       ${!st.checkSaved ? html`<p class="tiny muted">${t('decklist.bracket.notSaved')}</p>` : ''}
       ${cmp === 'below' ? html`<div class="dl-bk-below" data-dl-below>
@@ -193,15 +192,7 @@ export async function renderDeckList(slot, { deck, canEdit }) {
       ${reasons.length
         ? html`<ul class="dl-bk-list">${reasons.map((r) => html`<li data-reason="${r.code}"><b>${reasonText(r)}</b>${list(r.cards).length ? html`<span class="small">${list(r.cards).join(', ')}</span>` : ''}</li>`)}</ul>`
         : html`<p class="small muted" data-dl-clean>${t('decklist.bracket.clean')}</p>`}
-      ${combos.length ? html`<div class="dl-bk-sub"><h4 class="dl-stat-t">${t('decklist.bracket.combos')}</h4>
-        <ul class="dl-bk-list">${combos.map((k) => html`<li data-combo><b>${list(k.cards).join(' + ')}</b>${list(k.produces).length ? html`<span class="small">${t('decklist.bracket.produces', { x: list(k.produces).join(', ') })}</span>` : ''}</li>`)}</ul></div>` : ''}
-      ${hints.length ? html`<div class="dl-bk-sub dl-bk-hints"><h4 class="dl-stat-t">${t('decklist.bracket.hints')}</h4>
-        <ul class="dl-bk-list">${hints.map((h) => html`<li data-hint="${h.code}"><b>${hintText(h)}</b>${list(h.cards).length ? html`<span class="small">${list(h.cards).join(', ')}</span>` : ''}</li>`)}</ul></div>` : ''}
-      ${almost.length ? html`<details class="dl-bk-almost" data-dl-almost><summary>${t('decklist.bracket.almost', { n: almost.length })}<span class="dl-chev">${icon('chevDown', 16)}</span></summary>
-        <ul class="dl-bk-list">${almost.map((k) => html`<li><b>${list(k.cards).join(' + ')}</b>
-          ${list(k.missing).length ? html`<span class="small">${t('decklist.bracket.missing', { x: list(k.missing).join(', ') })}</span>` : ''}
-          ${list(k.produces).length ? html`<span class="small muted">${t('decklist.bracket.produces', { x: list(k.produces).join(', ') })}</span>` : ''}</li>`)}</ul></details>` : ''}
-      ${c.tag ? html`<p class="tiny muted">${t('decklist.bracket.tag', { x: t(`decklist.bracket.tags.${c.tag}`) })}</p>` : ''}
+      ${notes.length ? html`<ul class="dl-bk-list dl-bk-hints">${notes.map((h) => html`<li data-hint="${h.code}"><b>${hintText(h)}</b>${list(h.cards).length ? html`<span class="small">${list(h.cards).join(', ')}</span>` : ''}</li>`)}</ul>` : ''}
     </div>`;
   }
 
@@ -210,18 +201,26 @@ export async function renderDeckList(slot, { deck, canEdit }) {
     if (!box) return;
     const c = st.check;
     const offline = !navigator.onLine;
-    const label = st.checking ? t('decklist.bracket.checking') : st.error ? t('decklist.bracket.retry') : c ? t('decklist.bracket.recheck') : t('decklist.bracket.check');
+    const floor = c ? Number(c.floor) || 1 : 0;
+    const sub = st.checking ? t('decklist.bracket.checking') : c?.checked_at ? t('decklist.bracket.checkedAt', { date: fmtDate(c.checked_at) }) : t('decklist.bracket.intro');
+    // Mit Ergebnis: kleiner Knopf im Kopf. Ohne Ergebnis oder nach einem Fehler: der breite Knopf darunter.
+    const wide = !c || !!st.error;
+    const label = st.checking ? t('decklist.bracket.checking') : st.error ? t('decklist.bracket.retry') : t('decklist.bracket.check');
+    const off = offline || st.checking ? 'disabled' : '';
     mount(box, html`
       <div class="dl-bk-head">
         <span class="dl-bk-ic">${icon('shieldStar', 20)}</span>
-        <span class="grow-col"><b>${t('decklist.bracket.title')}</b>
-          <span class="tiny muted">${c?.checked_at ? t('decklist.bracket.checkedAt', { date: fmtDate(c.checked_at) }) : t('decklist.bracket.intro')}</span></span>
+        <span class="grow-col">${c
+          ? html`<span class="dl-bk-title" data-dl-result><b>${floor <= 1 ? t('decklist.bracket.level12') : t('decklist.bracket.level', { n: floor })}</b> <span>${floor <= 1 ? t('decklist.bracket.name12') : bracketName(floor)}</span></span>`
+          : html`<b>${t('decklist.bracket.title')}</b>`}
+          <span class="tiny muted">${sub}</span></span>
+        ${wide ? '' : html`<button type="button" class="icon-btn dl-bk-re" data-act="dl-check" aria-label="${t('decklist.bracket.recheck')}" title="${t('decklist.bracket.recheck')}" ${off} ${st.checking ? html`aria-busy="true"` : ''}>${icon('arrowCounterClockwise', 20)}</button>`}
       </div>
       ${c ? resultBlock(c) : ''}
       ${st.error ? html`<p class="dl-bk-err" role="alert" data-dl-error="${st.error}">${icon('warningCircle', 18)}<span>${t(`decklist.bracket.errors.${st.error}`)}</span></p>` : ''}
       ${offline ? html`<p class="dl-bk-note" data-dl-offline>${icon('wifiSlash', 16)}<span>${t('decklist.bracket.offline')}</span></p>` : ''}
-      <button type="button" class="btn ${c && !st.error ? 'soft' : ''} small block dl-bk-btn" data-act="dl-check" ${offline || st.checking ? 'disabled' : ''} ${st.checking ? html`aria-busy="true"` : ''}>
-        ${icon(st.error ? 'arrowCounterClockwise' : 'chartBar', 18)}${label}</button>
+      ${wide ? html`<button type="button" class="btn small block dl-bk-btn" data-act="dl-check" ${off} ${st.checking ? html`aria-busy="true"` : ''}>
+        ${icon(st.error ? 'arrowCounterClockwise' : 'chartBar', 18)}${label}</button>` : ''}
       <p class="tiny muted dl-bk-src">${t('decklist.bracket.source')}</p>`);
   }
 
@@ -244,7 +243,6 @@ export async function renderDeckList(slot, { deck, canEdit }) {
       const check = {
         floor: r.floor, reasons: r.reasons, hints: r.hints, banned: r.banned, tag: r.tag,
         combos: list(res.combos).slice(0, LIST_MAX).map((k) => ({ cards: list(k.cards), produces: list(k.produces) })),
-        almost: list(res.almost).slice(0, LIST_MAX).map((k) => ({ cards: list(k.cards), missing: list(k.missing), produces: list(k.produces) })),
         checked_at: new Date().toISOString(),
         cards_updated_at: st.deck.cards_updated_at ?? null,
       };

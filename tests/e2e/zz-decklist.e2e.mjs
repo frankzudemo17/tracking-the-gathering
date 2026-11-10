@@ -89,6 +89,8 @@ export default async function decklistE2e({ browser, base: BASE }) {
   await A.shot('dl-3-liste');
 
   // ---------------------------------------------------------------- 3 Kartenbild
+  ok('Gruppen sind zu Beginn zugeklappt', (await A.locator('details.dl-group[open]').count()) === 0);
+  await A.click('[data-group="artifact"] > summary');
   await A.click('[data-act="dl-card"][data-name="Sol Ring"]');
   await A.waitForSelector('.dl-zoom img');
   ok('K3 Sol Ring ⇒ Bild (scryfall)', /scryfall/.test(await A.getAttribute('.dl-zoom img', 'src') || ''));

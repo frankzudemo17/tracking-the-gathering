@@ -14,10 +14,8 @@
 .dl-reimport { background: var(--sf2); }
 
 /* ---- Kennzahlen ---- */
-.dl-stats { display: flex; flex-direction: column; gap: 16px; padding: 2px 0 4px; }
-.dl-stat { display: flex; flex-direction: column; gap: 8px; }
-.dl-stat-t { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 700; color: var(--mu); text-transform: uppercase; letter-spacing: .06em; }
-.dl-stat-h { font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--mu); opacity: .85; }
+.dl-stat-h { margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--mu); }
+.dl-fold-body { margin: 2px 0 14px; }
 .dl-num { font-variant-numeric: tabular-nums; font-weight: 700; }
 
 .dl-types { display: flex; flex-direction: column; gap: 6px; }
@@ -49,7 +47,7 @@
 .dl-group-n { color: var(--mu); font-variant-numeric: tabular-nums; font-size: 14px; }
 .dl-chev { display: grid; place-items: center; color: var(--mu); transition: transform .18s ease; }
 details[open] > summary .dl-chev { transform: rotate(180deg); }
-.dl-group > summary:focus-visible, .dl-bk-almost > summary:focus-visible, .dl-card:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; border-radius: 8px; }
+.dl-group > summary:focus-visible, .dl-card:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; border-radius: 8px; }
 
 .dl-rows { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; }
 .dl-card { width: 100%; display: flex; align-items: baseline; gap: 6px; min-height: 40px; padding: 9px 4px; border: 0; background: none; color: var(--ink); text-align: left; font-size: 15px; cursor: pointer; border-radius: 8px; }
@@ -62,12 +60,17 @@ details[open] > summary .dl-chev { transform: rotate(180deg); }
   font-size: 11px; font-weight: 700; letter-spacing: .02em; color: var(--hi); background: color-mix(in srgb, var(--hi) 16%, transparent); }
 
 /* ---- Bracket-Karte ---- */
-.dl-bk { gap: 12px; }
+.dl-bk { gap: 10px; }
 .dl-bk-head { display: flex; align-items: center; gap: 12px; }
 .dl-bk-head b { font-size: 16px; }
 .dl-bk-ic { width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--acc2) 16%, transparent); color: var(--acc2); }
 .dl-bk-res { display: flex; flex-direction: column; gap: 10px; }
-.dl-bk-title { font-family: var(--f-display); font-size: 21px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; }
+.dl-bk-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; line-height: 1.2; }
+.dl-bk-title b { font-family: var(--f-display); font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+.dl-bk-title span { font-size: 14px; font-weight: 600; color: var(--mu); }
+.dl-bk-re { background: var(--sf2); }
+.dl-bk-re svg { color: var(--acc2); }
+.dl-bk-re[disabled] { opacity: .55; }
 .dl-bk-note { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--mu); line-height: 1.45; }
 .dl-bk-note svg { flex-shrink: 0; margin-top: 1px; }
 .dl-bk-below { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: var(--r-md);
@@ -80,11 +83,7 @@ details[open] > summary .dl-chev { transform: rotate(180deg); }
 .dl-bk-list li b { font-size: 14px; line-height: 1.35; }
 .dl-bk-list li .small { color: var(--mu); line-height: 1.4; }
 .dl-bk-list li[data-reason] { border-left-color: var(--acc2); }
-.dl-bk-sub { display: flex; flex-direction: column; gap: 8px; }
-.dl-bk-hints .dl-bk-list li b { font-weight: 600; }
-.dl-bk-almost > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--tap); cursor: pointer; font-size: 14px; font-weight: 600; color: var(--mu); }
-.dl-bk-almost > summary::-webkit-details-marker { display: none; }
-.dl-bk-almost[open] .dl-bk-list { padding-bottom: 4px; }
+.dl-bk-hints li b { font-weight: 600; }
 .dl-bk-err { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; font-weight: 600; color: var(--danger); line-height: 1.4; }
 .dl-bk-err svg { flex-shrink: 0; margin-top: 1px; }
 .dl-bk-btn[disabled] { opacity: .55; }
