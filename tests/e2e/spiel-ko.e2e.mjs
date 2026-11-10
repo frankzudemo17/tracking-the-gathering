@@ -47,7 +47,11 @@ export default async function koE2e({ browser, base: BASE }) {
   const koInfo = (pg) => pg.evaluate(() => {
     const r = document.querySelector('.ko');
     return r && { v: r.dataset.variant, q: Number(r.dataset.quote), stage: r.dataset.stage, quote: r.querySelector('[data-ko-quote]')?.textContent ?? '',
-      ask: !!r.querySelector('[data-ko="ask"]'), out: r.querySelector('[data-ko="out"]')?.textContent.trim() ?? null, wins: r.querySelector('[data-ko-wins]')?.textContent ?? null };
+      ask: !!r.querySelector('[data-ko="ask"]'), out: r.querySelector('[data-ko="out"]')?.textContent.trim() ?? null, wins: r.querySelector('[data-ko-wins]')?.textContent ?? null,
+      // B1/B2 (Nachtrag 13:45): Rundenzahl je Variante, A-Tag, Lebensbalken C
+      tag: r.querySelector('.ko-a .ko-tag')?.textContent.trim() ?? null, aLine: r.querySelector('.ko-a .ko-line')?.textContent.trim() ?? null,
+      bLine: r.querySelector('.ko-b-line')?.textContent.trim() ?? null, bCard: r.querySelector('[data-ko-card-line]')?.textContent.trim() ?? null,
+      cRound: r.querySelector('[data-ko-round]')?.textContent.trim() ?? null, segs: r.querySelector('[data-ko-segs]')?.dataset.koSegs ?? null };
   });
   const abort = async (pg) => {
     await pg.click('.lc-hub');
@@ -81,6 +85,8 @@ export default async function koE2e({ browser, base: BASE }) {
   let k = await koInfo(P);
   ok('K2 erzwungen: Variante A mit Spruch Index 3', k?.v === 'A' && k.q === 3 && k.quote.includes(quotes[3]), JSON.stringify(k));
   ok('K3 B auf 0 (Tippen) ⇒ K.O.-Screen ohne Verursacher ⇒ „Wer war es?“', k?.ask === true && k.out === null, JSON.stringify(k));
+  ok('B1 A live: „fällt in Runde 1“ (Runde aus dem Spiel)', k?.aLine === 'fällt in Runde 1', JSON.stringify(k));
+  ok('B2 A-Tag „FINISH HIM!“', k?.tag === 'FINISH HIM!', JSON.stringify(k));
   await P.shot('p11-01-live-A');
   await P.click('.ko [data-ko="cancel"]');
   await P.waitForSelector(`${field(B)} [data-act="ko"]`);
@@ -94,6 +100,7 @@ export default async function koE2e({ browser, base: BASE }) {
   k = await koInfo(P);
   ok('K2 erzwungen: Variante B', k?.v === 'B', JSON.stringify(k));
   ok('K2 B zeigt nie Spruch 1 (Stub verlangt Index 0 ⇒ Index 4)', k?.q === 4 && !k.quote.includes(quotes[0]) && k.quote.includes(quotes[4]), JSON.stringify(k));
+  ok('B1 B live: Zeile „Runde 1 · Platz 3“, Karte „Runde 1 · Tymna …“', k?.bLine === 'Runde 1 · Platz 3' && /^Runde 1 · Tymna/.test(k.bCard ?? ''), JSON.stringify(k));
   ok('B: Titel „… wurde ins Reich der Schatten geschickt“', /Luka Test wurde ins Reich der Schatten geschickt/.test(await P.textContent('.ko .ko-b-title')));
   await P.shot('p11-02-live-B');
   await P.keyboard.press('Escape');
@@ -105,6 +112,7 @@ export default async function koE2e({ browser, base: BASE }) {
   await P.waitForSelector('.ko[data-stage="9"]');
   k = await koInfo(P);
   ok('K2 erzwungen: Variante C mit Spruch Index 2', k?.v === 'C' && k.q === 2 && k.quote.includes(quotes[2]), JSON.stringify(k));
+  ok('B1 C live: Mittelfeld „R1“, ohne Verursacher Balken leer', k?.cRound === 'R1' && k.segs === '0', JSON.stringify(k));
   ok('C ohne Verursacher: „K.O.“ ohne Siegerzeile', k?.wins === null && /K\.O\./.test(await P.textContent('.ko .ko-3d')), JSON.stringify(k));
   await P.shot('p11-03-live-C');
   await P.click('.ko [data-ko="ask"]');
@@ -195,6 +203,8 @@ export default async function koE2e({ browser, base: BASE }) {
   await iso({ player: { id: 'd', name: 'Deniz' }, deck: noImg, by: 'l', pick: { variant: 'C', quote: 3 }, candidates: cands });
   await P.waitForSelector('.ko[data-stage="9"]');
   ok('C mit Verursacher: „LUKA WINS“, Knopf „Ausscheiden“', /LUKA WINS/i.test(await P.textContent('.ko [data-ko-wins]')) && /Ausscheiden/i.test(await P.textContent('.ko [data-ko="out"]')));
+  k = await koInfo(P);
+  ok('Alter Aufrufer ohne round/life: C zeigt „VS“ und vollen Balken, kein Fehler', k?.cRound === 'VS' && k.segs === '10' && P.errs.length === 0, JSON.stringify(k));
   await P.click('.ko [data-ko="out"]');
   ok('„Ausscheiden“ mit bekanntem Verursacher ⇒ onEliminate(by)', JSON.stringify(await P.evaluate(() => window.__ev)) === JSON.stringify([['e', 'l']]));
 
@@ -242,7 +252,7 @@ export default async function koE2e({ browser, base: BASE }) {
     await V.evaluate(async (o) => {
       const { showKo } = await import('/src/views/ko.js');
       window.__close = showKo(document.body, { ...o, onEliminate() {}, onCancel() {} });
-    }, { player: { id: 'd', name: 'Deniz' }, deck: tymna, by: 'l', pick: { variant: v, quote: v === 'B' ? 1 : 3 }, candidates: [{ id: 'l', name: 'Luka', damage: 10, poison: 0, top: true }, { id: 't', name: 'Tim', damage: 0, poison: 0, top: false }, { id: 'j', name: 'Jo', damage: 0, poison: 0, top: false }] });
+    }, { player: { id: 'd', name: 'Deniz' }, deck: tymna, by: 'l', round: 7, life: { victim: -2, by: 24, start: 40 }, pick: { variant: v, quote: v === 'B' ? 1 : 3 }, candidates: [{ id: 'l', name: 'Luka', damage: 10, poison: 0, top: true }, { id: 't', name: 'Tim', damage: 0, poison: 0, top: false }, { id: 'j', name: 'Jo', damage: 0, poison: 0, top: false }] });
     await V.clock.runFor(340);
     await V.waitForTimeout(450); // CSS-Übergänge laufen in Echtzeit
     ok(`K1 Variante ${v}: Zwischenbild Stufe 4`, (await V.getAttribute('.ko', 'data-stage')) === '4');
@@ -250,6 +260,11 @@ export default async function koE2e({ browser, base: BASE }) {
     await V.clock.runFor(500);
     await V.waitForTimeout(1600);
     ok(`K1 Variante ${v}: Stufe 9`, (await V.getAttribute('.ko', 'data-stage')) === '9');
+    const kv = await koInfo(V);
+    const want = { A: kv?.aLine === 'fällt in Runde 7 · durch Luka' && kv.tag === 'FINISH HIM!',
+      B: kv?.bLine === 'Durch Luka · Runde 7 · Platz 4' && /^Runde 7 · Tymna/.test(kv.bCard ?? ''),
+      C: kv?.cRound === 'R7' && kv.segs === '6' }; // 24 von 40 Leben ⇒ 6 von 10 Segmenten wie ko-c-arcade.html
+    ok(`B1 Variante ${v}: Runde 7 im Text wie im Mockup${v === 'C' ? ', Lebensbalken anteilig' : ''}`, want[v], JSON.stringify(kv));
     await V.shot(`p11-k1-${v}-stufe9`);
     await V.evaluate(() => window.__close());
   }

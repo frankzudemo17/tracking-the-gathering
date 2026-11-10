@@ -1,12 +1,15 @@
 // K.O.-Screens (Spec P11, HANDOFF 5.5): Variante A · Anime, B · Reich der Schatten, C · Arcade.
 // Ersetzt die einfache P8-Fassung; die Schnittstelle bleibt dieselbe:
 //
-//   showKo(host, { player, deck, by, pick, candidates, onEliminate, onCancel }) ⇒ close()
+//   showKo(host, { player, deck, by, pick, candidates, round, life, onEliminate, onCancel }) ⇒ close()
 //     player      { id, name }                        wer tödlich ist
 //     deck        decks-Zeile oder null               Commander-Bild(er), Farben, Commander-Name
 //     by          member_id | null                    bekannter Verursacher (Angriff), sonst null
 //     pick        { variant, quote } aus koPick()      Variante A|B|C und Spruch 0..7 (ko.js zieht keinen Zufall)
 //     candidates  [{ id, name, damage, poison, top }]  lebende Gegner, Spitzenreiter markiert (life.js)
+//     round       Zahl | undefined                     Runde des K.O. (s.round; Nachtrag 13:45, B1)
+//     life        { victim, by, start } | undefined    Leben von Opfer/Verursacher im Moment des K.O., Startleben
+//                                                      (by = null ohne Verursacher). Fehlen round/life ⇒ Bild wie vorher.
 //     onEliminate(byId | null)                         „Ausscheiden“/„Verbannen“ bzw. Auswahl / „Aufgegeben“ (null)
 //     onCancel()                                       „Doch nicht“, Escape, Seitenwechsel
 //
@@ -20,7 +23,7 @@ import { icon } from '../lib/icons.js';
 import { sheet } from '../lib/ui.js';
 import { fieldColors } from '../lib/field-color.js';
 import { t } from '../i18n/index.js';
-import { cmdLine } from './life-ui.js';
+import { cmdLine, shortCmd } from './life-ui.js';
 import * as ART from './ko-art.js';
 
 const W = 390;
@@ -29,11 +32,10 @@ const PLAN = [[30, 1], [110, 2], [260, 3], [320, 4], [380, 5], [440, 6], [500, 7
 const SHAKE = [[0, 0], [-9, 5], [8, -6], [-6, -4], [5, 6], [-3, 2], [0, 0]];
 
 // Schriften der K.O.-Screens (HANDOFF 4: Bangers, Cinzel, Press Start 2P, Noto Sans JP) werden beim
-// ersten K.O. einmalig nachgeladen. Quelle OFFEN (GO-Gate Franco): Die Spec sieht einen Google-Fonts-
-// Link vor, die Datenschutzerklärung (P12, de.js „keine Anfrage an Google Fonts“) schließt das aus.
-// Bis zur Entscheidung bleibt die Quelle leer ⇒ Systemschriften aus ko.css (feste Boxgrößen, kein Fehler).
-// Selbst gehostet wäre z. B. 'src/styles/ko-fonts.css' (mit @font-face auf assets/fonts/…).
-export const KO_FONTS_HREF = '';
+// ersten K.O. einmalig nachgeladen — selbst gehostet (Block S, Franco 10.11. 13:05 „Schriften: ja das passt“),
+// keine Anfrage an Google (Datenschutzerklärung P12). Pfad relativ zur Seite (GitHub-Pages-Unterpfad);
+// font-display: swap und feste Boxgrößen in ko.css ⇒ offline/langsam Systemschriften, kein Sprung, kein Fehler.
+export const KO_FONTS_HREF = 'src/styles/ko-fonts.css';
 let fontsAsked = false;
 function loadKoFonts() {
   if (fontsAsked || !KO_FONTS_HREF) return;
@@ -42,12 +44,40 @@ function loadKoFonts() {
   l.rel = 'stylesheet';
   l.href = KO_FONTS_HREF;
   l.dataset.koFonts = '';
+  // Alle vier Familien gleich mitladen (zusammen ≈ 160 kB): der nächste K.O. kann eine andere Variante sein
+  l.onload = () => { try { for (const f of KO_FACES) document.fonts.load(f, f.includes('Noto') ? 'ドォン!!ゴ' : 'K.O.').catch(() => {}); } catch { /* ohne FontFaceSet: Schriften kommen beim Zeichnen */ } };
   document.head.append(l);
 }
+const KO_FACES = ['400 1em Bangers', '400 1em Cinzel', '700 1em Cinzel', '400 1em "Press Start 2P"', '900 1em "Noto Sans JP"'];
 
 const reduceMotion = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
 const cut = (s, n) => { const a = [...String(s ?? '')]; return a.length > n ? a.slice(0, n - 1).join('') + '…' : a.join(''); };
 const len = (s) => [...String(s ?? '')].length;
+
+/** Runde für die Anzeige: ganze Zahl ≥ 1, sonst null (alter Aufrufer ohne `round`). */
+export function koRound(round) {
+  const n = Number(round);
+  return Number.isInteger(n) && n >= 1 ? n : null;
+}
+
+/** Commander-Teil der B-Kartenzeile in höchstens `max` Zeichen: erst die volle Zeile (cmdLine), ist sie zu lang,
+ *  je Commander nur das erste Wort wie im Mockup („Tymna & Thrasios“), notfalls gekürzt. Ohne Deck ''. */
+export function koCardCmd(deck, max) {
+  const full = cmdLine(deck);
+  if (len(full) <= max) return full;
+  const first = (n) => shortCmd(n).split(/\s+/)[0] || '';
+  const compact = [first(deck.commander_name || deck.short_name), deck.partner_name ? first(deck.partner_name) : ''].filter(Boolean).join(' & ');
+  return cut(compact, max);
+}
+
+/** Lebensbalken des Verursachers (Variante C) in 10 Segmenten: anteilig `by / start`, begrenzt auf 0–100 %.
+ *  Ein lebender Verursacher (by > 0) behält mindestens ein Segment. Fehlt eine Angabe ⇒ null (Bild wie vorher). */
+export function koBarSegs(life) {
+  const by = Number(life?.by), start = Number(life?.start);
+  if (life?.by == null || life?.start == null || !Number.isFinite(by) || !Number.isFinite(start) || start <= 0) return null;
+  const frac = Math.min(1, Math.max(0, by / start));
+  return by > 0 ? Math.max(1, Math.round(frac * 10)) : 0;
+}
 
 /** Mana-Kreise und Streifen der Spielerkarte (Main.dc.html:2559–2577), Farben aus fieldColors (P7). */
 function cardColors(cols) {
@@ -65,7 +95,7 @@ function cardColors(cols) {
   return { stripes, pips };
 }
 
-function viewModel({ player, deck, by, pick, candidates }) {
+function viewModel({ player, deck, by, pick, candidates, round, life }) {
   const quotes = t('ko.quotes');
   const variant = ['A', 'B', 'C'].includes(pick?.variant) ? pick.variant : 'A';
   let q = Number.isInteger(pick?.quote) ? pick.quote : 0;
@@ -74,12 +104,16 @@ function viewModel({ player, deck, by, pick, candidates }) {
   const byC = by != null ? candidates.find((c) => c.id === by) : null;
   const byName = by != null ? (byC?.name || '?') : '';
   const place = candidates.length + 1; // lebende Gegner + der Ausscheidende
-  return { variant, quote, quoteIndex: q, name: String(player?.name ?? ''), by, byName, byDamage: byC?.damage ?? 0, place, deck };
+  return { variant, quote, quoteIndex: q, name: String(player?.name ?? ''), by, byName, byDamage: byC?.damage ?? 0, place, deck,
+    round: koRound(round), segs: by != null ? koBarSegs(life) : null };
 }
 
 // ------------------------------------------------------------------ Variante A · Anime
 function variantA(v) {
-  const sub = [v.by != null ? t('ko.by', { name: v.byName }) : t('ko.noCause'), t('ko.place', { n: v.place })].join(' · ');
+  // Mit Runde wie ko-a-anime.html:32 („fällt in Runde 7 · durch Luka“), ohne Runde das bisherige Bild
+  const sub = v.round != null
+    ? [t('ko.aRound', { n: v.round }), v.by != null ? t('ko.by', { name: v.byName }) : ''].filter(Boolean).join(' · ')
+    : [v.by != null ? t('ko.by', { name: v.byName }) : t('ko.noCause'), t('ko.place', { n: v.place })].join(' · ');
   return html`<div class="ko-layer ko-fade ko-a">
     <div class="ko-dots" aria-hidden="true"></div>
     <div class="ko-stage" aria-hidden="true">
@@ -90,7 +124,7 @@ function variantA(v) {
     </div>
     <div class="ko-sub ko-a-sub">
       <div class="ko-panel">
-        <span class="ko-tag">${t('ko.title')}</span>
+        <span class="ko-tag">${t('ko.aTag')}</span>
         <span class="ko-name" style="--nl:${Math.max(1, len(v.name))}">${v.name}</span>
         <span class="ko-line">${sub}</span>
         <div class="ko-bubble"><svg class="ko-tail" width="26" height="20" viewBox="0 0 26 20" aria-hidden="true"><path d="M2 20 L14 2 L22 20" style="fill: #FBF7EE; stroke: #16191D; stroke-width: 3; stroke-linejoin: round"></path><rect x="0" y="17" width="26" height="6" style="fill: #FBF7EE"></rect></svg><span data-ko-quote>„${v.quote}“</span></div>
@@ -106,10 +140,13 @@ function variantB(v) {
   const { stripes, pips } = cardColors(fieldColors(d));
   const arts = [d?.image_url, d?.partner_image_url].filter(Boolean);
   const aw = 130 / Math.max(1, arts.length);
-  const line1 = cut(cmdLine(d) || v.name, 30);
+  // ko-b-…html:49 „Runde 7 · Tymna & Thrasios“: mit Runde wird der Commander-Teil verdichtet, damit Partner sichtbar bleiben
+  const pre = v.round != null ? t('ko.bCard', { n: v.round, cmd: '' }) : '';
+  const line1 = v.round != null ? cut(pre + (koCardCmd(d, 30 - len(pre)) || cut(v.name, 30 - len(pre))), 30) : cut(cmdLine(d) || v.name, 30);
   const line2 = v.by != null ? t('ko.bDamage', { n: v.byDamage, name: cut(v.byName, 16) }) : t('ko.noCause') + '.';
   const title = t('ko.bTitle', { name: v.name });
-  const sub = [v.by != null ? t('ko.bBy', { name: v.byName }) : '', t('ko.place', { n: v.place })].filter(Boolean).join(' · ');
+  const sub = [v.by != null ? t('ko.bBy', { name: v.round != null ? cut(v.byName, 16) : v.byName }) : '', v.round != null ? t('ko.bRound', { n: v.round }) : '', t('ko.place', { n: v.place })]
+    .filter(Boolean).join(' · '); // ko-b-…html:67 „DURCH LUKA · RUNDE 7 · PLATZ 4“
   return html`<div class="ko-layer ko-fade ko-b">
     <svg class="ko-bg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${raw(ART.B_BG)}</svg>
     <div class="ko-stage" aria-hidden="true">
@@ -131,7 +168,7 @@ function variantB(v) {
           <rect x="12" y="124" width="130" height="16" rx="3" style="fill: #EDE6D2"></rect>
           <text x="17" y="135.5" class="ko-cz" style="font-weight: 700; font-size: 8.5px; fill: #16191D">${t('ko.bRole')}</text>
           <rect x="12" y="144" width="130" height="56" rx="3" style="fill: #E4DCC7"></rect>
-          <text x="18" y="160" class="ko-body" style="font-weight: 700; font-size: 8px; fill: #2A2440">${line1}</text>
+          <text x="18" y="160" data-ko-card-line class="ko-body" style="font-weight: 700; font-size: 8px; fill: #2A2440">${line1}</text>
           <text x="18" y="173" class="ko-body" style="font-size: 8px; fill: #2A2440">${line2}</text>
           <text x="18" y="190" class="ko-cz" style="font-style: italic; font-size: 7.5px; fill: #5A4E7A">${t('ko.bMotto')}</text>
           <g class="ko-cracks">
@@ -168,8 +205,8 @@ function variantC(v) {
         <div class="ko-score"><span>1P 012400</span><span>HI 099900</span></div>
         <div class="ko-bars">
           <svg class="ko-face" width="40" height="40" viewBox="0 0 40 40">${raw(ART.C_FACE)}</svg>
-          <div class="ko-seg">${seg(v.by != null ? 10 : 0)}</div>
-          <div class="ko-vs">${t('ko.cVs')}</div>
+          <div class="ko-seg" data-ko-segs="${v.by != null ? (v.segs ?? 10) : 0}">${seg(v.by != null ? (v.segs ?? 10) : 0)}</div>
+          <div class="ko-vs" data-ko-round>${v.round != null ? t('ko.cRound', { n: v.round }) : t('ko.cVs')}</div>
           <div class="ko-seg">${seg(0)}</div>
           <svg class="ko-face out" width="40" height="40" viewBox="0 0 40 40">${raw(ART.C_FACE_OUT)}</svg>
         </div>
@@ -217,9 +254,9 @@ function shield() {
   setTimeout(() => s.remove(), 350);
 }
 
-export function showKo(host, { player, deck = null, by = null, pick = null, candidates = [], onEliminate, onCancel }) {
+export function showKo(host, { player, deck = null, by = null, pick = null, candidates = [], round, life, onEliminate, onCancel }) {
   loadKoFonts();
-  const v = viewModel({ player, deck, by, pick, candidates });
+  const v = viewModel({ player, deck, by, pick, candidates, round, life });
   const reduce = reduceMotion();
   const timers = [];
   let done = false;

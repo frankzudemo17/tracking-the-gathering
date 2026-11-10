@@ -9,7 +9,7 @@ const VERSION = 'ttg-v20';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './src/styles/fonts.css', './src/styles/tokens.css', './src/styles/base.css', './src/styles/components.css',
-  './src/styles/setup.css', './src/styles/life.css', './src/styles/dice.css', './src/styles/attack.css', './src/styles/ko.css',
+  './src/styles/setup.css', './src/styles/life.css', './src/styles/dice.css', './src/styles/attack.css', './src/styles/ko.css', './src/styles/ko-fonts.css',
   './src/styles/decklist.css', './src/styles/live.css', './src/styles/table.css', // Naht P3 (Welle ttg-live-feinschliff-decks)
   './assets/fonts/bricolage-grotesque-latin-opsz.woff2', './assets/fonts/geist-latin-wght.woff2', './assets/fonts/unbounded-latin-wght.woff2',
   './src/main.js', './src/router.js', './src/state.js', './src/supabase.js', './src/config.js', './src/version.js',
