@@ -383,7 +383,10 @@ test('G8 Dubletten beim Laden: Server 1..3, lokal 2..5 ⇒ replay 1..5 je einmal
   const { store } = await setup({ db: serverDb(events.slice(0, 3)), storage });
   const { state } = await store.loadGame(GAME);
   assert.deepEqual(state.events.map((e) => e.seq), [1, 2, 3, 4, 5]);
-  assert.deepEqual(state, before);
+  // Alte Warteschlange ohne cid wird beim Lesen nachgestempelt (P4 Befund B3): 4/5 tragen cid
+  assert.ok(state.events.slice(3).every((e) => typeof e.payload.cid === 'string'));
+  const noCid = (st) => ({ ...st, events: st.events.map(({ payload: { cid: _c, ...p }, ...e }) => ({ ...e, payload: p })) });
+  assert.deepEqual(noCid(state), before);
 });
 
 test('G9 Undo übersteht Reload: gleicher Zustand (deep equal)', async () => {

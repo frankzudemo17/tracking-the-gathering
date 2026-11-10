@@ -36,6 +36,7 @@ function toEvent(row) {
 
 const toRow = (gameId, ev) => ({ game_id: gameId, ...toEvent(ev) });
 const cidOf = (e) => e?.payload?.cid ?? null;
+const actOf = (e) => (Number.isInteger(e?.payload?.act) ? e.payload.act : null);
 
 /** Schlüsselreihenfolge-unabhängige Form (jsonb ordnet Schlüssel um). */
 function canon(v) {
@@ -116,7 +117,7 @@ export function createStore(sb, {
   function ctxOf(gameId) {
     let c = contexts.get(gameId);
     if (!c) {
-      c = { init: null, game: null, server: new Map(), cids: new Set(), maxSeq: 0,
+      c = { init: null, game: null, server: new Map(), cids: new Set(), maxSeq: 0, maxAct: 0,
         subs: new Set(), channel: null, onOnline: null, catching: null, catchAgain: false, pendingEmit: null };
       contexts.set(gameId, c);
     }
@@ -130,6 +131,8 @@ export function createStore(sb, {
     const c = cidOf(ev);
     if (c) ctx.cids.add(c);
     if (ev.seq > ctx.maxSeq) ctx.maxSeq = ev.seq;
+    const a = actOf(ev);
+    if (a !== null && a > ctx.maxAct) ctx.maxAct = a; // alle Typen (wie engine nextAct)
     return true;
   }
 
@@ -162,7 +165,15 @@ export function createStore(sb, {
     let status = { state: 'saved', pending: 0 };
     let halted = false; // Dauerfehler: nur flush() versucht es erneut
     const listeners = new Set();
-    /** Veraltete Aufrufer (Entscheid 3a): alt → neu aller umnummerierten seq. */
+    /**
+     * Veraltete Aufrufer (Entscheid 3a): alt → { to: neu, horizon } aller umnummerierten seq.
+     * horizon = höchste seq, die ein Aufrufer vergeben kann, der das Umnummerieren noch nicht
+     * kennt (max(nextFree, Server-Ende + 1) davor). Wer mit seq ≤ horizon pusht, meint mit der
+     * alten seq seine eigene Zeile ⇒ übersetzen; wer darüber liegt, hat den umnummerierten
+     * Zustand (seine seq ≥ Ende der neuen seq + 1 > horizon) und meint die Server-Zeile
+     * (Befund B2). Pusht ein veralteter Aufrufer weiter (seq s ≤ horizon), rückt der Horizont
+     * mit (s + 1): seine Kette bleibt veraltet, ein frischer Aufrufer liegt stets ≥ nextFree.
+     */
     const seqMap = new Map();
     let nextFree = 1;
     for (const r of queue) nextFree = Math.max(nextFree, r.seq + 1);
@@ -170,6 +181,15 @@ export function createStore(sb, {
     const persist = () => {
       if (queue.length) store.set(queueKey(gameId), JSON.stringify(queue));
       else store.remove(queueKey(gameId));
+    };
+
+    stampLegacy(); // direkt nach dem Lesen (Befund B3): Zustand und Warteschlange tragen cid
+
+    /** Höchste act der Warteschlange (optional nur Zeilen, für die `keep` gilt). */
+    const queueMaxAct = (keep = () => true) => {
+      let m = 0;
+      for (const r of queue) { const a = actOf(r); if (a !== null && keep(r) && a > m) m = a; }
+      return m;
     };
 
     function setStatus(state, error) {
@@ -186,7 +206,7 @@ export function createStore(sb, {
       timer = timers.setTimeout(() => { timer = null; send().catch(() => {}); }, ms);
     }
 
-    /** Alte Warteschlange (vor P4) ohne cid: vor dem ersten Senden nachstempeln. */
+    /** Alte Warteschlange (vor P4) ohne cid: beim Lesen nachstempeln (Entscheid 8, Befund B3). */
     function stampLegacy() {
       let changed = false;
       for (const r of queue) if (!cidOf(r)) { r.payload = { ...r.payload, cid: newCid() }; changed = true; }
@@ -227,19 +247,37 @@ export function createStore(sb, {
      * umnummerierte Zeile zeigen, ziehen mit. Server-seq werden nie umnummeriert (Entscheid 4).
      */
     function rebase(from) {
+      // Eine Aktion (gemeinsame act) wird nie geteilt: Vorgänger gleicher act ziehen mit.
+      for (let i = queue.findIndex((r) => r.seq >= from); i > 0; i--) {
+        const a = actOf(queue[i]);
+        if (a === null || actOf(queue[i - 1]) !== a) break;
+        from = queue[i - 1].seq;
+      }
       const moved = queue.filter((r) => r.seq >= from);
+      const horizon = Math.max(nextFree, ctx.maxSeq + 1, ...queue.map((r) => r.seq + 1));
       const map = new Map();
       let next = ctx.maxSeq + 1;
       for (const r of queue) if (r.seq < from) next = Math.max(next, r.seq + 1);
       for (const r of moved) map.set(r.seq, next++);
+      // Neue act hinter der höchsten act auf dem Server (Befund B1, Weg a): die Engine wählt
+      // das Undo-Ziel über act; Zeilen einer Aktion (gleiche act in Folge) teilen die neue act.
+      let nextAct = Math.max(ctx.maxAct, queueMaxAct((r) => r.seq < from)) + 1;
+      let lastOld = null;
+      let lastNew = null;
+      for (const r of moved) {
+        const a = actOf(r);
+        if (a === null) { lastOld = null; continue; }
+        if (a !== lastOld) { lastOld = a; lastNew = nextAct++; }
+        r.payload = { ...r.payload, act: lastNew };
+      }
       for (const r of queue) {
         if (r.type === 'undo' && Number.isInteger(r.payload?.seq) && map.has(r.payload.seq)) {
           r.payload = { ...r.payload, seq: map.get(r.payload.seq) };
         }
       }
       for (const r of moved) r.seq = map.get(r.seq);
-      for (const [k, v] of seqMap) if (map.has(v)) seqMap.set(k, map.get(v));
-      for (const [k, v] of map) seqMap.set(k, v);
+      for (const e of seqMap.values()) if (map.has(e.to)) e.to = map.get(e.to); // Horizont bleibt
+      for (const [k, v] of map) seqMap.set(k, { to: v, horizon });
       nextFree = Math.max(nextFree, next);
       queue.sort((a, b) => a.seq - b.seq);
       persist();
@@ -363,6 +401,12 @@ export function createStore(sb, {
         if (!list.length) return;
         const known = new Set(queue.map(cidOf));
         nextFree = Math.max(nextFree, ctx.maxSeq + 1);
+        // act ≤ höchster bekannter act ⇒ veralteter Aufrufer: neue act dahinter (Befund B1);
+        // aufeinanderfolgende Zeilen gleicher alter act bleiben eine Aktion.
+        const actFloor = Math.max(ctx.maxAct, queueMaxAct());
+        let nextAct = Math.max(actFloor, ...list.map((e) => actOf(e) ?? 0)) + 1;
+        let lastOld = null;
+        let lastNew = null;
         for (const ev of list) {
           if (!ev || !Number.isInteger(ev.seq)) continue;
           // Stempel am Ereignis selbst: der Zustand des Aufrufers trägt dieselbe cid
@@ -371,12 +415,19 @@ export function createStore(sb, {
           const cid = ev.payload.cid;
           if (known.has(cid) || ctx.cids.has(cid)) continue; // schon gepusht / schon auf dem Server
           const row = toRow(gameId, ev);
+          const a = actOf(row);
+          if (a !== null && a <= actFloor) {
+            if (a !== lastOld) { lastOld = a; lastNew = nextAct++; }
+            row.payload.act = lastNew;
+          } else lastOld = null;
           if (row.seq < nextFree) {
-            // Veralteter Aufrufer (Entscheid 3a): nächste freie seq, Undo-Verweis übersetzen
-            if (row.type === 'undo' && Number.isInteger(row.payload.seq) && seqMap.has(row.payload.seq)) {
-              row.payload.seq = seqMap.get(row.payload.seq);
-            }
-            seqMap.set(row.seq, nextFree);
+            // Veralteter Aufrufer (Entscheid 3a): nächste freie seq, Undo-Verweis übersetzen —
+            // nur wenn der Aufrufer vor dem jeweiligen Umnummerieren steht (Befund B2)
+            const s = row.seq;
+            const m = row.type === 'undo' && Number.isInteger(row.payload.seq) ? seqMap.get(row.payload.seq) : undefined;
+            if (m && s <= m.horizon) row.payload.seq = m.to;
+            for (const e of seqMap.values()) if (s <= e.horizon) e.horizon = Math.max(e.horizon, s + 1);
+            seqMap.set(s, { to: nextFree, horizon: s + 1 });
             row.seq = nextFree;
           }
           nextFree = row.seq + 1;

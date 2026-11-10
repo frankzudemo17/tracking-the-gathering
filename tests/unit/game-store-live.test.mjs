@@ -427,6 +427,7 @@ test('A3b veralteter Aufrufer: nach Umnummerieren 5→7 pusht er seq 6 + undo(pa
   assert.equal(rows[7].payload.cid, life6.payload.cid);
   assert.equal(rows[8].type, 'undo');
   assert.equal(rows[8].payload.seq, 7, 'undo.payload.seq über die Abbildung übersetzt');
+  assert.deepEqual(rows.slice(4).map((r) => r.payload.act), [5, 6, 7, 8, 9], 'B1: umnummerierte 7 und veraltete 8/9 bekommen je eigene act hinter dem Server-Maximum');
   const conflicts = server.log.filter((l) => l.res === '23505').length;
   assert.equal(conflicts, 1, 'keine 23505-Schleife: nur der erste Konflikt');
   assert.deepEqual(x.rec.status, { state: 'saved', pending: 0 });
@@ -439,6 +440,89 @@ test('A3b veralteter Aufrufer: nach Umnummerieren 5→7 pusht er seq 6 + undo(pa
   const last = server.events().at(-1);
   assert.equal(last.seq, 10);
   assert.equal(last.payload.seq, 5, 'nicht veraltet ⇒ keine Übersetzung');
+});
+
+test('B1 zwei Geräte mit Konflikt (gleiche seq + act), Y schreibt zuerst, X umnummeriert; Undo auf X (umnummeriertes Gerät) ⇒ nur Xs −5 zurück, Ys −7 bleibt wirksam', async () => {
+  const server = seeded(4);
+  const t = clock();
+  const x = await device(server, t);
+  const y = await device(server, t, { actor: 'B' });
+  x.subscribe(); y.subscribe();
+  await t.advance(0);
+  const [ey] = y.act({ type: 'life', target: 'B', d: -7 });
+  const [ex] = x.act({ type: 'life', target: 'A', d: -5 });
+  assert.deepEqual([ex.payload.act, ey.payload.act, ex.seq, ey.seq], [5, 5, 5, 5], 'Ausgangslage: gleiche seq und act');
+  await t.advance(5000);
+  const rows = server.events();
+  assert.deepEqual(rows.slice(4).map((r) => [r.seq, r.payload.cid, r.target, r.amount]),
+    [[5, ey.payload.cid, 'B', -7], [6, ex.payload.cid, 'A', -5]], 'Y steht auf 5, X umnummeriert auf 6');
+  const u = x.act({ type: 'undo' });
+  await t.advance(5000);
+  assert.deepEqual(serverReplay(server).players.map((p) => p.life), [38, 31], 'Ys −7 bleibt wirksam');
+  assert.deepEqual(rows.slice(4).map((r) => [r.seq, r.payload.act]), [[5, 5], [6, 6]], 'umnummerierte Zeile bekommt neue act');
+  assert.deepEqual(u.map((e) => e.payload.seq), [6], 'Undo trifft nur Xs Zeile');
+  assert.deepEqual(view(x.state), view(serverReplay(server)));
+  assert.deepEqual(view(y.state), view(serverReplay(server)));
+});
+
+test('B1 Y schreibt 3 Aktionen, X (2 Aktionen) dahinter umnummeriert ⇒ Xs Undo trifft das neueste Ereignis, act je Aktion gemeinsam', async () => {
+  const server = seeded(4);
+  const t = clock();
+  const x = await device(server, t);
+  const y = await device(server, t, { actor: 'B' });
+  x.subscribe(); y.subscribe();
+  await t.advance(0);
+  y.act({ type: 'life', target: 'B', d: -1 }); y.act({ type: 'life', target: 'B', d: -2 }); y.act({ type: 'life', target: 'B', d: -3 });
+  let s = x.state; const mine = [];
+  for (const d of [-10, -20]) { const r = E.act(s, { type: 'life', target: 'A', d }, { actor: 'A' }); s = r.state; mine.push(...r.events); }
+  x.rec.push(mine);
+  await t.advance(5000);
+  assert.deepEqual(server.events().slice(4).map((r) => [r.seq, r.payload.act, r.amount]),
+    [[5, 5, -1], [6, 6, -2], [7, 7, -3], [8, 8, -10], [9, 9, -20]]);
+  const [u1] = x.act({ type: 'undo' });
+  assert.equal(u1.payload.seq, 9, 'erstes Undo: Xs neuestes Ereignis');
+  const u2 = x.act({ type: 'undo' });
+  assert.deepEqual(u2.map((e) => e.payload.seq), [8], 'zweites Undo: nur Xs seq 8, nicht Ys seq 6');
+  await t.advance(5000);
+  assert.deepEqual(serverReplay(server).players.map((p) => p.life), [38, 32]);
+});
+
+test('B1 Aktion mit mehreren Zeilen (Angriff + Lebensentzug) umnummeriert ⇒ gemeinsame neue act, Undo nimmt alle Zeilen zurück', async () => {
+  const server = seeded(4);
+  const t = clock();
+  let first = true;
+  const x = await device(server, t, { sbOpts: { beforeInsert: () => { if (first) { first = false; server.foreign(5); } } } });
+  x.subscribe();
+  await t.advance(0);
+  const evs = x.act({ type: 'attack', from: 'A', to: ['B'], kind: 'damage', amount: 3, lifelink: true });
+  assert.equal(evs.length, 2);
+  await t.advance(5000);
+  const mine = server.events().filter((r) => evs.some((e) => e.payload.cid === r.payload.cid));
+  assert.deepEqual(mine.map((r) => [r.seq, r.payload.act]), [[6, 6], [7, 6]]);
+  const u = x.act({ type: 'undo' });
+  assert.deepEqual(u.map((e) => e.payload.seq), [6, 7]);
+  await t.advance(5000);
+  assert.deepEqual(serverReplay(server).players.map((p) => p.life), [38, 37], 'nur das fremde −1 auf B bleibt');
+});
+
+test('B2 Aufrufer kennt das Umnummerieren 5→6 schon, hinkt nur um eine Fremd-Zeile hinterher ⇒ Undo auf fremde Server-seq 5 bleibt 5', async () => {
+  const server = seeded(4);
+  const t = clock();
+  let first = true;
+  const x = await device(server, t, { sbOpts: { beforeInsert: () => { if (first) { first = false; server.foreign(5); } } } });
+  x.subscribe();
+  await t.advance(0);
+  x.act({ type: 'life', target: 'A', d: -5 });
+  await t.advance(5000);
+  assert.deepEqual(server.seqs(), [1, 2, 3, 4, 5, 6]);
+  assert.equal(x.state.nextSeq, 7, 'Aufrufer hat das Umnummerieren übernommen');
+  server.foreign(7);
+  await t.advance(1000); // Store kennt fremd 7; der Aufrufer pusht noch mit seq 7 (veraltet um genau diese Zeile)
+  x.rec.push([{ seq: 7, round: 1, type: 'undo', actor: 'A', source: null, target: null, amount: null, payload: { seq: 5, act: 50 } }]);
+  await t.advance(5000);
+  const last = server.events().at(-1);
+  assert.equal(last.seq, 8);
+  assert.equal(last.payload.seq, 5, 'Undo auf Server-seq 5 bleibt 5');
 });
 
 // ---------------------------------------------------------------------------
@@ -701,6 +785,25 @@ test('Alte Warteschlange ohne cid ⇒ vor dem Senden nachgestempelt und persisti
   assert.ok(sent.every((r) => typeof r.payload.cid === 'string' && r.payload.cid.length >= 16), 'nachgestempelt');
   assert.deepEqual(server.seqs(), [1, 2, 3, 4]);
   assert.deepEqual(d.rec.status, { state: 'saved', pending: 0 });
+});
+
+test('B3 Alte Warteschlange ohne cid ⇒ schon beim Lesen (offline, direkt nach loadGame) nachgestempelt', async () => {
+  const server = seeded(2);
+  const t = clock();
+  const storage = memStorage();
+  let s = E.replay(freshState(), server.events().map(toEv));
+  const legacy = [];
+  for (const d of [-1, -2]) { const r = E.act(s, { type: 'life', target: 'B', d }, { actor: 'A' }); s = r.state; legacy.push(...r.events); }
+  storage.setItem(`ttg.queue.${GAME}`, JSON.stringify(legacy.map((e) => ({ game_id: GAME, ...e }))));
+  const d = await device(server, t, { storage, online: () => false });
+  assert.equal(d.sb.inserts().length, 0, 'offline: nichts gesendet');
+  const stored = JSON.parse(storage.getItem(`ttg.queue.${GAME}`));
+  assert.equal(stored.length, 2);
+  assert.ok(stored.every((r) => typeof r.payload.cid === 'string' && r.payload.cid.length >= 16), 'Warteschlange in localStorage gestempelt');
+  const pend = d.state.events.filter((e) => e.seq > 2);
+  assert.equal(pend.length, 2);
+  assert.ok(pend.every((e) => typeof e.payload.cid === 'string' && e.payload.cid.length >= 16), 'state.events tragen eine cid');
+  assert.deepEqual(pend.map((e) => e.payload.cid), stored.map((r) => r.payload.cid), 'dieselbe cid in Zustand und Warteschlange');
 });
 
 test('Alte Warteschlange ohne cid, Server hat dieselbe seq ohne cid (frühere Version) ⇒ bestätigt, nicht doppelt', async () => {
