@@ -1,2 +1,90 @@
 /* Styles „board“ · Besitzer: P17 (Rangliste). Naht aus P13 (eingebunden in index.html, SHELL in sw.js).
    Nur Token-Farben aus tokens.css, keine Hex-Werte (WELLE ttg-ende-statistik, UI-Regel 1). */
+
+/* ================= Rangliste ================= */
+.brd { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.brd-body { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* Ansicht: Segment über volle Breite */
+.brd-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: var(--r-md); background: var(--sf); }
+.brd-seg button { min-height: var(--tap); border: 0; border-radius: var(--r-sm); background: transparent; color: var(--mu);
+  font: inherit; font-size: 15px; font-weight: 700; }
+.brd-seg button[aria-pressed="true"] { background: var(--act); color: var(--act-ink); }
+
+/* Zeitraum: Chips */
+.brd-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.brd-chip { min-height: var(--tap); padding: 0 16px; border-radius: 999px; border: 0; background: transparent; color: var(--mu);
+  font: inherit; font-size: 14px; font-weight: 650; box-shadow: inset 0 0 0 1px var(--ln); }
+.brd-chip[aria-pressed="true"] { background: var(--sf); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.brd-chip:active, .brd-seg button:active { transform: scale(.97); }
+
+/* Podest: Rang 1 in der Mitte, 2 links, 3 rechts (DOM bleibt in Rang-Reihenfolge) */
+.brd-podium { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-areas: "b a c"; align-items: end; gap: 8px; }
+.brd-pod { min-width: 0; display: flex; }
+.brd-pod.pos-0 { grid-area: a; }
+.brd-pod.pos-1 { grid-area: b; }
+.brd-pod.pos-2 { grid-area: c; }
+.brd-pod-link { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--ink); text-decoration: none;
+  border-radius: var(--r-md); padding-top: 4px; }
+.brd-pod-link:active { transform: scale(.98); }
+.brd-pod-av { display: grid; }
+.brd-pod.pos-0 .brd-pod-av .avatar { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--hi); }
+.brd-pod-art { display: grid; width: 64px; height: 64px; border-radius: var(--r-md); flex-shrink: 0;
+  background: var(--sf2); }
+.brd-pod.pos-0 .brd-pod-art { width: 80px; height: 80px; box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--hi); }
+.brd-pod-name { max-width: 100%; padding: 0 4px; font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brd-pod-sub { max-width: 100%; margin-top: -6px; padding: 0 4px; font-size: 12px; color: var(--mu); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brd-step { align-self: stretch; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px;
+  padding: 10px 4px; border-radius: var(--r-md) var(--r-md) var(--r-sm) var(--r-sm); background: var(--sf); }
+.brd-step.step-1 { min-height: 104px; }
+.brd-step.step-2 { min-height: 84px; }
+.brd-step.step-3 { min-height: 68px; }
+.brd-step-rank { display: inline-flex; align-items: center; gap: 4px; color: var(--mu); }
+.brd-step-rank b { font-family: var(--f-display); font-size: 26px; font-weight: 700; line-height: 1; letter-spacing: -.03em; }
+.brd-step.step-1 .brd-step-rank { color: var(--hi); }
+.brd-step.step-1 .brd-step-rank b { font-size: 32px; }
+.brd-step-pts { font-size: 13px; color: var(--mu); white-space: nowrap; }
+.brd-step-pts b { font-family: var(--f-display); font-size: 17px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.brd-pod-link.me .brd-step { box-shadow: inset 0 0 0 2px var(--acc2); }
+
+/* Liste ab Rang 4 (Salz: alle Ränge) */
+.brd-row { gap: 12px; min-height: 64px; }
+.brd-row.me { box-shadow: inset 0 0 0 2px var(--acc2); border-radius: var(--r-lg); }
+.brd-row.me + .row { box-shadow: none; }
+.brd-rank { width: 24px; flex-shrink: 0; text-align: center; font-family: var(--f-display); font-size: 17px; font-weight: 700; color: var(--mu);
+  font-variant-numeric: tabular-nums; }
+.brd-art, .brd-pod-art { display: grid; place-items: center; position: relative; overflow: hidden; color: var(--mu);
+  font-family: var(--f-display); font-weight: 700; font-size: 15px; }
+/* Bild als Ebene über dem Kürzel: fehlt es oder lädt es nicht, bleibt das Kürzel sichtbar (ungetönt, kein Overlay) */
+.brd-art::before, .brd-pod-art::before { content: ""; position: absolute; inset: 0; background: var(--art, none) center 22% / cover; }
+.brd-art { display: grid; width: 44px; height: 44px; border-radius: var(--r-sm); flex-shrink: 0;
+  background: var(--sf2); }
+.brd-owner { font-weight: 500; color: var(--mu); }
+.brd-row .grow { overflow: hidden; gap: 1px; }
+.brd-stats { display: block; font-size: 12.5px; line-height: 1.4; color: var(--mu); max-width: 100%; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brd-stats > span + span::before { content: "·"; margin: 0 6px; }
+.brd-pts { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+.brd-pts b { font-family: var(--f-display); font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.brd-pts > span { font-size: 11px; color: var(--mu); }
+.brd-salt-line { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+
+/* Salz-Icons: 5 Stück, anteilig gefüllt über --f (0…1) */
+.brd-salt-icons { display: inline-flex; gap: 1px; flex-shrink: 0; }
+.brd-salt-ic { position: relative; display: inline-grid; width: 13px; height: 13px; }
+.brd-salt-ic > span { position: absolute; inset: 0; display: grid; }
+.brd-salt-ic .off { color: color-mix(in srgb, var(--mu) 40%, transparent); }
+.brd-salt-ic .on { color: var(--acc2); clip-path: inset(0 calc((1 - var(--f, 0)) * 100%) 0 0); }
+
+/* Punkte-Erklärung, Fußnote */
+.brd-info { display: flex; align-items: center; gap: 10px; min-height: var(--tap); padding: 10px 16px; border: 0; border-radius: var(--r-md);
+  background: var(--sf); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; text-align: left; }
+.brd-info > span { flex: 1; min-width: 0; }
+.brd-info svg { flex-shrink: 0; }
+.brd-info > svg:first-child { color: var(--acc2); }
+.brd-info > svg:last-child { color: var(--mu); }
+.brd-note { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--mu); }
+.brd-sheet { display: flex; flex-direction: column; gap: 8px; padding: 4px 4px 8px; }
+.brd-sheet h3 { margin: 0; font-family: var(--f-display); font-size: 20px; }
+.brd-sheet p { margin: 0; line-height: 1.5; }
