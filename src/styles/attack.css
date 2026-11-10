@@ -1,2 +1,83 @@
 /* attack.css · Besitzer: P10 (Angriff per Ziehen, Angriffsfenster).
-   Naht aus P7: nur dieses Paket schreibt hier. Tokens aus tokens.css, keine neuen Farbwerte. */
+   Naht aus P7: nur dieses Paket schreibt hier. Tokens aus tokens.css, keine neuen Farbwerte.
+   Bild: Mockup P2 Bildschirm 6 (Zielfernrohr, ALLE, Angriffsfenster, Hinweis-Banner). */
+
+/* ---------- Hinweis-Banner (einmalig, im Fluss über dem Brett) */
+.lc-screen:has(> .atk-banner) { height: 100dvh; }
+.atk-banner { flex-shrink: 0; display: flex; align-items: center; gap: 10px; margin: calc(8px + var(--safe-t)) 8px 0;
+  padding: 8px 8px 8px 14px; border-radius: 16px; background: var(--sf); color: var(--ink); }
+.atk-banner > .ic, .atk-banner > svg { flex-shrink: 0; color: var(--hi); }
+.atk-banner span { flex: 1; font-size: 13px; font-weight: 600; line-height: 1.35; }
+.atk-banner button { min-height: 44px; padding: 0 12px; border-radius: 12px; border: 0; background: var(--sf2); color: var(--ink);
+  font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; }
+.atk-banner + .lc { height: auto; flex: 1; min-height: 0; }
+.atk-banner + .lc .lc-board { padding-top: 8px; }
+
+/* ---------- Ziehen: Startfeld gedimmt, Zielfeld roter Rahmen, Mittelknopf zeigt ALLE */
+.lc-board .lc-field { touch-action: none; -webkit-touch-callout: none; }
+.lc-field.atk-from .lc-inner { opacity: .55; transition: opacity .12s; }
+.lc-field.atk-over::after { box-shadow: inset 0 0 0 4px var(--danger), 0 0 0 1px var(--danger); }
+.lc-hub .atk-alle { display: none; flex-direction: column; align-items: center; gap: 1px; font-size: 9.5px; font-weight: 800; letter-spacing: .12em; }
+.lc-hub.atk-drag > :not(.atk-alle) { display: none; }
+.lc-hub.atk-drag .atk-alle { display: flex; }
+.lc-hub.atk-drag { transition: transform .12s; }
+.lc-hub.atk-drag.atk-over { color: var(--danger); box-shadow: 0 0 0 3px var(--danger), 0 6px 22px rgba(0,0,0,.4); transform: translate(-50%, -50%) scale(1.08); }
+
+/* Zielfernrohr: Bildschirmkoordinaten, fängt keine Zeiger (elementFromPoint trifft darunter) */
+.atk-layer { position: fixed; inset: 0; z-index: 25; pointer-events: none; color: var(--hero-ink); }
+.atk-layer svg { display: block; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0,0,0,.55)); }
+.atk-line { stroke: currentColor; stroke-width: 2; stroke-dasharray: 2 6; stroke-linecap: round; opacity: .5; }
+.atk-start { fill: none; stroke: currentColor; stroke-width: 2; opacity: .5; }
+.atk-scope { color: var(--hero-ink); }
+.atk-c1 { fill: transparent; stroke: currentColor; stroke-width: 2.5; transition: r .12s; }
+.atk-c2 { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 3 5; opacity: .8; transition: r .12s; }
+.atk-cross { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; }
+.atk-dot { fill: currentColor; }
+.atk-layer.locked .atk-scope, .atk-layer.locked .atk-line { color: var(--danger); }
+.atk-layer.locked .atk-c1 { fill: color-mix(in srgb, var(--danger) 12%, transparent); }
+
+/* ---------- Angriffsfenster */
+.atk-sheet { gap: 14px; }
+.atk-h { display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; font-family: var(--f-display); font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.atk-h > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.atk-h > svg, .atk-h > .ic { flex-shrink: 0; color: var(--danger); }
+.atk-tgts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.atk-kinds { display: grid; width: 100%; }
+.atk-kinds button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 0; padding: 0 6px; }
+.atk-kinds button span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.atk-amt { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.atk-amt button { width: 54px; height: 54px; border-radius: 16px; border: 0; background: var(--sf2); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.atk-amt button:disabled { opacity: .4; cursor: default; }
+.atk-amt b { min-width: 86px; text-align: center; font-family: var(--f-display); font-size: 60px; font-weight: 700; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.atk-quick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.atk-quick .lc-pill { justify-content: center; min-height: 40px; border-radius: 12px; padding: 0; font-weight: 700; }
+
+/* Vorschau (Werte aus previewAttack) */
+.atk-pv { background: var(--sf2); border-radius: 16px; padding: 2px 14px; display: flex; flex-direction: column; }
+.atk-pvrow { display: flex; flex-direction: column; gap: 7px; padding: 10px 0; }
+.atk-pvrow + .atk-pvrow { box-shadow: inset 0 1px 0 var(--ln); }
+.atk-pvrow .l { display: flex; align-items: center; gap: 10px; color: var(--mu); }
+.atk-pvrow .l .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; color: var(--ink); }
+.atk-pvrow .l .grow b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.atk-pvrow .l .grow small { font-size: 12px; color: var(--mu); }
+.atk-pvrow .l.sub { font-size: 12px; }
+.atk-pvrow .from { font-family: var(--f-display); font-size: 18px; font-weight: 600; color: var(--mu); font-variant-numeric: tabular-nums; }
+.atk-pvrow .to { min-width: 50px; text-align: right; font-family: var(--f-display); font-size: 26px; font-weight: 700; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.atk-pvrow .to small { font-size: 13px; color: var(--mu); font-family: var(--f-body); font-weight: 500; }
+.atk-pvrow .cmdv { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.atk-pvrow .dead, .atk-pvrow .to.dead { color: var(--danger); }
+.atk-pvrow.gain .to, .atk-pvrow.gain .l .grow b { color: var(--live); }
+.atk-bar { height: 6px; border-radius: 3px; background: var(--ln); overflow: hidden; }
+.atk-bar i { display: block; height: 100%; border-radius: 3px; background: var(--hi); transition: width .15s; }
+.atk-bar i.dead { background: var(--danger); }
+
+.atk-foot { display: flex; gap: 8px; }
+.atk-foot .btn { flex: 1; min-width: 0; }
+.atk-foot .btn:disabled { background: var(--ln); color: var(--mu); opacity: 1; }
+.atk-link { min-height: 52px; padding: 0 14px; border-radius: 14px; border: 0; background: var(--sf2); color: var(--ink); font: inherit; font-weight: 700; font-size: 13px;
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.atk-link[aria-pressed="true"] { background: color-mix(in srgb, var(--live) 22%, var(--sf2)); color: var(--live); box-shadow: inset 0 0 0 1.5px var(--live); }
+
+@media (prefers-reduced-motion: reduce) {
+  .atk-c1, .atk-c2, .atk-bar i, .lc-hub.atk-drag, .lc-field.atk-from .lc-inner { transition: none; }
+}
