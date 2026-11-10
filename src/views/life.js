@@ -257,8 +257,10 @@ export default async function life(el, { params, isStale }) {
   /** Treffer eines Zustandswechsels zeigen; still (Entscheid 3) setzt die Schadenssummen aller Felder zurück. */
   function showHits(list, prev, next, reason) {
     const lifeMoved = next.players.some((p) => { const q = prev.players.find((x) => x.id === p.id); return q && q.life !== p.life; });
+    const seen = new Set(prev.events.map((e) => e.seq));
+    const undone = next.events.some((e) => e.type === 'undo' && !seen.has(e.seq)); // auch Rückgängig ohne Lebensänderung (Gift …)
     const quiet = document.visibilityState !== 'visible' || next.finished
-      || (reason !== 'local' && reason !== 'remote') || (!list.length && lifeMoved);
+      || (reason !== 'local' && reason !== 'remote') || undone || (!list.length && lifeMoved);
     if (quiet) { for (const h of hits.values()) h.acc = null; return; }
     for (const { id: mid, d } of list) pulseField(mid, d);
   }
