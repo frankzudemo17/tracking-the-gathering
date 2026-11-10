@@ -199,7 +199,7 @@ export function attachAttack(root, { getState, onApply, name, deck, busy = () =>
             <span class="from num">${r.poison[0]}</span>${arrow}<span class="to num ${dead ? 'dead' : ''}" data-to-poison>${r.poison[1]}<small>/${r.poison[2]}</small></span></div>
             <div class="atk-bar"><i class="${dead ? 'dead' : ''}" style="width:${barPct(r.poison[1], r.poison[2])}%"></i></div></div>`;
         }
-        const deadLife = r.lethal && r.life[1] <= 0;
+        const deadLife = r.lethal; // „rot bei tödlich“ je Ziel (Spec P10), auch bei Commander-Tod
         const cmd = r.cmd ? (() => {
           const dead = r.lethal && r.cmd[1] >= r.cmd[2];
           return html`<div class="l sub"><span class="grow"><small>${t('attack.cmdFrom', { name: cmdName })}</small></span>
