@@ -257,7 +257,8 @@ export default {
     ],
   },
 
-  common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.', reload: 'Neu laden' },
+  common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.', reload: 'Neu laden',
+    stale: 'Nicht aktualisiert – Stand von {time} Uhr' }, // P12
 
   setup, life, dice, attack, ko,
   decklist, live, table, // Naht P3 (Welle ttg-live-feinschliff-decks)

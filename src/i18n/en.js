@@ -257,7 +257,8 @@ export default {
     ],
   },
 
-  common: { back: 'Back', close: 'Close', cancel: 'Cancel', loading: 'Loading …', error: 'Something went wrong.', reload: 'Reload' },
+  common: { back: 'Back', close: 'Close', cancel: 'Cancel', loading: 'Loading …', error: 'Something went wrong.', reload: 'Reload',
+    stale: 'Not updated – as of {time}' }, // P12
 
   setup, life, dice, attack, ko,
   decklist, live, table, // seam P3 (wave ttg-live-feinschliff-decks)

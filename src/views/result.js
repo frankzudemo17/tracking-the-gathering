@@ -26,6 +26,9 @@ const SCORES = [1, 2, 3, 4, 5];
 export default async function result(el, { params, isStale }) {
   const id = params?.id || '';
   const back = backHead('', '#/start');
+  // Startseite/Historie sollen das gerade beendete Spiel zeigen (life.js leert den Zwischenspeicher nicht).
+  // P12: vor jedem frühen Ausstieg verwerfen (Entscheid 12).
+  groupData.invalidate(state.groupId);
   /** @type {any} */
   let data = null;
   try { data = await groupData.loadGame(id); } catch (e) { console.warn('Spiel laden', e); data = null; }
@@ -53,9 +56,6 @@ export default async function result(el, { params, isStale }) {
     mount(el, html`${back}<div class="card">${empty('history', t('result.unknown'), t('result.unknownSub'))}</div>`);
     return;
   }
-  // Startseite/Historie sollen das gerade beendete Spiel zeigen (life.js leert den Zwischenspeicher nicht)
-  groupData.invalidate(state.groupId);
-
   /** @type {Record<string, string|null>} */
   let phUrls = {};
   if (s.photoPath) { try { phUrls = await photoUrls([s.photoPath]); } catch { /* Foto ist Beiwerk */ } }

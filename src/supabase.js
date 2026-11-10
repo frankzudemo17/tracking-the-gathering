@@ -63,3 +63,6 @@ export async function photoUrls(paths) {
   return out;
 }
 export const forgetPhoto = (path) => photoCache.delete(path);
+
+// P12: Abmelden/Kontowechsel — beide Karten der signierten Bild-Adressen leeren (src/state.js clearCaches)
+export function clearSignedUrls() { urlCache.clear(); photoCache.clear(); }

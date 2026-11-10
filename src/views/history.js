@@ -5,28 +5,37 @@ import { state, currentMembership } from '../state.js';
 import { groupData } from '../lib/data.js';
 import { gameSummary } from '../lib/stats.js';
 import { fmtAvg } from '../lib/format.js';
-import { html, mount, on } from '../lib/dom.js';
+import { html, on } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
-import { avatar, empty } from '../lib/parts.js';
+import { avatar, empty, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
+import { GROUP_MAX_AGE_MS } from '../lib/cache.js';
 import { t, getLang } from '../i18n/index.js';
 import { FILTERS, NO_SESSION, readFilter, writeFilter, validFilter, historyEvenings, byId, deckArt, fmtDayLong, num } from './history-ui.js';
 
 const store = () => { try { return sessionStorage; } catch { return null; } };
 
-export default async function history(el, { isStale }) {
-  const groupId = state.groupId;
-  const data = await groupData.loadGroup(groupId);
-  if (isStale()) return;
-  const members = byId(data?.members);
-  const decks = byId(data?.decks);
+export default async function history(el, { isStale, fail }) {
+  // P12: gemerkter Stand sofort (oder Gerüst), Auffrischen im Hintergrund; Zeichnen nur bei gleichem Konto + Gruppe
+  const sc = viewScope(state, isStale);
+  const paint = painter(el);
+  const stale = staleMark(el);
+  /** @type {any} */
+  let data = null;
+  let members = byId([]);
+  let decks = byId([]);
+  let hasGames = false;
   /** @type {Record<string, string|null>} */
   let urls = {};
-  try { urls = await avatarUrls((data?.members || []).map((m) => m.avatarPath)); } catch { urls = {}; }
-  if (isStale()) return;
+  const setData = (/** @type {any} */ d) => {
+    data = d;
+    members = byId(d?.members);
+    decks = byId(d?.decks);
+    hasGames = (d?.games || []).length > 0;
+  };
+  const signed = (/** @type {any} */ d) => avatarUrls((d?.members || []).map((m) => m.avatarPath)).catch(() => ({}));
 
   const meMemberId = currentMembership()?.id ?? null;
   const lang = getLang();
-  const hasGames = (data?.games || []).length > 0;
   let filter = readFilter(store());
 
   const name = (id) => members.get(id)?.name || '–';
@@ -100,10 +109,19 @@ export default async function history(el, { isStale }) {
     return list.map(eveningBlock);
   };
 
-  mount(el, html`
+  const draw = () => {
+    if (!data) {
+      paint(html`
+    <h2 class="title-xl">${t('history.title')}</h2>
+    <div class="hist-filters" role="group" aria-label="${t('history.filterLabel')}">${chips()}</div>
+    <div class="hist-skel">${skel.rows(5)}</div>`, { busy: true });
+      return;
+    }
+    paint(html`
     <h2 class="title-xl">${t('history.title')}</h2>
     ${hasGames ? html`<div class="hist-filters" role="group" aria-label="${t('history.filterLabel')}">${chips()}</div>` : ''}
     <div class="hist-list" aria-live="polite">${listHtml()}</div>`);
+  };
 
   on(el, 'click', '[data-filter]', (e, b) => {
     const f = validFilter(b.getAttribute('data-filter'));
@@ -111,7 +129,25 @@ export default async function history(el, { isStale }) {
     filter = f;
     writeFilter(store(), f);
     el.querySelectorAll('[data-filter]').forEach((c) => c.setAttribute('aria-pressed', String(c.getAttribute('data-filter') === f)));
-    const list = el.querySelector('.hist-list');
-    if (list) mount(list, html`${listHtml()}`);
+    if (data) draw();
+  });
+
+  const g = fromCache(sc.key('group'), (o) => groupData.loadGroup(sc.gid, o), { maxAge: GROUP_MAX_AGE_MS, fits: ownNameFits(state) });
+  if (g.cached) {
+    setData(g.cached.value);
+    const u = signed(data);
+    urls = (await settled(u)) || {};
+    if (!sc.ok()) return;
+    u.then((x) => { if (sc.ok()) { urls = x; draw(); } });
+  }
+  draw();
+  g.promise?.then(async (d) => {
+    if (!sc.ok()) return;
+    const u = await signed(d);
+    if (!sc.ok()) return;
+    setData(d); urls = u; draw(); stale.good();
+  }, (e) => {
+    if (!sc.ok()) return;
+    if (g.cached) { console.warn('Historie auffrischen', e); stale.bad(g.cached.at); } else fail(e);
   });
 }
