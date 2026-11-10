@@ -1,7 +1,8 @@
 // Ablauf „Spieler aus der Gruppe entfernen“ (src/views/member-remove.js) mit Client-Attrappe — Spec P10 G, Krit. 14.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runMemberRemoval, rpcOrUnavailable, canRemoveMember } from '../../src/views/member-remove.js';
+import fs from 'node:fs';
+import { runMemberRemoval, rpcOrUnavailable, canRemoveMember, removedRowKind, removedRow } from '../../src/views/member-remove.js';
 
 const M = { id: 'm-1', playgroup_id: 'g-1' };
 const fail = (message, code) => ({ data: null, error: { message, code } });
@@ -172,4 +173,30 @@ test('B1 canRemoveMember: Admin sieht Profil des Superadmins als Mitglied ⇒ ke
   assert.equal(canRemoveMember(plainMember, { isMe: false, isAdmin: false, isSuperadmin: true }), true, 'Superadmin ohne Gruppen-Admin');
   // Übergang: Profil ohne die Spalte (älterer Stand) ⇒ wie bisher
   assert.equal(canRemoveMember({ removed_at: null, role: 'member', profiles: { display_name: 'B' } }, admin), true, 'Spalte fehlt');
+});
+
+// Spec-Nachtrag „Gelöschte Konten“: Zeile in „Entfernte Spieler“ (groups.js)
+test('Entfernte Spieler: gelöschtes Konto ⇒ „Konto gelöscht“, kein Wiederherstellen-Knopf; frühere Konto-Zeile und Platzhalter wie bisher', () => {
+  const deleted = { id: 'm-del', former_profile_id: null, had_account: true };
+  const former = { id: 'm-for', former_profile_id: 'p-1', had_account: true };
+  const ph = { id: 'm-ph', former_profile_id: null, had_account: false };
+  const old = { id: 'm-old', former_profile_id: null }; // vor dem db push: Spalte fehlt
+  assert.deepEqual([deleted, former, ph, old].map(removedRowKind), ['deleted', 'invite', 'restore', 'restore']);
+  const rd = String(removedRow(deleted, 'Ehemaliges Mitglied'));
+  assert.match(rd, /Konto gelöscht/);
+  assert.doesNotMatch(rd, /data-act="restore"/, 'kein Knopf beim gelöschten Konto');
+  assert.doesNotMatch(rd, /Einladungslink/);
+  const rf = String(removedRow(former, 'Bea'));
+  assert.match(rf, /kommt über den Einladungslink zurück/);
+  assert.doesNotMatch(rf, /data-act="restore"|Konto gelöscht/);
+  for (const m of [ph, old]) {
+    const r = String(removedRow(m, 'Pit'));
+    assert.match(r, new RegExp(`data-act="restore" data-id="${m.id}"`), `Knopf bei ${m.id}`);
+    assert.doesNotMatch(r, /Konto gelöscht|Einladungslink/);
+  }
+  assert.match(String(removedRow(ph, '<b>x</b>')), /&lt;b&gt;x&lt;\/b&gt;/, 'Name escaped');
+  // groups.js baut die Liste aus genau diesem Baustein (kein eigener Knopf daneben)
+  const src = fs.readFileSync(new URL('../../src/views/groups.js', import.meta.url), 'utf8');
+  assert.match(src, /gone\.map\(\(m\) => removedRow\(m, memberName\(m\)\)\)/);
+  assert.doesNotMatch(src, /data-act="restore" data-id=/);
 });

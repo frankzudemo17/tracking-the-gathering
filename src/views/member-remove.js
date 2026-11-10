@@ -1,5 +1,33 @@
 // Spieler aus der Gruppe entfernen, Ablauf ohne DOM und ohne Netz-Import (Spec P10 G/H; Unit-Test
 // tests/unit/member-remove.test.mjs). Eigene Datei wie group-delete.js: profile.js importiert supabase.js.
+// Dazu die Zeile der Liste „Entfernte Spieler“ (groups.js) als reiner String-Baustein.
+import { html } from '../lib/dom.js';
+import { icon } from '../lib/icons.js';
+import { t } from '../i18n/index.js';
+
+/**
+ * Art einer entfernten Zeile (Spec-Nachtrag „Gelöschte Konten“): 'invite' = frühere Zeile eines bestehenden Kontos
+ * (kommt über den Einladungslink zurück) · 'deleted' = gehörte einem inzwischen gelöschten Konto (kein Knopf, der
+ * Server lehnt restore_member ab) · 'restore' = Platzhalter ohne Konto. former_profile_id geht vor; had_account fehlt
+ * vor dem db push (undefined) ⇒ wie bisher.
+ * @param {{ former_profile_id?: string|null, had_account?: boolean }} m
+ */
+export const removedRowKind = (m) => (m.former_profile_id ? 'invite' : m.had_account ? 'deleted' : 'restore');
+
+/**
+ * Zeile in „Entfernte Spieler“: Name, Hinweis je Art, Wiederherstellen-Knopf nur bei 'restore'.
+ * @param {{ id: string, former_profile_id?: string|null, had_account?: boolean }} m
+ * @param {string} name
+ */
+export function removedRow(m, name) {
+  const kind = removedRowKind(m);
+  const note = kind === 'invite' ? t('memberRemove.viaInvite') : kind === 'deleted' ? t('memberRemove.accountDeleted') : '';
+  return html`
+          <div class="row" data-removed-row="${m.id}">
+            <a class="grow" href="#/profil/${m.id}"><span class="title">${name}</span>${note ? html`<span class="tiny muted">${note}</span>` : ''}</a>
+            ${kind === 'restore' ? html`<button type="button" class="btn small soft" data-act="restore" data-id="${m.id}">${icon('arrowCounterClockwise', 16)}${t('memberRemove.restore')}</button>` : ''}
+          </div>`;
+}
 
 /** RPC fehlt (Migration noch nicht gepusht): PostgREST PGRST202. */
 export const isUnavailable = (e) => e?.code === 'PGRST202';

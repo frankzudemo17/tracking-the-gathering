@@ -9,6 +9,10 @@
 //                         (zeigt: der Trigger sperrt, nicht start_game)
 //   GEGENPROBE=detach   ⇒ _member_detach mit dem alten Verhalten (ältere frühere Zeile verliert den
 //                         Kontobezug) ⇒ „Frühere Zeilen“ (Spec-Nachtrag B2) rot
+//   GEGENPROBE=restore  ⇒ restore_member ohne die had_account-Prüfung ⇒ „Gelöschte Konten“ (a)/(b) rot
+//                         (der Check members_had_account_no_code hält den Code dann noch auf, aber mit
+//                         anderer Meldung — die Fälle prüfen ausdrücklich member_has_account)
+//   GEGENPROBE=check    ⇒ Check members_had_account_no_code abgeschaltet ⇒ „Gelöschte Konten“ (f) rot
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,7 +23,7 @@ import { probeMembers, membersCleanup } from '../e2e/fixture-members.mjs';
 
 const FILE = '20261117000000_mitglieder.sql';
 const GEGEN = process.env.GEGENPROBE || '';
-const EXPECTED = 23;
+const EXPECTED = 25;
 let ran = 0;
 let gegenDir = null;
 const check = (name, fn) => test(name, async () => { ran++; await fn(); });
@@ -88,12 +92,14 @@ check('K1 Bestand: Migration löscht und ändert nichts; neue Spalten leer, vom 
     eq(await allCounts(d), before0, 'Zeilenzahlen aller public-Tabellen vor = nach');
     const after0 = await q(`select * from members order by id`);
     ok(after0.every((r) => r.removed_at === null && r.removed_by === null && r.former_profile_id === null), 'drei neue Spalten null');
+    // had_account: hier nur Konten und Platzhalter mit Code ⇒ überall false (Bestand gelöschter Konten: eigener Fall „Gelöschte Konten (e)“)
+    ok(after0.every((r) => r.had_account === false), 'had_account false');
     // alte Spalten feldgleich
-    eq(after0.map(({ removed_at, removed_by, former_profile_id, ...r }) => J(r)), membersBefore, 'Bestandsspalten unverändert');
+    eq(after0.map(({ removed_at, removed_by, former_profile_id, had_account, ...r }) => J(r)), membersBefore, 'Bestandsspalten unverändert');
 
     // Client (Gruppen-Admin) setzt keine der neuen Spalten — Spaltenfreigabe nur display_name, avatar_path
     await as(U.A);
-    for (const col of [`removed_at = now()`, `removed_by = '${U.A}'`, `former_profile_id = '${U.B}'`]) {
+    for (const col of [`removed_at = now()`, `removed_by = '${U.A}'`, `former_profile_id = '${U.B}'`, `had_account = true`]) {
       const e = await err(`update members set ${col} where id = $1`, [tim.id]);
       ok(/permission denied/.test(e || ''), `${col}: ${e}`);
     }
@@ -662,6 +668,7 @@ check('Frühere Zeilen (B2): verlassen → Platzhalter übernehmen → verlassen
   const tn = async (sql, p) => (await tq(sql, p))[0].n;
   try {
     if (GEGEN === 'detach') await d.exec(OLD_DETACH);
+    if (GEGEN === 'restore') await d.exec(OLD_RESTORE);
     for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de']]) await t.seedUser(id, { email });
     await t.su();
     await tq(`update profiles set display_name = 'Bea Echtname' where id = $1`, [U.B]);
@@ -691,6 +698,9 @@ check('Frühere Zeilen (B2): verlassen → Platzhalter übernehmen → verlassen
     // (a) beide Zeilen tragen former_profile_id
     const s0 = await rows();
     eq(s0.map((r) => [r.id, r.profile_id, r.former_profile_id, !!r.removed_at]), [[r1, null, U.B, true], [pl.id, null, U.B, true]], '(a) beide frühere Zeilen von B');
+    // Spec-Nachtrag „Gelöschte Konten“ (d): auch der übernommene Platzhalter (Pit, nie zuvor Konto) trägt nach dem Verlassen had_account
+    eq((await tq(`select id, had_account from members where id = any($1) order by removed_at`, [[r1, pl.id]])).map((r) => [r.id, r.had_account]),
+      [[r1, true], [pl.id, true]], 'Gelöschte Konten (d): beide had_account');
     // (b) restore_member auf beide ⇒ member_has_account, nichts geändert
     await t.as(U.A);
     for (const id of [r1, pl.id]) ok(/member_has_account/.test(await terr(`select * from restore_member($1)`, [id]) || ''), `(b) ${id}`);
@@ -700,6 +710,7 @@ check('Frühere Zeilen (B2): verlassen → Platzhalter übernehmen → verlassen
     await t.as(U.B);
     const [j] = await tq(`select * from join_playgroup($1)`, [Xg.invite_code]);
     ok(j.id === pl.id && j.profile_id === U.B && j.role === 'member' && j.removed_at === null && j.former_profile_id === null, J(j));
+    ok(j.had_account === true, 'had_account wird nie wieder false (auch aktiv mit Konto)');
     await t.su();
     eq((await rows())[0], s0[0], '(c) ältere Zeile R1 unverändert');
     eq(await tn(`select count(*)::int n from members where playgroup_id = $1 and profile_id = $2`, [Xg.id, U.B]), 1, '(c) genau eine aktive Zeile');
@@ -723,6 +734,120 @@ check('Frühere Zeilen (B2): verlassen → Platzhalter übernehmen → verlassen
     eq(await tn(`select count(*)::int n from members where playgroup_id = $1`, [Xg.id]), m0, '(d) keine neue Zeile');
     // Deck-Übernahme in c) fest bestimmt: die zuletzt entfernte frühere Zeile (Pit) übernimmt Bs gespieltes Deck
     eq((await tq(`select owner_member_id, owner_profile_id from decks where id = $1`, [dB]))[0], { owner_member_id: pl.id, owner_profile_id: null });
+    // Spec-Nachtrag „Gelöschte Konten“ (a): former_profile_id ist jetzt leer (Fremdschlüssel set null) — trotzdem
+    // lehnt restore_member beide Zeilen ab; keine Zeile trägt je einen Code
+    const s1 = await tq(`select id, former_profile_id, had_account, claim_code from members where id = any($1) order by id`, [[r1, pl.id]]);
+    ok(s1.every((r) => r.former_profile_id === null && r.had_account === true && r.claim_code === null), `Gelöschte Konten (a) vorher: ${J(s1)}`);
+    await t.as(U.A);
+    for (const id of [r1, pl.id]) {
+      const e = await terr(`select * from restore_member($1)`, [id]);
+      ok(/member_has_account/.test(e || ''), `Gelöschte Konten (a) ${id}: ${e}`);
+    }
+    await t.su();
+    eq(await tq(`select id, former_profile_id, had_account, claim_code from members where id = any($1) order by id`, [[r1, pl.id]]), s1, 'Gelöschte Konten (a): nichts geändert');
+    eq(await tn(`select count(*)::int n from members where playgroup_id = $1 and had_account and profile_id is null and claim_code is not null`, [Xg.id]), 0);
+  } finally {
+    await d.close();
+  }
+});
+
+// ================================================================ Spec-Nachtrag „Gelöschte Konten“ (eigene Datenbanken)
+// restore_member ohne die had_account-Prüfung (Schritt 4) — aus der Migration geschnitten, nur Gegenprobe.
+const OLD_RESTORE = (() => {
+  const src = fs.readFileSync(path.join(MIGRATIONS, FILE), 'utf8');
+  const fn = src.match(/create or replace function public\.restore_member\([\s\S]*?\nend \$\$;/)[0];
+  const old = fn.replace(/\r?\n[^\n]*if m\.had_account then raise exception 'member_has_account'; end if;/, '');
+  assert.notEqual(old, fn, 'had_account-Prüfung in restore_member nicht gefunden');
+  return old;
+})();
+check('Gelöschte Konten (b)(c)(f): beim Löschen aktive Zeile ⇒ had_account, entfernen ⇒ wiederherstellen abgelehnt; Platzhalter ohne Konto wie bisher; Check hält Code ab', async () => {
+  const d = await freshDb({ migrations: migrations() });
+  const t = tools(d);
+  const tq = t.q, terr = t.err;
+  try {
+    if (GEGEN === 'restore') await d.exec(OLD_RESTORE);
+    if (GEGEN === 'check') await d.exec('alter table public.members drop constraint members_had_account_no_code;');
+    for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de']]) await t.seedUser(id, { email });
+    const Xg = await t.mkGroup(U.A, 'X');
+    await t.as(U.A);
+    const a = (await tq(`select my_member_id($1) id`, [Xg.id]))[0].id;
+    const dA = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'A1', 'A1') returning id`, [U.A]))[0].id;
+    const [pl] = await tq(`select * from create_placeholder($1, 'Pit')`, [Xg.id]);
+    const dP = (await tq(`insert into decks (owner_member_id, commander_name, short_name) values ($1, 'P1', 'P1') returning id`, [pl.id]))[0].id;
+    await t.as(U.B);
+    const mB = (await tq(`select * from join_playgroup($1)`, [Xg.invite_code]))[0].id;
+    const dB = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'B1', 'B1') returning id`, [U.B]))[0].id;
+    await t.as(U.A);
+    const [g1] = await tq(START, [Xg.id, J([P(a, dA, 0), P(mB, dB, 1), P(pl.id, dP, 2)])]);
+    await tq(`select * from finish_game($1, 'finished', 3, $2::jsonb)`, [g1.id, J([R(a, 1), R(mB, 2, a), R(pl.id, 3, mB)])]);
+    // (b) B löscht sein Konto, während die Zeile aktiv ist ⇒ „Ehemaliges Mitglied“, had_account
+    await t.as(U.B);
+    eq(await terr(`select delete_my_account()`), null);
+    await t.su();
+    const rb = (await tq(`select * from members where id = $1`, [mB]))[0];
+    ok(rb.profile_id === null && rb.former_profile_id === null && rb.removed_at === null && rb.claim_code === null
+       && rb.had_account === true && rb.display_name === 'Ehemaliges Mitglied', `(b) nach Löschen: ${J(rb)}`);
+    // Admin entfernt (Modus mark: Spiel verweist), dann wiederherstellen ⇒ member_has_account, Zeile unverändert
+    await t.as(U.A);
+    eq((await tq(`select remove_member($1, 'mark') r`, [mB]))[0].r, { result: 'marked' });
+    await t.su();
+    const rb2 = (await tq(`select * from members where id = $1`, [mB]))[0];
+    ok(rb2.removed_at !== null && rb2.had_account === true && rb2.claim_code === null, `(b) markiert: ${J(rb2)}`);
+    await t.as(U.A);
+    const eb = await terr(`select * from restore_member($1)`, [mB]);
+    ok(/member_has_account/.test(eb || ''), `(b) restore_member: ${eb}`);
+    await t.su();
+    eq((await tq(`select * from members where id = $1`, [mB]))[0], rb2, '(b) nichts geändert');
+    // (c) gewöhnlicher Platzhalter (nie Konto): entfernen (mark) ⇒ wiederherstellen ⇒ neuer Code, had_account false
+    await t.as(U.A);
+    eq((await tq(`select remove_member($1, 'mark') r`, [pl.id]))[0].r, { result: 'marked' });
+    const [rp] = await tq(`select * from restore_member($1)`, [pl.id]);
+    ok(rp.id === pl.id && rp.removed_at === null && rp.profile_id === null && rp.had_account === false
+       && CODE_RE.test(rp.claim_code || '') && rp.claim_code !== pl.claim_code, `(c) ${J(rp)}`);
+    // (f) Stolperdraht: als Tabellen-Eigentümer einer had_account-Zeile ohne Konto einen Code geben ⇒ abgelehnt
+    await t.su();
+    const ef = await terr(`update members set claim_code = 'EHEM-ABCDEF' where id = $1`, [mB]);
+    ok(/members_had_account_no_code/.test(ef || ''), `(f) Check: ${ef}`);
+    eq((await tq(`select claim_code from members where id = $1`, [mB]))[0].claim_code, null, '(f) kein Code');
+    // Gegenstück: der übernehmbare Platzhalter (had_account false) darf seinen Code behalten
+    eq(await terr(`update members set claim_code = 'PIT-ABCDEF' where id = $1`, [pl.id]), null, '(f) Platzhalter ohne Konto: Code erlaubt');
+  } finally {
+    await d.close();
+  }
+});
+
+check('Gelöschte Konten (e) Bestand: Zeilen gelöschter Konten (vor P10) ⇒ had_account true; Platzhalter mit Code und Konten ⇒ false', async () => {
+  const d = await freshDb({ migrations: migrations(), until: FILE });
+  const t = tools(d);
+  const tq = t.q;
+  try {
+    for (const [id, email] of [[U.A, 'a@x.de'], [U.B, 'b@x.de']]) await t.seedUser(id, { email });
+    const Xg = await t.mkGroup(U.A, 'X');
+    await t.as(U.A);
+    const a = (await tq(`select my_member_id($1) id`, [Xg.id]))[0].id;
+    const dA = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'A1', 'A1') returning id`, [U.A]))[0].id;
+    const [tim] = await tq(`select * from create_placeholder($1, 'Tim')`, [Xg.id]);
+    await t.as(U.B);
+    const mB = (await tq(`select * from join_playgroup($1)`, [Xg.invite_code]))[0].id;
+    const dB = (await tq(`insert into decks (owner_profile_id, commander_name, short_name) values ($1, 'B1', 'B1') returning id`, [U.B]))[0].id;
+    await t.as(U.A);
+    const [g1] = await tq(START, [Xg.id, J([P(a, dA, 0), P(mB, dB, 1)])]);
+    await tq(`select * from finish_game($1, 'finished', 2, $2::jsonb)`, [g1.id, J([R(a, 1), R(mB, 2, a)])]);
+    // Form a) aus 20261112000000_konto.sql:122: das echte delete_my_account vor P10 wandelt Bs Zeile um
+    await t.as(U.B);
+    await tq(`select delete_my_account()`);
+    // Form c) aus 20261112000000_konto.sql:156 (Deck-Erb-Zeile in einer Gruppe ohne Zeile des Kontos), wortgleich eingefügt
+    await t.su();
+    const [{ id: heir }] = await tq(`insert into members (playgroup_id, display_name) values ($1, 'Ehemaliges Mitglied') returning id`, [Xg.id]);
+    const pre = await tq(`select id, profile_id, claim_code from members where playgroup_id = $1 order by id`, [Xg.id]);
+    eq(pre.filter((r) => r.profile_id === null && r.claim_code === null).map((r) => r.id).sort(), [mB, heir].sort(), 'vorher: genau die zwei Zeilen ohne Konto und Code');
+    if (GEGEN !== '1') await d.exec(fs.readFileSync(path.join(MIGRATIONS, FILE), 'utf8'));
+    const got = Object.fromEntries((await tq(`select id, had_account from members where playgroup_id = $1`, [Xg.id])).map((r) => [r.id, r.had_account]));
+    eq(got, { [a]: false, [tim.id]: false, [mB]: true, [heir]: true }, '(e) had_account nach der Migration');
+    // und die Folge: Bs umgewandelte Zeile ist nach entfernen nicht wiederherstellbar
+    await t.as(U.A);
+    eq((await tq(`select remove_member($1, 'mark') r`, [mB]))[0].r, { result: 'marked' });
+    ok(/member_has_account/.test(await t.err(`select * from restore_member($1)`, [mB]) || ''), '(e) restore_member abgelehnt');
   } finally {
     await d.close();
   }

@@ -132,7 +132,7 @@ export default {
     yesDelete: 'Endgültig löschen', yesMark: 'Entfernen',
     deleted: '{name} wurde gelöscht.', marked: '{name} wurde entfernt.', already: '{name} ist schon entfernt.',
     removedTitle: 'Entfernte Spieler', restore: 'Wiederherstellen', restored: '{name} ist wieder dabei.',
-    viaInvite: 'kommt über den Einladungslink zurück',
+    viaInvite: 'kommt über den Einladungslink zurück', accountDeleted: 'Konto gelöscht',
     leave: 'Gruppe verlassen', leaveSub: 'Deine Spiele bleiben in der Historie.', leaveTitle: '„{name}“ verlassen?',
     leaveText: 'Du verlässt „{name}“. Deine Spiele bleiben in der Historie; du siehst die Gruppe danach nicht mehr. Über Verwaltung → Alle Gruppen kannst du sie wieder betreten.',
     leaveTextMember: 'Du verlässt „{name}“. Deine Spiele bleiben in der Historie; du siehst die Gruppe danach nicht mehr. Zurück kommst du mit einem Einladungslink.',

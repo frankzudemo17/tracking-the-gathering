@@ -132,7 +132,7 @@ export default {
     yesDelete: 'Delete for good', yesMark: 'Remove',
     deleted: '{name} was deleted.', marked: '{name} was removed.', already: '{name} is already removed.',
     removedTitle: 'Removed players', restore: 'Restore', restored: '{name} is back.',
-    viaInvite: 'comes back via the invite link',
+    viaInvite: 'comes back via the invite link', accountDeleted: 'Account deleted',
     leave: 'Leave group', leaveSub: 'Your games stay in the history.', leaveTitle: 'Leave “{name}”?',
     leaveText: 'You are leaving “{name}”. Your games stay in the history; you will no longer see the group. You can enter it again under Admin → All groups.',
     leaveTextMember: 'You are leaving “{name}”. Your games stay in the history; you will no longer see the group. You can come back with an invite link.',

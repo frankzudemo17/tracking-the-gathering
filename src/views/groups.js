@@ -11,7 +11,7 @@ import { inviteCode } from '../zugang/invite.js';
 import { shareInvite, openInviteQr, openRenew } from '../zugang/invite-ui.js';
 import { t } from '../i18n/index.js';
 import { go } from '../router.js';
-import { rpcOrUnavailable } from './member-remove.js';
+import { rpcOrUnavailable, removedRow } from './member-remove.js';
 import { groupData } from '../lib/data.js';
 
 export const MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path)';
@@ -190,11 +190,7 @@ export default async function groups(el, { isStale }) {
         <span class="chev">${icon('chevDown', 20)}</span>
       </button>
       <div id="grp-removed" class="list" hidden>
-        ${gone.map((m) => html`
-          <div class="row" data-removed-row="${m.id}">
-            <a class="grow" href="#/profil/${m.id}"><span class="title">${memberName(m)}</span>${m.former_profile_id ? html`<span class="tiny muted">${t('memberRemove.viaInvite')}</span>` : ''}</a>
-            ${m.former_profile_id ? '' : html`<button type="button" class="btn small soft" data-act="restore" data-id="${m.id}">${icon('arrowCounterClockwise', 16)}${t('memberRemove.restore')}</button>`}
-          </div>`)}
+        ${gone.map((m) => removedRow(m, memberName(m)))}
       </div>
     </div>` : ''}
 

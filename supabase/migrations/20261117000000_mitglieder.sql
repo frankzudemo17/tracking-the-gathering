@@ -7,6 +7,9 @@
 --    schließen Entfernte von selbst aus. Die Spaltenfreigabe aus 20261109000000_sicherheit.sql
 --    (update display_name, avatar_path) bleibt ⇒ die neuen Spalten setzt nur eine Funktion.
 --    Index game_players(deck_id) für den neuen Zweig in can_see_deck.
+--    Spec-Nachtrag „Gelöschte Konten“: members.had_account (je zu einem Konto gehört, nie wieder false;
+--    gesetzt in _member_detach und delete_my_account, Bestand per update) + Check members_had_account_no_code;
+--    restore_member lehnt solche Zeilen ab ⇒ die Historie eines gelöschten Kontos wird nie übernehmbar.
 -- B. Regel „löschen oder markieren“: kein einziger Verweis ⇒ Zeile wirklich löschen (samt
 --    Decks und deck_cards); irgendein Verweis ⇒ markieren (removed_at), Historie unberührt.
 --    Der Modus kommt aus einem Löschversuch im Unterblock (zurückgerollt), nicht aus einer
@@ -35,7 +38,7 @@
 --    members.former_profile_id (set null).
 -- Rückwärts-Block (am Ende): stellt mem_update, mem_delete, die vier D-Funktionen,
 --    join_playgroup und delete_my_account wortgleich wieder her, entfernt Trigger, Funktionen,
---    Indizes und Spalten. Preis (Risiko 2): Markierungen gehen verloren — markierte Zeilen sind
+--    Indizes, Checks und Spalten (auch had_account). Preis (Risiko 2): Markierungen gehen verloren — markierte Zeilen sind
 --    danach wieder aktiv, umgewandelte Zeilen bleiben als Platzhalter ohne Konto zurück.
 --    Gefahrlos nur vor dem ersten echten Entfernen.
 -- ============================================================================
@@ -54,6 +57,18 @@ alter table public.members
 -- haben (verlassen → Platzhalter übernehmen → wieder verlassen); jede behält former_profile_id.
 create index members_group_former_profile_idx on public.members (playgroup_id, former_profile_id)
   where former_profile_id is not null;
+-- Spec-Nachtrag „Gelöschte Konten“: had_account = die Zeile gehörte je zu einem Konto; wird nie wieder
+-- false. former_profile_id reicht dafür nicht (Fremdschlüssel on delete set null leert es beim Löschen des
+-- Kontos). Eine solche Zeile bekommt nie einen Übernahme-Code (restore_member, Check unten).
+alter table public.members add column had_account boolean not null default false;
+-- Bestand: vor dieser Migration entsteht eine Zeile ohne Konto und ohne Code nur durch ein gelöschtes Konto
+-- (delete_my_account a/c in 20261112000000_konto.sql oder profiles-Löschung per Fremdschlüssel; Platzhalter aus
+-- create_placeholder tragen immer einen Code, übernommene ein profile_id, claim_member löscht den Platzhalter
+-- beim Zusammenführen). Vor dem db push read-only zählen (WELLE.md Dirigat).
+update public.members set had_account = true where profile_id is null and claim_code is null;
+-- Stolperdraht: nie zugleich had_account, kein Konto und ein Code
+alter table public.members
+  add constraint members_had_account_no_code check (not (had_account and profile_id is null and claim_code is not null));
 create index game_players_deck_id_idx on public.game_players (deck_id);
 
 -- ---------------------------------------------------------------------------
@@ -181,6 +196,8 @@ begin
   if m.profile_id is not null then raise exception 'member_has_account'; end if;
   if m.removed_at is null then return m; end if;
   if m.former_profile_id is not null then raise exception 'member_has_account'; end if;
+  -- Spec-Nachtrag „Gelöschte Konten“: auch nach dem Löschen des Kontos (former_profile_id leer) kein Code
+  if m.had_account then raise exception 'member_has_account'; end if;
   prefix := left(regexp_replace(
               replace(replace(replace(replace(upper(m.display_name), 'Ä', 'AE'), 'Ö', 'OE'), 'Ü', 'UE'), 'ß', 'SS'),
               '[^A-Z]', '', 'g'), 4);
@@ -286,7 +303,7 @@ begin
   end if;
   select left(coalesce(nullif(p.display_name, ''), m.display_name), 40) into nm from profiles p where p.id = m.profile_id;
   update members set former_profile_id = m.profile_id, profile_id = null, display_name = coalesce(nm, m.display_name),
-    role = 'member', removed_at = now(), removed_by = auth.uid(), claim_code = null
+    role = 'member', removed_at = now(), removed_by = auth.uid(), claim_code = null, had_account = true
   where id = m.id;
   return 'mark';
 end $$;
@@ -383,7 +400,8 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- Block K5: delete_my_account (jüngste Definition 20261112000000_konto.sql:89–194) bekommt
 -- EINEN Block vor Schritt a) und in c) eine feste Reihenfolge bei der Wahl der Zeile, die ein Deck
--- übernimmt (eine Gruppe kann mehrere Zeilen in former[] haben); sonst wortgleich.
+-- übernimmt (eine Gruppe kann mehrere Zeilen in former[] haben); dazu had_account = true in a) und c)
+-- (Spec-Nachtrag „Gelöschte Konten“); sonst wortgleich.
 -- ---------------------------------------------------------------------------
 create or replace function public.delete_my_account()
 returns void language plpgsql security definer set search_path = public as $$
@@ -407,7 +425,7 @@ begin
   -- P10 Block K5 (20261117000000_mitglieder.sql): frühere Mitgliedschaften (verlassen/entfernt,
   -- former_profile_id, alle — auch mehrere je Gruppe) heißen danach neutral und nehmen in c) die
   -- Decks auf, statt dass dort eine neue aktive Zeile entsteht. Dazu in c) eine feste Reihenfolge.
-  update members set display_name = 'Ehemaliges Mitglied' where former_profile_id = me;
+  update members set display_name = 'Ehemaliges Mitglied', had_account = true where former_profile_id = me;
   former := former || array(select x.id from members x where x.former_profile_id = me order by x.created_at, x.id);
 
   -- a) Mitgliedschaften
@@ -425,7 +443,7 @@ begin
         update members set role = 'admin' where id = heir;
       end if;
       update members set profile_id = null, display_name = 'Ehemaliges Mitglied', claim_code = null,
-                         avatar_path = null, role = 'member', claimed_at = null
+                         avatar_path = null, role = 'member', claimed_at = null, had_account = true
       where id = m.id;
       former := former || m.id;
     end if;
@@ -461,7 +479,8 @@ begin
       select x.id into ph from members x where x.id = any(former) and x.playgroup_id = gid
       order by x.removed_at desc nulls first, x.id limit 1;
       if ph is null then
-        insert into members (playgroup_id, display_name) values (gid, 'Ehemaliges Mitglied') returning id into ph;
+        -- Spec-Nachtrag „Gelöschte Konten“: die Zeile trägt die Decks des gelöschten Kontos
+        insert into members (playgroup_id, display_name, had_account) values (gid, 'Ehemaliges Mitglied', true) returning id into ph;
         former := former || ph;
       end if;
       if not used then
@@ -697,6 +716,8 @@ revoke execute on function public._member_delete(uuid), public._member_deletable
 -- );
 -- drop index public.game_players_deck_id_idx;
 -- drop index public.members_group_former_profile_idx;
+-- alter table public.members drop constraint members_had_account_no_code;
+-- alter table public.members drop column had_account;
 -- alter table public.members drop constraint members_former_no_account, drop constraint members_removed_no_account;
 -- alter table public.members drop column former_profile_id, drop column removed_by, drop column removed_at;
 -- RÜCKWÄRTS-ENDE
