@@ -30,7 +30,14 @@ function segRow(key, ic, title, sub, options, value, label, extra = '') {
   </div>`;
 }
 
-function view(p) {
+/** Kopf eines Abschnitts: Knopf, der die Liste darunter auf- und zuklappt (Muster wie „Decks“ im Profil). */
+function foldHead(key, title, open) {
+  return html`<button type="button" class="collapse-head" data-fold="${key}" aria-expanded="${String(open)}" aria-controls="tb-list-${key}">
+    <h3 class="section-title">${title}</h3><span class="chev">${icon('chevDown', 20)}</span>
+  </button>`;
+}
+
+function view(p, open) {
   const variants = p.koScreens === 'some'
     ? html`<div class="tb-checks" role="group" aria-label="${t('table.ko.title')}">${KO_VARIANTS.map((v) => {
       const on = p.koVariants.includes(v);
@@ -41,8 +48,8 @@ function view(p) {
     : '';
   return html`
     <div class="section" data-settings="table">
-      <div class="section-head"><h3 class="section-title">${t('table.tableTitle')}</h3></div>
-      <div class="list">
+      ${foldHead('table', t('table.tableTitle'), open.table)}
+      <div class="list" id="tb-list-table" ${open.table ? '' : html`hidden`}>
         ${switchRow('wakeLock', 'sun', t('table.wake.title'), t('table.wake.sub'), p.wakeLock, !canWakeLock())}
         ${switchRow('vibration', 'vibrate', t('table.vibration.title'), t('table.vibration.sub'), p.vibration, !canVibrate())}
         ${segRow('reduceMotion', 'sliders', t('table.motion.title'), t(`table.motion.subs.${p.reduceMotion}`), MOTION_MODES, p.reduceMotion, (m) => t(`table.motion.modes.${m}`))}
@@ -51,8 +58,8 @@ function view(p) {
     </div>
 
     <div class="section" data-settings="game">
-      <div class="section-head"><h3 class="section-title">${t('table.gameTitle')}</h3></div>
-      <div class="list">
+      ${foldHead('game', t('table.gameTitle'), open.game)}
+      <div class="list" id="tb-list-game" ${open.game ? '' : html`hidden`}>
         ${segRow('startLife', 'heart', t('table.life.title'), t('table.life.sub'), START_LIVES, p.startLife, (v) => String(v))}
         ${segRow('layout', 'deviceMobile', t('table.layout.title'), t(`setup.layoutDesc.${p.layout}`), LAYOUTS, p.layout, (k) => t(`setup.layouts.${k}`))}
         <div class="row static tb-row tb-stack">
@@ -81,15 +88,24 @@ function nextValue(p, key, b) {
 }
 
 export function renderTableSettings(slot) {
+  // Beide Abschnitte sind beim Öffnen der Seite zu; der Stand hält, solange die Seite steht (auch über Neuzeichnen).
+  const open = { table: false, game: false };
   const paint = () => {
-    const focus = document.activeElement && slot.contains(document.activeElement)
-      ? { pref: document.activeElement.dataset.pref, v: document.activeElement.dataset.v } : null;
-    mount(slot, view(getPrefs()));
-    if (focus?.pref) {
+    const ae = /** @type {HTMLElement|null} */ (document.activeElement && slot.contains(document.activeElement) ? document.activeElement : null);
+    const focus = ae ? { pref: ae.dataset.pref, v: ae.dataset.v, fold: ae.dataset.fold } : null;
+    mount(slot, view(getPrefs(), open));
+    if (focus?.fold) /** @type {HTMLElement|null} */ (slot.querySelector(`[data-fold="${focus.fold}"]`))?.focus({ preventScroll: true });
+    else if (focus?.pref) {
       const sel = `[data-pref="${focus.pref}"]${focus.v != null ? `[data-v="${focus.v}"]` : ''}`;
       slot.querySelector(sel)?.focus({ preventScroll: true });
     }
   };
+  on(slot, 'click', '[data-fold]', (e, b) => {
+    const key = b.dataset.fold;
+    if (key !== 'table' && key !== 'game') return;
+    open[key] = !open[key];
+    paint();
+  });
   on(slot, 'click', '[data-pref]', (e, b) => {
     if (b.disabled || b.getAttribute('aria-disabled') === 'true') return;
     const key = b.dataset.pref;

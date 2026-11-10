@@ -5,7 +5,7 @@
 // esm.sh (supabase-js) „Cache zuerst“. Supabase-Anfragen werden nie gecacht.
 // Schriften liegen selbst gehostet unter assets/fonts/ und stehen in der SHELL (offline da).
 // Die Ereignis-Warteschlange für Offline-Spiele folgt in Etappe 5/6.
-const VERSION = 'ttg-v27';
+const VERSION = 'ttg-v28';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './src/styles/fonts.css', './src/styles/tokens.css', './src/styles/base.css', './src/styles/components.css',

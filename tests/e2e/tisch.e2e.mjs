@@ -71,7 +71,13 @@ export default async function tischE2e({ browser, base: BASE }) {
     && (await P.getAttribute('[data-act="layout"][data-l="seiten"]', 'aria-pressed')) === 'true');
 
   await P.goto(BASE + '#/einstellungen');
+  await P.waitForSelector('[data-fold="table"]');
+  ok('Einstellungen: „Am Tisch“ und „Spiel-Standards“ zu Beginn zugeklappt', (await P.getAttribute('[data-fold="table"]', 'aria-expanded')) === 'false'
+    && (await P.getAttribute('[data-fold="game"]', 'aria-expanded')) === 'false' && !(await P.isVisible('[data-pref="wakeLock"]')) && !(await P.isVisible('[data-pref="startLife"][data-v="30"]')));
+  await P.click('[data-fold="table"]');
+  await P.click('[data-fold="game"]');
   await P.waitForSelector('[data-settings="table"] [data-pref="wakeLock"]');
+  ok('Beide Abschnitte aufgeklappt', (await P.getAttribute('[data-fold="table"]', 'aria-expanded')) === 'true' && (await P.isVisible('[data-pref="startLife"][data-v="30"]')));
   ok('Einstellungen: Abschnitte „Am Tisch“ und „Spiel-Standards“ zwischen Erscheinungsbild und Konto', await P.evaluate(() => {
     const secs = [...document.querySelectorAll('#view .section-title')].map((h) => h.textContent.trim());
     return secs.indexOf('Am Tisch') > 0 && secs.indexOf('Spiel-Standards') === secs.indexOf('Am Tisch') + 1 && secs.indexOf('Konto') === secs.indexOf('Spiel-Standards') + 1;
