@@ -258,6 +258,7 @@ export default async function life(el, { params, isStale }) {
         .map((c, i) => ({ ...c, name: nm(c.id), top: i === 0 && (c.damage > 0 || c.poison > 0) }));
       showKo(el, {
         player: { id: mid, name: nm(mid) }, deck: deckOf(mid), by, pick: koPick(appRand), candidates,
+        round: s.round, life: { victim: p.life, by: by != null ? (pl(by)?.life ?? null) : null, start: s.setup?.startingLife ?? null },
         onEliminate: (byId) => { koOpen = false; doAct({ type: 'eliminate', target: mid, by: byId ?? null }); },
         onCancel: () => { koOpen = false; nextKo(); },
       });
