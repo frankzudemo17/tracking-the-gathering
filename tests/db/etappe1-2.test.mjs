@@ -103,8 +103,16 @@ check('Letzter Admin kann sich nicht herabstufen', async () => {
   e = await err(`select * from set_member_role((select id from members where profile_id = $1), 'member')`, [U.A]);
   ok(e && /mindestens einen Admin/.test(e), e);
 });
-check('Admin kann befördern', async () => {
+// P9 Zugang (Krit. 14): Befördern zu admin nur Superadmin; der Gruppen-Admin bekommt superadmin_only,
+// der positive Fall läuft als Superadmin (B, Flag per SQL, nicht Mitglied der Gruppe).
+check('Admin kann nicht befördern (superadmin_only), Superadmin kann', async () => {
+  e = await err(`select * from set_member_role($1, 'admin')`, [mc.id]);
+  ok(e && /superadmin_only/.test(e), e);
+  await su(); await q(`update profiles set is_superadmin = true where id = $1`, [U.B]);
+  await as(U.B);
   [promo] = await q(`select * from set_member_role($1, 'admin')`, [mc.id]);
+  await su(); await q(`update profiles set is_superadmin = false where id = $1`, [U.B]);
+  await as(U.A);
   ok(promo.role === 'admin');
 });
 
