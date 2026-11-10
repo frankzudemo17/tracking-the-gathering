@@ -1,9 +1,11 @@
 // Service Worker · Etappe 1: App-Shell offline verfügbar.
 // Strategie: eigene Dateien „Netz zuerst, sonst Cache“ (so kommen Updates sofort an),
+// dabei am HTTP-Cache vorbei neu prüfen (GitHub Pages liefert max-age=600 — sonst mischen sich
+// nach einem Deploy bis zu 10 Minuten lang alte und neue Module),
 // esm.sh (supabase-js) „Cache zuerst“. Supabase-Anfragen werden nie gecacht.
 // Schriften liegen selbst gehostet unter assets/fonts/ und stehen in der SHELL (offline da).
 // Die Ereignis-Warteschlange für Offline-Spiele folgt in Etappe 5/6.
-const VERSION = 'ttg-v15';
+const VERSION = 'ttg-v17';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './src/styles/fonts.css', './src/styles/tokens.css', './src/styles/base.css', './src/styles/components.css',
@@ -34,11 +36,15 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
 
   if (url.origin === self.location.origin) {
+    const nav = req.mode === 'navigate';
+    const cached = () => caches.match(req, { ignoreSearch: true });
     e.respondWith(
-      fetch(req).then((res) => {
-        if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); }
-        return res;
-      }).catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match('./index.html')))
+      (nav ? fetch(req) : fetch(req, { cache: 'no-cache' })).then((res) => {
+        if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); return res; }
+        // 404/5xx (z. B. mitten im Deploy): lieber die letzte gute Fassung als eine Fehlerseite
+        return cached().then((hit) => hit || res);
+      }).catch(() => cached().then((hit) => hit || (nav ? caches.match('./index.html') : null) || Response.error()))
+      // index.html nur als Ersatz für Seitenaufrufe — nie als Antwort auf ein Skript, Stylesheet oder Bild
     );
     return;
   }

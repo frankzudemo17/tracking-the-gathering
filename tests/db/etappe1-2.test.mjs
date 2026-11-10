@@ -171,7 +171,7 @@ check('Fremdes Mitglied nicht in eigenes Spiel setzbar', async () => {
   await q(`insert into game_players (game_id, member_id, seat, place) values ($1,$2,0,1), ($1,$3,1,2)`, [game.id, meA, tim.id]);
   await q(`update game_players set eliminated_by = $2, eliminated_round = 5 where game_id = $1 and member_id = $3`, [game.id, meA, tim.id]);
   await q(`insert into game_events (game_id, round, type, source, target, amount) values ($1, 3, 'damage', $2, $3, 7), ($1, 4, 'damage', $3, $2, 2)`, [game.id, meA, tim.id]);
-  await q(`insert into player_ratings (game_id, member_id, salt, fun) values ($1, $2, 4, 3)`, [game.id, tim.id]);
+  await su(); await q(`insert into player_ratings (game_id, member_id, salt, fun) values ($1, $2, 4, 3)`, [game.id, tim.id]); await as(U.A);
   await q(`update games set status = 'finished' where id = $1`, [game.id]);
   // fremde Gruppe: B legt eigene Gruppe an; A darf B's Mitglied nicht in eigenes Spiel setzen
   await as(U.B);

@@ -166,8 +166,10 @@ revoke execute on function public.deck_card_invalid(jsonb) from public, anon, au
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen; Zeilen ohne „-- “ ausführen, Reihenfolge einhalten).
 -- Datenverlust: alle Decklisten (deck_cards) sowie decks.cards_updated_at/bracket_check.
+-- RÜCKWÄRTS-BEGINN
 -- drop function public.replace_deck_cards(uuid, jsonb);
 -- drop function public.deck_card_invalid(jsonb);
 -- drop table public.deck_cards;
 -- alter table public.decks drop column bracket_check, drop column cards_updated_at;
+-- RÜCKWÄRTS-ENDE
 -- ============================================================================
