@@ -46,3 +46,20 @@ export async function avatarUrls(paths) {
   return out;
 }
 export const forgetAvatar = (path) => urlCache.delete(path);
+
+// ---------------- Spielfotos (privater Bucket game-photos → signierte URLs, eigener Cache) ----------------
+const photoCache = new Map(); // path -> { url, until }
+
+export async function photoUrls(paths) {
+  const want = [...new Set(paths.filter(Boolean))];
+  const now = Date.now();
+  const missing = want.filter((p) => !(photoCache.get(p)?.until > now));
+  if (missing.length && sb) {
+    const { data } = await sb.storage.from('game-photos').createSignedUrls(missing, 3600);
+    for (const row of data || []) if (row.signedUrl && !row.error) photoCache.set(row.path, { url: row.signedUrl, until: now + TTL });
+  }
+  const out = {};
+  for (const p of want) out[p] = photoCache.get(p)?.url || null;
+  return out;
+}
+export const forgetPhoto = (path) => photoCache.delete(path);
