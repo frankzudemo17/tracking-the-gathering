@@ -15,6 +15,7 @@ export default {
   points1: '1 Punkt',
   pointsN: '{n} Punkte',
   avgPlace: 'Ø Platz {v}',
+  point: 'Punkt',
   points: 'Punkte',
   avgSalt: 'Ø Salz',
   pointsShort: 'P.',

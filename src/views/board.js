@@ -81,7 +81,7 @@ export default async function board(el, { isStale }) {
         <span class="title">${label}${isDeck ? html`<span class="brd-owner"> · ${owner(d)}</span>` : ''}</span>
         ${statLine(r)}
       </span>
-      <span class="brd-pts"><b>${r.points}</b><span>${t('board.points')}</span></span>
+      <span class="brd-pts"><b>${r.points}</b><span>${t(r.points === 1 ? 'board.point' : 'board.points')}</span></span>
     </a>`;
   })}</div>` : '');
 

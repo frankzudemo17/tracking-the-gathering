@@ -15,6 +15,7 @@ export default {
   points1: '1 point',
   pointsN: '{n} points',
   avgPlace: 'avg. place {v}',
+  point: 'Point',
   points: 'Points',
   avgSalt: 'avg. salt',
   pointsShort: 'pts',
