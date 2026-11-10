@@ -313,9 +313,9 @@ export default async function liveE2e({ browser, base: BASE }) {
       await PB.goto(BASE + '#/spiel/' + NIL_GAME);
       await PB.waitForSelector('.empty, .lc-field', { timeout: 10000 });
       const fieldN = await PB.locator('.lc-field').count();
-      const view = (await text(PB, '#view')).replace(/s+/g, ' ');
+      const view = (await text(PB, '#view')).replace(/\s+/g, ' ');
       ok('B2 unbekanntes Spiel ⇒ „Spiel nicht gefunden“ + Erklärung, kein Lifecounter, kein „nochmal“',
-        fieldN === 0 && /Spiel nicht gefunden/.test(view) && /Dieses Spiel gibt es nicht mehr oder es gehört zu einer anderen Gruppe./.test(view) && !/nochmal/.test(view),
+        fieldN === 0 && /Spiel nicht gefunden/.test(view) && /Dieses Spiel gibt es nicht mehr oder es gehört zu einer anderen Gruppe\./.test(view) && !/nochmal/.test(view),
         `Felder ${fieldN} · „${view.slice(0, 200)}“`);
       ok('B2 Knopf „Zur Startseite“ vorhanden', (await PB.locator('[data-live-missing][href="#/start"]').count()) === 1 && /Zur Startseite/.test(await text(PB, '[data-live-missing]')));
       await looks(PB, 'nicht-gefunden');
