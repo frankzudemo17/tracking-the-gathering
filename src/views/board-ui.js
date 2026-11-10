@@ -88,15 +88,15 @@ export function deckOwnerId(deck, members) {
 }
 
 /**
- * Leerzustand: 'none' (gar keine gewerteten Spiele) · 'range' (Zeitraum leer) · 'salt' (Spiele da, aber
- * kein Deck mit ≥ 2 Salz-Bewertungen) · null (es gibt Zeilen).
- * @param {{ allGames: number, rangeGames: number, rows: number }} n
+ * Leerzustand: 'none' (keine gewerteten Spiele bzw. keine Zeile) · 'range' (Zeitraum leer) · 'salt' (nur im
+ * Salz-Modus: Spiele da, aber kein Deck mit ≥ 2 Salz-Bewertungen) · null (es gibt Zeilen).
+ * @param {{ allGames: number, rangeGames: number, rows: number, salt?: boolean }} n
  * @returns {'none'|'range'|'salt'|null}
  */
-export function emptyKind({ allGames, rangeGames, rows }) {
+export function emptyKind({ allGames, rangeGames, rows, salt = false }) {
   if (!allGames) return 'none';
   if (!rangeGames) return 'range';
-  if (!rows) return 'salt';
+  if (!rows) return salt ? 'salt' : 'none';
   return null;
 }
 

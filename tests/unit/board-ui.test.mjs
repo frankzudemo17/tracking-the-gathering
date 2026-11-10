@@ -63,7 +63,8 @@ test('Leerzustand je Lage', async () => {
   const { emptyKind } = await ui();
   assert.equal(emptyKind({ allGames: 0, rangeGames: 0, rows: 0 }), 'none');
   assert.equal(emptyKind({ allGames: 6, rangeGames: 0, rows: 0 }), 'range');
-  assert.equal(emptyKind({ allGames: 6, rangeGames: 1, rows: 0 }), 'salt');
+  assert.equal(emptyKind({ allGames: 6, rangeGames: 1, rows: 0, salt: true }), 'salt');
+  assert.equal(emptyKind({ allGames: 6, rangeGames: 1, rows: 0 }), 'none'); // Spieler/Decks: nie der Salz-Text
   assert.equal(emptyKind({ allGames: 6, rangeGames: 6, rows: 4 }), null);
 });
 
@@ -104,17 +105,21 @@ test('K2 Spieler/30 Tage mit now = 2026-11-20T12:00+01:00: Franco 9 · Marie 8 �
 });
 
 test('K3 Decks/Gesamt: Edgar 10 · Atraxa 9 · Krenko 8 · Kinnan 7 · Prosper 7 · Yuriko 5 (Ränge 1–6)', async () => {
+  const { splitPodium } = await ui();
   const d = fixtureGroupData();
   const short = Object.fromEntries(d.decks.map((x) => [x.id, x.shortName]));
-  const rows = deckTable(d);
-  assert.deepEqual(rows.map((r) => [short[r.deckId], r.points]), [['Edgar', 10], ['Atraxa', 9], ['Krenko', 8], ['Kinnan', 7], ['Prosper', 7], ['Yuriko', 5]]);
-  assert.deepEqual(rows.map((r) => r.rank), [1, 2, 3, 4, 5, 6]);
+  const { podium, rest } = splitPodium(deckTable(d));
+  const view = (r) => [short[r.deckId], r.rank, r.points];
+  assert.deepEqual(podium.map(view), [['Edgar', 1, 10], ['Atraxa', 2, 9], ['Krenko', 3, 8]]);
+  assert.deepEqual(rest.map(view), [['Kinnan', 4, 7], ['Prosper', 5, 7], ['Yuriko', 6, 5]]);
 });
 
 test('K4 Salz: Kinnan 4,0 (6, Deniz) · Yuriko 3,3 (4, Franco) · Atraxa 2,8 (4, Deniz) · Krenko 2,5 (4) · Prosper 2,5 (2) · Edgar 2,3 (6)', async () => {
+  const { saltFill } = await ui();
   const d = fixtureGroupData();
   const short = Object.fromEntries(d.decks.map((x) => [x.id, x.shortName]));
   const rows = deckSaltTable(d, { min: 2 });
+  assert.deepEqual(saltFill(rows[0].avgSalt), [1, 1, 1, 1, 0]); // Kinnan 4,0 ⇒ vier volle Salz-Icons
   assert.deepEqual(rows.map((r) => [short[r.deckId], fmtAvg(r.avgSalt), r.ratings]),
     [['Kinnan', '4,0', 6], ['Yuriko', '3,3', 4], ['Atraxa', '2,8', 4], ['Krenko', '2,5', 4], ['Prosper', '2,5', 2], ['Edgar', '2,3', 6]]);
   assert.equal(names[rows[0].mostSaltedMemberId], 'Deniz');

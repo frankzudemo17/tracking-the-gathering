@@ -119,7 +119,7 @@ export default async function board(el, { isStale }) {
     const rangeGames = (d?.games || []).length;
     if (prefs.mode === 'salt') {
       const rows = deckSaltTable(d, { min: 2 });
-      const kind = emptyKind({ allGames, rangeGames, rows: rows.length });
+      const kind = emptyKind({ allGames, rangeGames, rows: rows.length, salt: true });
       return html`${kind ? emptyBlock(kind) : saltList(rows)}<p class="brd-note">${t('board.saltNote')}</p>`;
     }
     const rows = prefs.mode === 'decks' ? deckTable(d) : playerTable(d);
