@@ -156,9 +156,14 @@ export async function anonPart({ browser, base, offline = false }) {
       a.s === 'invite' && b.s === 'invite' && a.create && b.create && a.have && b.have && a.text.includes(FIXTURE_NAME) && b.text.includes(FIXTURE_NAME),
       JSON.stringify({ a: a.s, b: b.s }));
     ok('K1 src/views/code.js existiert nicht', !fs.existsSync(path.join(ROOT, 'src', 'views', 'code.js')));
-    let diff = null;
-    try { diff = execFileSync('git', ['-C', ROOT, 'diff', '--unified=0', 'main...HEAD', '--', 'src/main.js'], { encoding: 'utf8', timeout: 20000 }); } catch { /* kein main */ }
-    if (diff === null) skip('K1 git diff main...HEAD -- src/main.js nur Routenzeilen', 'Zweig main nicht auffindbar');
+    // Zweigprüfung des Pakets P9b: gilt nur auf dessen Zweig. Spätere Pakete dürfen src/main.js ändern.
+    let diff = null; let zweig = '';
+    try { zweig = execFileSync('git', ['-C', ROOT, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8', timeout: 20000 }).trim(); } catch { /* kein git */ }
+    if (zweig === 'feat/zugang-ui') {
+      try { diff = execFileSync('git', ['-C', ROOT, 'diff', '--unified=0', 'main...HEAD', '--', 'src/main.js'], { encoding: 'utf8', timeout: 20000 }); } catch { /* kein main */ }
+    }
+    if (zweig !== 'feat/zugang-ui') skip('K1 git diff main...HEAD -- src/main.js nur Routenzeilen', 'Zweigprüfung von P9b, nur auf feat/zugang-ui (hier: ' + (zweig || 'unbekannt') + ')');
+    else if (diff === null) skip('K1 git diff main...HEAD -- src/main.js nur Routenzeilen', 'Zweig main nicht auffindbar');
     else {
       const lines = diff.split('\n').filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
       ok('K1 git diff main...HEAD -- src/main.js berührt nur Routenzeilen', lines.every((l) => /^[+-]route\(/.test(l)), JSON.stringify(lines));
