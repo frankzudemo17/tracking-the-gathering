@@ -208,7 +208,7 @@ export default async function profile(el, { params, isStale, fail }) {
   const rerender = () => go(location.hash.slice(1));
 
   on(el, 'click', '[data-act="avatar-zoom"]', () => { if (avUrl) openPhoto(avUrl, t('avatar.alt', { name }), { round: true }); });
-  on(el, 'click', '[data-act="photo"]', () => openAvatarSheet({ name, url: urls[avPath], has: !!avPath, target, isMe, onDone: rerender }));
+  on(el, 'click', '[data-act="photo"]', () => openAvatarSheet({ name, url: urls[avPath], has: !!avPath, target, isMe, onDone: () => { groupData.invalidate(m.playgroup_id || state.groupId); rerender(); } })); // P12 Nachtrag 1 (B2)
   on(el, 'click', '[data-act="rename"]', () => openRename({ name, isMe, member: m, onDone: rerender }));
   on(el, 'click', '[data-act="claim-link"]', () => copyText(appUrl(`#/code/${m.claim_code}`)));
   on(el, 'click', '[data-act="toggle-decks"]', (e, b) => {
@@ -412,6 +412,7 @@ function openRename({ name, isMe, member, onDone }) {
             await loadMe();
           } else {
             must(await sb.from('members').update({ display_name: v }).eq('id', member.id));
+            groupData.invalidate(member.playgroup_id); // P12 Nachtrag 1 (B2): eigener Schreibvorgang ⇒ Gruppen-Stand verworfen
           }
           close(); toast(t('profile.saved')); onDone();
         } catch (ex) { err.textContent = errText(ex); err.hidden = false; }
