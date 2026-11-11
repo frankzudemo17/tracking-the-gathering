@@ -59,10 +59,12 @@ html:has(.lc-screen), html:has(.lc-screen) body { overflow: hidden; overscroll-b
    für alle Looks statt --danger (Arktis/Lachs: dunkles Rot für helle Flächen, auf dem Feld nur 2,3–3,6:1). */
 .lc-big.low { color: #FF948C; }
 .lc-field.out .lc-big { opacity: .35; }
-.lc-delta { position: absolute; top: calc(50% - clamp(42px, 34cqmin, 132px) * .5 - 26px); font-size: 18px; font-weight: 800; padding: 1px 10px; border-radius: 12px;
+/* Plakette „−5“ über der Zahl: wächst mit dem Feld (--d), sitzt mit kleinem Abstand über der großen Zahl. */
+.lc-delta { --d: clamp(20px, 8cqmin, 30px); position: absolute; top: calc(50% - clamp(42px, 34cqmin, 132px) * .5 - var(--d) * 1.5 - 2px);
+  font-size: var(--d); line-height: 1.2; font-weight: 800; padding: 2px 12px; border-radius: 20px;
   background: rgba(var(--scrim), .7); font-variant-numeric: tabular-nums; }
-.lc-delta.neg { color: var(--danger); }
-.lc-delta.pos { color: var(--live); }
+.lc-delta.neg { color: #FF948C; }
+.lc-delta.pos { color: #6EE7A0; }
 .lc-turnchip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--turn); padding: 3px 10px; border-radius: 12px;
   background: rgba(var(--scrim), .66); }
 .lc-turnchip i { width: 7px; height: 7px; border-radius: 50%; background: var(--turn); }
@@ -204,31 +206,47 @@ html:has(.lc-screen), html:has(.lc-screen) body { overflow: hidden; overscroll-b
   .lc-field::after { transition: none; }
 }
 
-/* ---------- Treffer (P13): kurzer Rand-Puls von außen nach innen, wenn sich das Leben eines Feldes ändert.
-   Über Bild und Inhalt, unter Rahmen und „am Zug“ (::after, gleiche Ebene, später im Baum). Die Mitte bleibt frei.
+/* ---------- Treffer (P13, verstärkt am 11.11. auf Francos Wunsch): ändert sich das Leben eines Feldes,
+   blitzt bei Schaden das ganze Feld rot auf (Fläche + Rand), bei Gewinn schimmert der Rand hell und die Zahl wird grün.
+   Über Bild und Inhalt, unter Rahmen und „am Zug“ (::after, gleiche Ebene, später im Baum).
    Nur opacity wird animiert; Grundzustand unsichtbar, ohne hit-* gibt es das Pseudo-Element nicht.
-   Tiefe = Unschärfe + Ausdehnung in cqmin (kürzere Feldseite): B 16 %, D 26 % (Ring 7,5 %: sichtbar innerhalb des Zug-Rahmens). */
+   Dauer 0,65 s, groß (ab HIT_BIG Schaden) 1,1 s. Die Klasse nimmt life.js danach weg (HIT_MS). */
 .lc-field.hit-dmg::before, .lc-field.hit-gain::before, .lc-field.hit-big::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 8; opacity: 0;
-  animation: lc-hit .3s ease-out 1; }
-.lc-field.hit-dmg::before { box-shadow: inset 0 0 14cqmin 2cqmin color-mix(in srgb, var(--danger) 70%, black); }
+  animation: lc-hit .65s ease-out 1; }
+.lc-field.hit-dmg::before { background: color-mix(in srgb, var(--danger) 34%, transparent);
+  box-shadow: inset 0 0 16cqmin 3cqmin color-mix(in srgb, var(--danger) 78%, black); }
 .lc-field.hit-gain::before { box-shadow: inset 0 0 14cqmin 2cqmin color-mix(in srgb, var(--hero-ink) 50%, transparent); }
-.lc-field.hit-big::before { animation: lc-hit-big .55s ease-out 1;
+.lc-field.hit-big::before { animation: lc-hit-big 1.1s ease-out 1; background: color-mix(in srgb, var(--danger) 50%, transparent);
   box-shadow: inset 0 0 4cqmin 3.5cqmin color-mix(in srgb, var(--danger) 82%, black), inset 0 0 20cqmin 6cqmin color-mix(in srgb, var(--danger) 60%, black); }
-@keyframes lc-hit { from { opacity: 1; } to { opacity: 0; } }
-/* Die Zahl reagiert mit (Franco 10.11.): bei Schaden rot und kurz „nach hinten“, groß mit Ruck; bei Gewinn kurz nach vorn.
-   Ohne Endfarbe im Keyframe läuft sie auf die eigene Farbe zurück (auch .low). Dauer ≤ Puls, die Klasse geht danach weg. */
-.lc-field.hit-dmg .lc-big { animation: lc-num-dmg .32s ease-out 1; }
-.lc-field.hit-big .lc-big { animation: lc-num-big .55s ease-out 1; }
-.lc-field.hit-gain .lc-big { animation: lc-num-gain .3s ease-out 1; }
-@keyframes lc-num-dmg { 0% { transform: scale(1); color: #FF5A50; } 30% { transform: scale(.82); color: #FF5A50; } 100% { transform: scale(1); } }
-@keyframes lc-num-big { 0% { transform: scale(1); color: #FF5A50; } 14% { transform: scale(.74) translateX(-9%); color: #FF5A50; }
-  30% { transform: scale(.78) translateX(9%); color: #FF5A50; } 46% { transform: scale(.84) translateX(-5%); color: #FF5A50; } 100% { transform: scale(1); } }
-@keyframes lc-num-gain { 0% { transform: scale(1); } 35% { transform: scale(1.08); } 100% { transform: scale(1); } }
-@keyframes lc-hit-big { 0%, 22% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes lc-hit { 0%, 18% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes lc-hit-big { 0%, 30% { opacity: 1; } 100% { opacity: 0; } }
+/* Die Zahl reagiert mit: bei Schaden rot und „nach hinten“, groß mit Ruck; bei Gewinn grün und kurz nach vorn.
+   Helle Farbtöne für alle Looks, weil die Felder immer dunkel sind (wie .lc-big.low).
+   Ohne Endfarbe im Keyframe läuft sie auf die eigene Farbe zurück (auch .low). */
+.lc-field.hit-dmg .lc-big { animation: lc-num-dmg .65s ease-out 1; }
+.lc-field.hit-big .lc-big { animation: lc-num-big 1.1s ease-out 1; }
+.lc-field.hit-gain .lc-big { animation: lc-num-gain .65s ease-out 1; }
+@keyframes lc-num-dmg { 0% { transform: scale(1); color: #FF5A50; } 22% { transform: scale(.78); color: #FF5A50; }
+  60% { transform: scale(.95); color: #FF5A50; } 100% { transform: scale(1); } }
+@keyframes lc-num-big { 0% { transform: scale(1); color: #FF5A50; } 10% { transform: scale(.7) translateX(-10%); color: #FF5A50; }
+  22% { transform: scale(.74) translateX(10%); color: #FF5A50; } 34% { transform: scale(.8) translateX(-7%); color: #FF5A50; }
+  46% { transform: scale(.86) translateX(5%); color: #FF5A50; } 70% { transform: scale(.97); color: #FF5A50; } 100% { transform: scale(1); } }
+@keyframes lc-num-gain { 0% { transform: scale(1); color: #6EE7A0; } 25% { transform: scale(1.14); color: #6EE7A0; }
+  60% { transform: scale(1.04); color: #6EE7A0; } 100% { transform: scale(1); } }
+/* „Bewegung reduzieren“ (System oder „Weniger Bewegung: An“): die Farbe kommt trotzdem, nur ohne Schrumpfen und Wackeln
+   (Franco 11.11.). Die Dauer steht hier mit !important, weil base.css/table.css sonst jede Animation auf 0 kürzen. */
+@keyframes lc-num-dmg-still { 0%, 60% { color: #FF5A50; } }
+@keyframes lc-num-gain-still { 0%, 60% { color: #6EE7A0; } }
 @media (prefers-reduced-motion: reduce) {
-  .lc-field.hit-dmg::before, .lc-field.hit-gain::before, .lc-field.hit-big::before { content: none; animation: none; }
-  .lc-field.hit-dmg .lc-big, .lc-field.hit-gain .lc-big, .lc-field.hit-big .lc-big { animation: none; }
+  .lc-field.hit-dmg::before, .lc-field.hit-gain::before { animation-duration: .65s !important; }
+  .lc-field.hit-big::before { animation-duration: 1.1s !important; }
+  .lc-field.hit-dmg .lc-big { animation-name: lc-num-dmg-still; animation-duration: .65s !important; }
+  .lc-field.hit-big .lc-big { animation-name: lc-num-dmg-still; animation-duration: 1.1s !important; }
+  .lc-field.hit-gain .lc-big { animation-name: lc-num-gain-still; animation-duration: .65s !important; }
 }
-html[data-motion="reduce"] .lc-field.hit-dmg::before, html[data-motion="reduce"] .lc-field.hit-gain::before,
-html[data-motion="reduce"] .lc-field.hit-big::before { content: none; animation: none; }
+html[data-motion="reduce"] .lc-field.hit-dmg::before, html[data-motion="reduce"] .lc-field.hit-gain::before { animation-duration: .65s !important; }
+html[data-motion="reduce"] .lc-field.hit-big::before { animation-duration: 1.1s !important; }
+html[data-motion="reduce"] .lc-field.hit-dmg .lc-big { animation-name: lc-num-dmg-still; animation-duration: .65s !important; }
+html[data-motion="reduce"] .lc-field.hit-big .lc-big { animation-name: lc-num-dmg-still; animation-duration: 1.1s !important; }
+html[data-motion="reduce"] .lc-field.hit-gain .lc-big { animation-name: lc-num-gain-still; animation-duration: .65s !important; }

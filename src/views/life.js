@@ -32,10 +32,11 @@ import {
 // über Seitenwechsel weiter und wird nicht doppelt angelegt.
 const store = createStore(sb);
 
-const DELTA_MS = 1800;
+const DELTA_MS = 1800; // Sammelfenster: Änderungen innerhalb dieser Zeit zählen zur selben Plakette / zum selben Treffer
+const DELTA_SHOW_MS = 2800; // so lange bleibt die Plakette nach der letzten Änderung stehen
 const FLICKER_MS = 500;
 const HIT_CLS = ['hit-dmg', 'hit-gain', 'hit-big'];
-const HIT_MS = { dmg: 340, gain: 340, big: 600 }; // Klasse weg nach Puls (300/550 ms), Grenze 450/700 ms
+const HIT_MS = { dmg: 700, gain: 700, big: 1150 }; // Klasse weg nach dem Effekt (650/1100 ms in life.css)
 const ROLL_KINDS = ['w6', 'w6x2', 'w20', 'coin', 'player'];
 const CTR_ICON = { poison: 'drop', tax: 'coins', tax2: 'coins', energy: 'lightning', exp: 'star', rad: 'radioactive', speed: 'gauge', ring: 'eye', dungeon: 'castleTurret' };
 const FLAGS = [['monarch', 'crown'], ['init', 'shieldStar'], ['city', 'buildings']];
@@ -221,12 +222,13 @@ export default async function life(el, { params, isStale }) {
   function bumpDelta(mid, d) {
     const cur = deltas.get(mid);
     if (cur) { clearTimeout(cur.timer); timers.delete(cur.timer); }
-    const entry = { v: (cur?.v || 0) + d, timer: null };
+    const now = Date.now();
+    const entry = { v: (cur && now - cur.at < DELTA_MS ? cur.v : 0) + d, at: now, timer: null };
     entry.timer = setTimeout(() => {
       timers.delete(entry.timer);
       if (deltas.get(mid) === entry) deltas.delete(mid);
       const p = pl(mid); if (p && !stopped) paintField(p);
-    }, DELTA_MS);
+    }, DELTA_SHOW_MS);
     timers.add(entry.timer);
     deltas.set(mid, entry);
   }

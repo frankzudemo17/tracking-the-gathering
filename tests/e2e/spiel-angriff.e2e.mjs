@@ -107,7 +107,7 @@ export default async function angriffE2e({ browser, base: BASE }) {
   ok('K4 Vorschau = Feldwert (B 35)', pv6.length === 1 && pv6[0][0] === B && pv6[0][1] === (await lifeOf(B)) && pv6[0][1] === 35, JSON.stringify(pv6));
 
   // ---------------------------------------------------------------- Kriterium 3 + 4: ALLE + Lifelink, Rückgängig
-  await P.waitForFunction(() => !document.querySelector('.lc-delta')); // Plaketten summieren im Fenster von 1,8 s ⇒ erst leer
+  await P.waitForFunction(() => !document.querySelector('.lc-delta')); // Plaketten summieren im Fenster von 1,8 s und stehen 2,8 s ⇒ erst leer
   const before3 = await lives();
   await openAttack(A, '.lc-hub', async () => {
     ok('Ziehen auf den Mittelknopf ⇒ „ALLE“ rot', (await P.locator('.lc-hub.atk-drag.atk-over .atk-alle').isVisible()) && (await P.textContent('.lc-hub .atk-alle')).includes('ALLE'));
