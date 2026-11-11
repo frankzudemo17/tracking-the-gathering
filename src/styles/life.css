@@ -72,9 +72,8 @@ html:has(.lc-screen), html:has(.lc-screen) body { overflow: hidden; overscroll-b
 /* Unten: „Zug beenden →“ bzw. „Ausgeschieden?“ */
 .lc-bot { position: absolute; left: 0; right: 0; bottom: 10px; z-index: 6; display: flex; justify-content: center; pointer-events: none; }
 .lc-bot > * { pointer-events: auto; }
-.lc-endturn, .lc-outq { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px; border-radius: 20px; border: 0;
+.lc-outq { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px; border-radius: 20px; border: 0;
   font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
-.lc-endturn { background: var(--turn); color: #1A1406; }
 .lc-outq { background: var(--danger); color: #fff; }
 
 /* Platz-Plakette (ausgeschieden) und Sieger */
@@ -88,11 +87,28 @@ html:has(.lc-screen), html:has(.lc-screen) body { overflow: hidden; overscroll-b
 .lc-plaque .win b { color: var(--hi); }
 
 /* Mittelknopf (F4 a: rund, zeigt die Runde) */
-.lc-hub { position: absolute; left: 50%; transform: translate(-50%, -50%); z-index: 9; width: 68px; height: 68px; border-radius: 50%;
+.lc-hub { position: absolute; left: 50%; transform: translate(-50%, -50%); z-index: 9; width: 80px; height: 80px; border-radius: 50%; padding: 0;
+  touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; transition: transform .12s;
   border: 3px solid var(--bg); background: var(--sf); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center;
   cursor: pointer; box-shadow: 0 6px 22px rgba(0,0,0,.4); }
-.lc-hub small { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mu); }
-.lc-hub b { font-family: var(--f-display); font-size: 24px; line-height: 1; }
+.lc-hub small { font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mu); }
+.lc-hub b { font-family: var(--f-display); font-size: 27px; line-height: 1; }
+/* Mitte halten = Zug beenden: Ring füllt sich in HOLD_MS (life.js), Zeiger zeigt aufs Feld am Zug */
+.lc-hub.holding { transform: translate(-50%, -50%) scale(.95); }
+.lc-hub-ring { position: absolute; inset: -3px; width: calc(100% + 6px); height: calc(100% + 6px); transform: rotate(-90deg); pointer-events: none; overflow: visible; }
+.lc-hub-ring circle { fill: none; stroke: var(--turn); stroke-width: 7; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; opacity: 0; }
+.lc-hub.holding .lc-hub-ring circle { opacity: 1; stroke-dashoffset: 0; transition: stroke-dashoffset 550ms linear; }
+.lc-hub-ptr { position: absolute; inset: -3px; pointer-events: none; transition: transform .28s ease; }
+.lc-hub-ptr[hidden] { display: none; }
+.lc-hub-ptr::before { content: ''; position: absolute; left: 50%; top: -9px; margin-left: -8px; border: 8px solid transparent; border-top-width: 0;
+  border-bottom: 11px solid var(--turn); filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+.lc-hub.fired { animation: lc-hub-fired .45s ease-out; }
+@keyframes lc-hub-fired { from { box-shadow: 0 0 0 0 var(--turn), 0 6px 22px rgba(0,0,0,.4); } to { box-shadow: 0 0 0 18px transparent, 0 6px 22px rgba(0,0,0,.4); } }
+.lc-hub-tip { position: absolute; top: calc(100% + 16px); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 6px 11px; border-radius: 13px;
+  background: var(--turn); color: #1A1406; font-size: 12.5px; font-weight: 700; pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+/* Der Ring ist eine Fortschrittsanzeige, kein Schmuck: er läuft auch bei „Bewegung reduzieren“ in voller Länge */
+@media (prefers-reduced-motion: reduce) { .lc-hub.holding .lc-hub-ring circle { transition-duration: 550ms !important; } }
+html[data-motion="reduce"] .lc-hub.holding .lc-hub-ring circle { transition-duration: 550ms !important; }
 
 /* ---------- Spielmenü */
 .lc-menu .lc-tabs { display: flex; width: 100%; }

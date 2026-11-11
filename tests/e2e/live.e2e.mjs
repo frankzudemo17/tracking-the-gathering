@@ -252,7 +252,11 @@ export default async function liveE2e({ browser, base: BASE }) {
     try {
       const evBefore = await events(g1);
       const seatBefore = await PA.evaluate(() => document.querySelector('.lc-field.turn')?.dataset.pid);
-      await Promise.all([PA.click('.lc-field.turn [data-act="endturn"]'), PB.click('.lc-field.turn [data-act="endturn"]')]);
+      const holdHub = async (P) => {
+        const b = await P.locator('.lc-hub').boundingBox();
+        await P.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await P.mouse.down(); await P.waitForTimeout(900); await P.mouse.up();
+      };
+      await Promise.all([holdHub(PA), holdHub(PB)]); // seit Variante E: Mitte halten statt Knopf im Feld
       await PA.waitForTimeout(4000);
       const evAfter = await events(g1);
       const ends = evAfter.slice(evBefore.length).filter((e) => e.type === 'turn_end').length;

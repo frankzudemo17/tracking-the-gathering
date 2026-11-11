@@ -1,5 +1,5 @@
 // Lifecounter (Spec P8, HANDOFF 5.4, Mockup P2 Bildschirme 3–5): Felder je Sitz (Layout + Drehung
-// aus layouts.js), Tippen links −1 / rechts +1, Zug beenden, Spielmenü (Zug · Werkzeuge · Verlauf),
+// aus layouts.js), Tippen links −1 / rechts +1, Mitte halten = Zug beenden (kurz tippen = Spielmenü) (Zug · Werkzeuge · Verlauf),
 // Zähler-Sheet, Randomizer, einfacher Ausscheide-Ablauf (ko.js), Spiel beenden (E4).
 // Alle Regeln kommen aus der Engine (P3), alle Schreibvorgänge über den Store (P5):
 // Aktion ⇒ act() ⇒ recorder.push(events) + store.publish(state) ⇒ Felder neu zeichnen.
@@ -24,6 +24,7 @@ import { MEMBER_SELECT } from './groups.js';
 import { openFieldColor } from './setup.js';
 import { showKo } from './ko.js';
 import { attachAttack } from './attack.js';
+import { buzz } from '../lib/prefs.js';
 import {
   mmss, signed, counterRows, togglePin, DEFAULT_PINS, rollText, logText, lowLife, cmdLine, shortCmd, byPlace, flickerValue, secondsSince, hitStep, hitDiff,
 } from './life-ui.js';
@@ -35,6 +36,10 @@ const store = createStore(sb);
 const DELTA_MS = 1800; // Sammelfenster: Änderungen innerhalb dieser Zeit zählen zur selben Plakette / zum selben Treffer
 const DELTA_SHOW_MS = 2800; // so lange bleibt die Plakette nach der letzten Änderung stehen
 const FLICKER_MS = 500;
+const HOLD_MS = 550; // Mitte so lange halten ⇒ Zug beenden (Ring in life.css läuft gleich lang)
+const HOLD_MOVE = 14; // px: weiter verrutscht ⇒ kein Halten mehr
+const HOLD_TIP_KEY = 'ttg.hint.hold'; // Zahl der gezeigten Hinweise bzw. 'done' nach dem ersten gehaltenen Zug
+const HOLD_TIP_MS = 6000;
 const HIT_CLS = ['hit-dmg', 'hit-gain', 'hit-big'];
 const HIT_MS = { dmg: 700, gain: 700, big: 1150 }; // Klasse weg nach dem Effekt (650/1100 ms in life.css)
 const ROLL_KINDS = ['w6', 'w6x2', 'w20', 'coin', 'player'];
@@ -173,7 +178,7 @@ export default async function life(el, { params, isStale }) {
       ${turn && !lethal ? html`<span class="lc-turnchip"><i></i>${t('life.turn')} · <span data-clock="turn">${mmss(secondsSince(s.turnStartedAt, Date.now()))}</span></span>` : ''}`);
     mount($('[data-part="bot"]', f), lethal && !s.finished
       ? html`<button type="button" class="lc-outq" data-act="ko" data-pid="${p.id}">${icon('skull', 16)}${t('life.outQ')}</button>`
-      : turn ? html`<button type="button" class="lc-endturn" data-act="endturn">${t('life.endTurn')}${icon('chevRight', 16)}</button>` : '');
+      : '');
     mount($('[data-part="plaque"]', f), p.out
       ? html`<div>${icon('skull', 22)}<b>${t('life.place', { n: p.place })}</b><span>${p.outBy ? t('life.outLine', { r: p.outRound, by: nm(p.outBy) }) : t('life.outLineGaveUp', { r: p.outRound })}</span></div>`
       : winner ? html`<div class="win">${icon('crown', 22)}<b>${t('life.place', { n: 1 })}</b><span>${t('life.winner')}</span></div>` : '');
@@ -183,6 +188,19 @@ export default async function life(el, { params, isStale }) {
     for (const p of s.players) paintField(p);
     const hub = $('.lc-hub', el);
     if (hub) { hub.setAttribute('aria-label', t('life.hub', { n: s.round })); $('[data-round]', hub).textContent = String(s.round); }
+    aimHub();
+  }
+
+  /** Zeiger am Mittelknopf dreht sich zum Feld, das am Zug ist (Bildschirmkoordinaten, gilt für jede Drehung). */
+  function aimHub() {
+    const hub = $('.lc-hub', el); const ptr = hub && $('.lc-hub-ptr', hub);
+    if (!ptr) return;
+    const f = s.finished ? null : $('.lc-field.turn', el);
+    ptr.hidden = !f;
+    if (!f) return;
+    const H = hub.getBoundingClientRect(); const F = f.getBoundingClientRect();
+    const a = Math.atan2((F.top + F.height / 2) - (H.top + H.height / 2), (F.left + F.width / 2) - (H.left + H.width / 2));
+    ptr.style.transform = `rotate(${(a * 180 / Math.PI + 90).toFixed(1)}deg)`;
   }
 
   function boardHtml() {
@@ -191,23 +209,42 @@ export default async function life(el, { params, isStale }) {
     const hubTop = L.layout === 'rundum' && n >= 3 ? `${(100 / L.rows).toFixed(3)}%` : '50%';
     return html`<div class="lc-board" data-layout="${L.layout}" style="grid-template-columns:repeat(${L.cols},minmax(0,1fr));grid-template-rows:repeat(${L.rows},minmax(0,1fr))">
       ${s.players.map((p, i) => fieldHtml(p, L.slots[i]))}
-      <button type="button" class="lc-hub" data-act="menu" data-pid="__all" style="top:${hubTop}" aria-label="${t('life.hub', { n: s.round })}"><small>${t('life.round')}</small><b class="num" data-round>${s.round}</b></button>
+      <button type="button" class="lc-hub" data-act="menu" data-pid="__all" style="top:${hubTop}" aria-label="${t('life.hub', { n: s.round })}"><svg class="lc-hub-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="47" pathLength="100"/></svg><i class="lc-hub-ptr" aria-hidden="true" hidden></i><small>${t('life.round')}</small><b class="num" data-round>${s.round}</b>${holdTip ? html`<span class="lc-hub-tip" aria-hidden="true">${t('life.holdTip')}</span>` : ''}</button>
     </div>`;
   }
 
-  /** Namen unter dem Mittelknopf rücken in Feldrichtung ein (Mockup clearHub, gilt für jede Drehung). */
+  /**
+   * Namen und „⋯“ unter dem Mittelknopf rücken in Feldrichtung aus dem Kreis (Mockup clearHub, gilt für jede Drehung).
+   * Jeder Schritt wird nachgemessen: reicht das Einrücken nicht, rückt die Zeile bzw. der Knopf nach unten.
+   */
   function clearHub() {
     const hub = $('.lc-hub', el);
     if (!hub) return;
-    const H = hub.getBoundingClientRect(); const pad = 8;
+    const H = hub.getBoundingClientRect();
+    const cx = H.left + H.width / 2; const cy = H.top + H.height / 2; const r = H.width / 2;
+    /** @param {Element} n @param {number} pad */
+    const boxHit = (n, pad) => { const w = n.getBoundingClientRect(); return w.width > 0 && w.left < H.right + pad && w.right > H.left - pad && w.top < H.bottom + pad && w.bottom > H.top - pad; };
+    /** @param {Element} n @param {number} pad */
+    const roundHit = (n, pad) => { const w = n.getBoundingClientRect(); return Math.hypot(Math.max(w.left, Math.min(cx, w.right)) - cx, Math.max(w.top, Math.min(cy, w.bottom)) - cy) < r + pad; };
     for (const top of $$('.lc-top', el)) {
-      top.style.paddingTop = ''; top.style.paddingLeft = '';
+      const who = $('.who', top); const stat = $('.lc-stat', top); const more = $('.lc-more', top);
+      top.style.paddingTop = ''; top.style.paddingLeft = ''; top.style.paddingRight = '';
+      if (stat) stat.style.marginTop = '';
       const narrow = top.offsetWidth < 175;
       top.classList.toggle('narrow', narrow);
-      const w = $('.who', top).getBoundingClientRect();
-      const hit = w.left < H.right + pad && w.right > H.left - pad && w.top < H.bottom + pad && w.bottom > H.top - pad;
-      if (hit) { if (narrow) top.style.paddingTop = '40px'; else top.style.paddingLeft = '62px'; }
+      if (who && boxHit(who, 8)) {
+        if (narrow) top.style.paddingTop = '46px';
+        else { top.style.paddingLeft = '68px'; if (boxHit(who, 2)) { top.style.paddingLeft = ''; top.style.paddingTop = '52px'; } }
+      }
+      // „⋯“ muss ganz frei bleiben: erst in der Zeile einrücken (breite Felder) bzw. nach unten (schmale), dann der andere Weg
+      if (stat && more && roundHit(more, 6)) {
+        const undo = () => { top.style.paddingRight = ''; stat.style.marginTop = ''; };
+        const ways = [() => { top.style.paddingRight = '52px'; }, () => { stat.style.marginTop = '44px'; }];
+        if (top.offsetWidth < 260) ways.reverse();
+        for (const way of ways) { undo(); way(); if (!roundHit(more, 4)) break; }
+      }
     }
+    aimHub();
   }
 
   function renderBoard() {
@@ -330,11 +367,50 @@ export default async function life(el, { params, isStale }) {
       const p = pl(mid);
       if (!p || p.out || s.finished) return;
       doAct({ type: 'life', target: mid, d: Number(b.dataset.v) });
-    } else if (a === 'endturn') doAct({ type: 'endTurn', at: Date.now() });
-    else if (a === 'menu') openMenu();
+    } else if (a === 'menu') { if (holdFired) { holdFired = false; return; } openMenu(); } // nach gehaltenem Zug öffnet das Loslassen kein Menü
     else if (a === 'counters') openCounters(mid);
     else if (a === 'ko') { koQueue.push({ mid, by: null, force: false }); nextKo(); }
   });
+
+  // ---------- Mitte halten = Zug beenden (Variante E, Franco 11.11.): kurz tippen öffnet weiter das Menü
+  let hold = null; // { timer, hub, pointer, x, y }
+  let holdFired = false; // der click nach einem gehaltenen Zug wird verschluckt
+  let holdTip = false; // Hinweis-Plakette am Mittelknopf (die ersten drei Spiele, bis einmal gehalten wurde)
+  function dropTip() { holdTip = false; $('.lc-hub-tip', el)?.remove(); }
+  function holdEnd() {
+    if (!hold) return;
+    clearTimeout(hold.timer); timers.delete(hold.timer);
+    hold.hub.classList.remove('holding');
+    hold = null;
+  }
+  el.addEventListener('pointerdown', (e) => {
+    const hub = e.target.closest?.('.lc-hub');
+    if (!hub || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    holdFired = false;
+    holdEnd();
+    if (stopped || s.finished || koOpen || sheetOpen()) return;
+    const timer = setTimeout(() => {
+      timers.delete(timer);
+      if (!hold || hold.timer !== timer) return;
+      holdEnd();
+      if (stopped || koOpen || sheetOpen()) return;
+      takePending();
+      if (s.finished) return;
+      holdFired = true;
+      if (!doAct({ type: 'endTurn', at: Date.now() })) return;
+      buzz(18);
+      lsSet(HOLD_TIP_KEY, 'done'); dropTip();
+      const h = $('.lc-hub', el);
+      if (h) { h.classList.remove('fired'); void h.offsetWidth; h.classList.add('fired'); }
+    }, HOLD_MS);
+    timers.add(timer);
+    hold = { timer, hub, pointer: e.pointerId, x: e.clientX, y: e.clientY };
+    hub.classList.add('holding');
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (hold && e.pointerId === hold.pointer && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > HOLD_MOVE) holdEnd();
+  });
+  el.addEventListener('contextmenu', (e) => { if (e.target.closest?.('.lc-hub')) e.preventDefault(); });
 
   // ---------- Spielmenü
   let rollKind = 'w6';
@@ -675,6 +751,7 @@ export default async function life(el, { params, isStale }) {
   function takePending() { if (remotePending) applyRemote(remotePending, remoteWhy); }
 
   function release() {
+    holdEnd(); // Finger weg vor Ablauf ⇒ bleibt ein Tippen (Menü)
     if (!gesture) return;
     gesture = false;
     // Geste ohne click (Ziehen, Wischen): nach dem click-Zeitpunkt nachziehen. Mit click hat doAct
@@ -713,6 +790,15 @@ export default async function life(el, { params, isStale }) {
     menu?.live();
   });
   window.addEventListener('resize', clearHub);
+  {
+    const seen = lsGet(HOLD_TIP_KEY);
+    if (seen !== 'done' && Number(seen || 0) < 3 && !s.finished) {
+      holdTip = true;
+      lsSet(HOLD_TIP_KEY, String(Number(seen || 0) + 1));
+      const h = setTimeout(() => { timers.delete(h); dropTip(); }, HOLD_TIP_MS);
+      timers.add(h);
+    }
+  }
 
   el.classList.add('lc-screen');
   mount(el, html`<div class="lc" data-game="${id}"></div>`);

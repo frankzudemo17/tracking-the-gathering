@@ -64,7 +64,8 @@ export default async function lifeE2e({ browser, base: BASE }) {
   await P.waitForSelector('.lc-field');
   ok('K1 Lifecounter: 3 Felder, Startleben 20', (await P.locator('.lc-field').count()) === 3 && (await lifeOf(A)) === 20);
   ok('Namen wie in der App (Profilname „Tim Echt“)', (await P.textContent(`${field(C)} .who b`)).trim() === 'Tim Echt', await P.textContent(`${field(C)} .who b`));
-  ok('Am Zug: genau A mit „Zug beenden“', (await P.locator('.lc-field.turn').count()) === 1 && (await P.locator(`${field(A)}.turn [data-act="endturn"]`).count()) === 1);
+  ok('Am Zug: genau A, kein „Zug beenden“-Knopf im Feld (Mitte halten)', (await P.locator('.lc-field.turn').count()) === 1 && (await P.locator(`${field(A)}.turn`).count()) === 1
+    && (await P.locator('.lc-field [data-act="endturn"], .lc-endturn').count()) === 0);
   await P.shot('p8-01-start-3p');
 
   await tap(A, -1, 5);
@@ -82,9 +83,23 @@ export default async function lifeE2e({ browser, base: BASE }) {
   await menu('log');
   await P.click('[data-sheet="menu"] [data-m="undo"]');
   ok('K3 Rückgängig ⇒ Monarch weg', (await P.locator(`${field(C)} .lc-badge.monarch`).count()) === 0);
+  // Mitte halten = Zug beenden: kurz tippen öffnet das Menü, halten gibt den Zug weiter (ohne Menü)
+  await closeSheet();
+  const turnOf = () => P.evaluate(() => document.querySelector('.lc-field.turn')?.dataset.pid);
+  const holdHub = async (ms) => {
+    const b = await P.locator('.lc-hub').boundingBox();
+    await P.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await P.mouse.down(); await P.waitForTimeout(ms); await P.mouse.up(); await P.waitForTimeout(400);
+  };
+  await holdHub(250);
+  ok('Mitte kurz gedrückt (250 ms) ⇒ Menü, Zug bleibt bei A', (await P.locator('[data-sheet="menu"]').count()) === 1 && (await turnOf()) === A, String(await turnOf()));
+  await closeSheet();
+  await holdHub(900);
+  ok('Mitte gehalten ⇒ Zug geht an B, kein Menü', (await turnOf()) === B && (await P.locator('.sheet-wrap').count()) === 0, String(await turnOf()));
+  await holdHub(900);
+  ok('Mitte gehalten ⇒ Zug geht an C', (await turnOf()) === C && (await P.locator('.sheet-wrap').count()) === 0, String(await turnOf()));
   await menu('zug');
-  for (let i = 0; i < 3; i++) await P.click('[data-sheet="menu"] [data-m="endturn"]');
-  ok('K3 Zug beenden ×3 ⇒ Runde 2', (await P.textContent('.lc-hub [data-round]')).trim() === '2');
+  await P.click('[data-sheet="menu"] [data-m="endturn"]');
+  ok('K3 Zug beenden ×3 (2× Mitte halten, 1× Menü) ⇒ Runde 2', (await P.textContent('.lc-hub [data-round]')).trim() === '2');
   await P.click('[data-sheet="menu"] [data-m="storm"][data-v="1"]');
   await P.click('[data-sheet="menu"] [data-m="storm"][data-v="1"]');
   ok('K3 Sturm 2', (await P.textContent('[data-storm]')).trim() === '2');
