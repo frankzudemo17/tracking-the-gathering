@@ -23,7 +23,7 @@ import { MEMBER_SELECT } from './groups.js';
 import { openDiceTable } from './dice.js';
 import { bracketHint } from './bracket-hint.js';
 import { getPrefs } from '../lib/prefs.js';
-import { readDraft, writeDraft, clearDraft } from '../lib/setup-draft.js';
+import { readDraft, writeDraft, clearDraft, rematchLoss } from '../lib/setup-draft.js';
 
 const MAX = 6;
 const LIVES = [20, 25, 30, 40];
@@ -71,6 +71,9 @@ export default async function setup(el, { isStale }) {
     if (r && r.key === s.sel.join() && r.startRoll.winnerSeat === s.start && Array.isArray(v) && v.length === s.sel.length
       && v.every((x) => Number.isInteger(x) && x >= 1 && x <= 6)) s.roll = { key: r.key, startRoll: { values: v, winnerSeat: s.start } };
   }
+  // P2 Revanche: was beim Wiederherstellen herausfiel (Spieler entfernt, Deck nicht mehr verfügbar) ⇒ ein Hinweis nach
+  // dem ersten Zeichnen. Die Marke `rematch` verschwindet mit dem ersten save() ⇒ Neuladen/Umweg zeigen ihn nicht erneut.
+  const loss = rematchLoss(draft, s);
   if (!s.sel.length && me && byId.has(me)) { // kein oder abgelaufener Entwurf ⇒ eigenes Mitglied vorausgewählt
     s.sel = [me];
     s.deck[me] = ownDecks(me)[0]?.id || null;
@@ -273,6 +276,10 @@ export default async function setup(el, { isStale }) {
   }
 
   render();
+  if (loss && (loss.players > 0 || loss.decks > 0)) {
+    const n = (k, c) => (c === 1 ? t(`setup.rematch.${k}1`) : t(`setup.rematch.${k}N`, { n: c }));
+    toast([t('setup.rematch.lead'), loss.players > 0 ? n('players', loss.players) : '', loss.decks > 0 ? n('decks', loss.decks) : ''].filter(Boolean).join(' '));
+  }
 }
 
 /**

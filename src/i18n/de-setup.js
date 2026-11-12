@@ -54,6 +54,14 @@ export default {
   },
   mana: { W: 'Weiß', U: 'Blau', B: 'Schwarz', R: 'Rot', G: 'Grün', C: 'Farblos' },
   colors: { red: 'Rot', orange: 'Orange', gold: 'Gold', green: 'Grün', teal: 'Türkis', blue: 'Blau', violet: 'Violett', pink: 'Pink', brown: 'Braun', grey: 'Grau' },
+  // P2 Revanche: einmaliger Hinweis, wenn aus der Aufstellung etwas nicht mehr verfügbar ist
+  rematch: {
+    lead: 'Revanche:',
+    players1: '1 Spieler ist nicht mehr in der Gruppe.',
+    playersN: '{n} Spieler sind nicht mehr in der Gruppe.',
+    decks1: '1 Deck ist nicht mehr verfügbar – bitte prüfen.',
+    decksN: '{n} Decks sind nicht mehr verfügbar – bitte prüfen.',
+  },
   placeholder: {
     title: 'Spiel läuft',
     text: 'Der Lifecounter kommt mit dem nächsten Update. Bis dahin kannst du das Spiel hier verwerfen; es zählt dann nicht.',

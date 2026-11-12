@@ -54,6 +54,14 @@ export default {
   },
   mana: { W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', C: 'Colourless' },
   colors: { red: 'Red', orange: 'Orange', gold: 'Gold', green: 'Green', teal: 'Teal', blue: 'Blue', violet: 'Violet', pink: 'Pink', brown: 'Brown', grey: 'Grey' },
+  // P2 Rematch: one-time hint when part of the line-up is no longer available
+  rematch: {
+    lead: 'Rematch:',
+    players1: '1 player is no longer in the group.',
+    playersN: '{n} players are no longer in the group.',
+    decks1: '1 deck is no longer available – please check.',
+    decksN: '{n} decks are no longer available – please check.',
+  },
   placeholder: {
     title: 'Game in progress',
     text: 'The life counter arrives with the next update. Until then you can discard the game here; it will not count.',
