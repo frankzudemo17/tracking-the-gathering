@@ -66,6 +66,8 @@ export default {
   photoBad: 'This image cannot be read',
   save: 'Save',
   later: 'Later',
+  rematch: 'Rematch', // P2 Revanche
+  rematchSave: 'Save and rematch',
   saved: 'Saved',
   photoFailed: 'Saved · photo not saved',
   err: {

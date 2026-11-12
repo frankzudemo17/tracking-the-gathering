@@ -135,7 +135,7 @@ test('K13 Abbildung snake ⇒ camel an einer Zeile je Tabelle', async () => {
     { id: 'm1', name: 'Franco', profileId: 'p1', avatarPath: 'p1/avatar.jpg', isPlaceholder: false, removed: false, formerProfileId: null },
     { id: 'm2', name: 'Tim', profileId: null, avatarPath: 'members/m2/avatar.jpg', isPlaceholder: true, removed: false, formerProfileId: null },
   ]);
-  assert.deepEqual(data.games, [{ id: 'g1', sessionId: 's1', status: 'finished', startedAt: '2026-10-01T19:00:00Z', endedAt: '2026-10-01T20:00:00Z', round: 7, wincon: 'kombo', note: 'n', photoPath: `${GID}/g1.jpg`, startingLife: 40 }]);
+  assert.deepEqual(data.games, [{ id: 'g1', sessionId: 's1', status: 'finished', startedAt: '2026-10-01T19:00:00Z', endedAt: '2026-10-01T20:00:00Z', round: 7, wincon: 'kombo', note: 'n', photoPath: `${GID}/g1.jpg`, startingLife: 40, layout: null }]);
   assert.deepEqual(data.sessions, [{ id: 's1', playedOn: '2026-10-01', location: 'WG' }]);
   assert.deepEqual(data.players[1], { gameId: 'g1', memberId: 'm2', deckId: null, seat: 1, place: 2, eliminatedRound: 5, eliminatedBy: 'm1', finalLife: 0 });
   assert.deepEqual(data.ratings, [{ gameId: 'g1', memberId: 'm1', salt: 2, fun: 4, deckRating: 5 }]);
@@ -331,4 +331,41 @@ test('P12 H4 invalidate entfernt Konto|Gruppe|group; nächste Ladung geht ans Ne
   assert.equal(cache.peek(k), undefined);
   await data.loadGroup(GID);
   assert.equal(sb.of('games').length, 2);
+});
+
+// ---------------------------------------------------------------------------
+// P2 Revanche (Welle ttg-features, spec-p2-revanche.md Entscheid 4): games.layout wird geladen, first_seat nicht
+
+test('P2 HL1 games.layout gelesen ⇒ loadGroup und loadGame liefern layout', async () => {
+  const { createHistoryData } = await load();
+  const sb = fakeSb({ games: [gameRow('g1', { layout: 'rundum', first_seat: 1 })] });
+  const api = createHistoryData(sb);
+  const group = await api.loadGroup(GID);
+  assert.equal(group.games[0].layout, 'rundum');
+  const one = await api.loadGame('g1');
+  assert.equal(one.game.layout, 'rundum');
+  assert.ok(!('firstSeat' in one.game) && !('first_seat' in one.game), 'Startspieler wird nicht übernommen');
+});
+
+test('P2 HL2 Zeile ohne layout ⇒ layout null', async () => {
+  const { createHistoryData } = await load();
+  const sb = fakeSb({ games: [gameRow('g1')] });
+  const api = createHistoryData(sb);
+  assert.equal((await api.loadGroup(GID)).games[0].layout, null);
+  assert.equal((await api.loadGame('g1')).game.layout, null);
+});
+
+test('P2 HL3 select der games-Abfrage: mit layout, ohne first_seat, live_state und *', async () => {
+  const { createHistoryData } = await load();
+  const sb = fakeSb({ games: [gameRow('g1')] });
+  const api = createHistoryData(sb);
+  await api.loadGroup(GID);
+  await api.loadGame('g1');
+  const calls = sb.of('games');
+  assert.equal(calls.length, 2);
+  for (const c of calls) {
+    const cols = String(c.select).split(',').map((s) => s.trim());
+    assert.ok(cols.includes('layout'), `layout fehlt: ${c.select}`);
+    assert.ok(!cols.includes('first_seat') && !/live_state|\*/.test(c.select), `zu viel: ${c.select}`);
+  }
 });

@@ -67,6 +67,8 @@ export default {
   photoBad: 'Dieses Bild lässt sich nicht lesen',
   save: 'Speichern',
   later: 'Später',
+  rematch: 'Revanche', // P2 Revanche
+  rematchSave: 'Speichern und Revanche',
   saved: 'Gespeichert',
   photoFailed: 'Gespeichert · Foto nicht gespeichert',
   err: {

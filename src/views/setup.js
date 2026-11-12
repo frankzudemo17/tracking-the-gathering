@@ -1,7 +1,7 @@
 // Setup „Neues Spiel“ (Spec P7, HANDOFF 5.3, Mockup P2 Bildschirme 1 + 2):
 // Spieler 2–6, Sitzordnung mit Mini-Vorschau (zwei Plätze tauschen), Deck je Spieler
 // (eigene zuerst, dann Leihdecks), Feldfarbe-Sheet, Startspieler, Startleben, Start.
-// Der Entwurf liegt in sessionStorage `ttg.setup.<groupId>` und übersteht den Umweg über
+// Der Entwurf liegt in sessionStorage (src/lib/setup-draft.js, je Gruppe) und übersteht den Umweg über
 // „+ Spieler“ (#/spieler-neu?zurueck=setup) und „+ Commander“ (#/deck-neu/<id>?zurueck=setup).
 // P7 (Welle ttg-live-feinschliff-decks): Startleben und Tischlayout kommen aus den Spiel-Standards (src/lib/prefs.js);
 // der Entwurf stellt sie nur wieder her, wenn sie hier angefasst wurden (lifeSet/layoutSet). Bracket-Hinweis über dem
@@ -23,21 +23,13 @@ import { MEMBER_SELECT } from './groups.js';
 import { openDiceTable } from './dice.js';
 import { bracketHint } from './bracket-hint.js';
 import { getPrefs } from '../lib/prefs.js';
+import { readDraft, writeDraft, clearDraft, rematchLoss } from '../lib/setup-draft.js';
 
 const MAX = 6;
 const LIVES = [20, 25, 30, 40];
 const DECK_COLS = 'id, owner_profile_id, owner_member_id, short_name, commander_name, partner_name, image_url, partner_image_url, color_identity, field_color, field_mode, bracket, bracket_check, created_at';
-const draftKey = (gid) => `ttg.setup.${gid}`;
 const clampLife = (v) => Math.max(5, Math.min(99, Math.round(Number(v) || 40)));
 const cssUrl = (u) => `url('${String(u).replace(/'/g, '%27')}')`;
-
-function readDraft(gid) {
-  try { const raw = sessionStorage.getItem(draftKey(gid)); return raw ? JSON.parse(raw) : null; } catch { return null; }
-}
-function writeDraft(gid, s) {
-  try { sessionStorage.setItem(draftKey(gid), JSON.stringify({ sel: s.sel, deck: s.deck, layout: s.layout, life: s.life, layoutSet: s.layoutSet, lifeSet: s.lifeSet, start: s.start, roll: s.roll })); } catch { /* Privatmodus */ }
-}
-function clearDraft(gid) { try { sessionStorage.removeItem(draftKey(gid)); } catch { /* egal */ } }
 
 /** Query-Teil des Hash (#/spiel-neu?deck=…&fuer=…) — der Router ignoriert ihn. */
 function hashQuery() { return new URLSearchParams(location.hash.split('?')[1] || ''); }
@@ -79,6 +71,9 @@ export default async function setup(el, { isStale }) {
     if (r && r.key === s.sel.join() && r.startRoll.winnerSeat === s.start && Array.isArray(v) && v.length === s.sel.length
       && v.every((x) => Number.isInteger(x) && x >= 1 && x <= 6)) s.roll = { key: r.key, startRoll: { values: v, winnerSeat: s.start } };
   }
+  // P2 Revanche: was beim Wiederherstellen herausfiel (Spieler entfernt, Deck nicht mehr verfügbar) ⇒ ein Hinweis nach
+  // dem ersten Zeichnen. Die Marke `rematch` verschwindet mit dem ersten save() ⇒ Neuladen/Umweg zeigen ihn nicht erneut.
+  const loss = rematchLoss(draft, s);
   if (!s.sel.length && me && byId.has(me)) { // kein oder abgelaufener Entwurf ⇒ eigenes Mitglied vorausgewählt
     s.sel = [me];
     s.deck[me] = ownDecks(me)[0]?.id || null;
@@ -281,6 +276,10 @@ export default async function setup(el, { isStale }) {
   }
 
   render();
+  if (loss && (loss.players > 0 || loss.decks > 0)) {
+    const n = (k, c) => (c === 1 ? t(`setup.rematch.${k}1`) : t(`setup.rematch.${k}N`, { n: c }));
+    toast([t('setup.rematch.lead'), loss.players > 0 ? n('players', loss.players) : '', loss.decks > 0 ? n('decks', loss.decks) : ''].filter(Boolean).join(' '));
+  }
 }
 
 /**

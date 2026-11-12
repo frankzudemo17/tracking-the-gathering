@@ -182,3 +182,77 @@ test('Startseite: letzte 3 gewertete Spiele der Fixture g1, g2, g3 (neueste zuer
   assert.deepEqual(recentGames(fixtureGroupData().games).map((g) => g.id), ['g1', 'g2', 'g3']);
   assert.deepEqual(recentGames([{ id: 'a', status: 'live', startedAt: '2026-01-02T00:00:00Z' }]), []);
 });
+
+// ---------------------------------------------------------------------------
+// P2 Revanche (Welle ttg-features, spec-p2-revanche.md Entscheid 9): formDirty — hat sich am Formular etwas geändert?
+
+test('P2 D1 gleiche Form ⇒ nicht geändert', async () => {
+  const { initialForm, formDirty } = await ui();
+  const i = initialForm(null, null);
+  assert.equal(formDirty(i, i), false);
+  assert.equal(formDirty(i, { ...i }), false);
+  assert.equal(formDirty(i, { ...i, deckSalt: { ...i.deckSalt } }), false);
+});
+
+test('P2 D2 Salz gesetzt ⇒ geändert', async () => {
+  const { initialForm, formDirty } = await ui();
+  const i = initialForm(null, null);
+  assert.equal(formDirty(i, { ...i, salt: 3 }), true);
+  assert.equal(formDirty(i, { ...i, fun: 2 }), true);
+  assert.equal(formDirty(i, { ...i, deckRating: 5 }), true);
+});
+
+test('P2 D3 Notiz nur Leerzeichen ⇒ nicht geändert; Text ⇒ geändert', async () => {
+  const { initialForm, formDirty } = await ui();
+  const i = initialForm(null, null);
+  assert.equal(formDirty(i, { ...i, note: '   ' }), false);
+  assert.equal(formDirty(i, { ...i, note: 'x' }), true);
+});
+
+test('P2 D4 POTG-Text nur Leerzeichen ⇒ nicht geändert', async () => {
+  const { initialForm, formDirty } = await ui();
+  const i = initialForm(null, null);
+  assert.equal(formDirty(i, { ...i, potgText: '  ' }), false);
+  assert.equal(formDirty(i, { ...i, potgText: 'Stark' }), true);
+});
+
+test('P2 D5 Deck-Salz setzen ⇒ geändert; derselbe Wert noch einmal (abgewählt) ⇒ nicht geändert', async () => {
+  const { initialForm, formDirty, setDeckSalt } = await ui();
+  const i = initialForm(null, null);
+  const a = setDeckSalt(i, 'd1', 3);
+  assert.equal(formDirty(i, a), true);
+  assert.equal(formDirty(i, setDeckSalt(a, 'd1', 3)), false);
+});
+
+test('P2 D6 Salzigstes Deck ⇒ geändert', async () => {
+  const { initialForm, formDirty, pickSaltiest } = await ui();
+  const i = initialForm(null, null);
+  assert.equal(formDirty(i, pickSaltiest(i, 'd1')), true);
+});
+
+test('P2 D7 gespeicherte Bewertung: gleich ⇒ nicht geändert; Salz abgewählt ⇒ geändert', async () => {
+  const { initialForm, formDirty, toggleScore } = await ui();
+  const data = { game: { id: 'gx', wincon: 'kombo', note: 'Notiz' }, ratings: [{ gameId: 'gx', memberId: 'm-F', salt: 4, fun: 3, deckRating: 2 }],
+    deckSalt: [{ gameId: 'gx', raterId: 'm-F', deckId: 'd1', salt: 5 }], potg: [{ gameId: 'gx', voterId: 'm-F', votedFor: 'm-M', text: 'Gut' }] };
+  const i = initialForm(data, 'm-F');
+  assert.equal(formDirty(i, { ...i, salt: 4 }), false);
+  assert.equal(formDirty(i, initialForm(data, 'm-F')), false, 'frisch berechnet ⇒ gleich');
+  assert.equal(formDirty(i, { ...i, salt: toggleScore(i.salt, 4) }), true);
+  assert.equal(formDirty(i, { ...i, deckSalt: { d1: 5 } }), false, 'Menge gleich');
+  assert.equal(formDirty(i, { ...i, deckSalt: {} }), true, 'Deck-Salz entfernt');
+  assert.equal(formDirty(i, { ...i, potg: null }), true);
+});
+
+test('P2 D8 Siegbedingung gewählt ⇒ geändert', async () => {
+  const { initialForm, formDirty, pickWincon } = await ui();
+  const i = initialForm(null, null);
+  assert.equal(formDirty(i, pickWincon(i, 'kombo')), true);
+});
+
+test('P2 D9 nur hadRating/hadDeckSalt anders ⇒ nicht geändert; fehlende Felder werfen nicht', async () => {
+  const { initialForm, formDirty } = await ui();
+  const i = initialForm(null, null);
+  assert.equal(formDirty(i, { ...i, hadRating: !i.hadRating, hadDeckSalt: !i.hadDeckSalt }), false);
+  assert.doesNotThrow(() => formDirty(/** @type {any} */ (null), /** @type {any} */ (undefined)));
+  assert.equal(formDirty(/** @type {any} */ ({}), /** @type {any} */ ({})), false);
+});

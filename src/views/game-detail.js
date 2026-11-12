@@ -1,6 +1,7 @@
 // Spieldetail (#/partie/:id): Kopf, Platzierung, Schadensmatrix, POTG, Notiz, Foto. Besitzer: P16.
 // Daten nur über groupData.loadGame, Zahlen nur aus stats.js (gameSummary), Anzeige nur über format.js.
 // Spielerfarben nur in der Schadensmatrix (Diagramm, WELLE UI-Regel 2).
+// P2 Revanche (Welle ttg-features): „Revanche“ öffnet das Setup mit derselben Aufstellung (Entwurf über src/lib/setup-draft.js).
 import { avatarUrls, photoUrls } from '../supabase.js';
 import { state, currentMembership } from '../state.js';
 import { groupData } from '../lib/data.js';
@@ -13,6 +14,8 @@ import { avatar, backHead, empty } from '../lib/parts.js';
 import { t, getLang } from '../i18n/index.js';
 import { openPhoto } from '../lib/ui.js';
 import { WINCONS, byId, deckArt, colorDeck, damageGrid, fmtDateTime, num } from './history-ui.js';
+import { go } from '../router.js';
+import { rematchDraft, writeDraft } from '../lib/setup-draft.js';
 
 export default async function gameDetail(el, { params, isStale }) {
   const id = params?.id || '';
@@ -193,6 +196,7 @@ export default async function gameDetail(el, { params, isStale }) {
 
     <div class="gd-actions">
       ${iPlayed ? html`<a class="btn block" href="#/spiel/${encodeURIComponent(game.id)}/ende">${icon('starFill', 20)}${t('history.rate')}</a>` : ''}
+      <button type="button" class="btn soft block" data-act="rematch">${icon('arrowCounterClockwise', 20)}<span>${t('history.rematch')}</span></button>
       ${s.sessionId ? html`<a class="btn soft block" href="#/abend/${encodeURIComponent(s.sessionId)}">${icon('calendarBlank', 20)}${t('history.toEvening')}</a>` : ''}
     </div>`);
 
@@ -201,4 +205,10 @@ export default async function gameDetail(el, { params, isStale }) {
   img?.addEventListener('error', () => el.querySelector('.gd-photo-sec')?.remove(), { once: true });
 
   on(el, 'click', '[data-act="photo"]', () => { if (photo) openPhoto(photo, t('history.photoAlt', { date: when })); });
+  // P2 Revanche: kein Formular, kein Speichern — Entwurf schreiben, ins Setup (gestartet wird nur dort)
+  on(el, 'click', '[data-act="rematch"]', () => {
+    const d = rematchDraft(data);
+    if (d) writeDraft(data.groupId, d);
+    go('/spiel-neu');
+  });
 }
