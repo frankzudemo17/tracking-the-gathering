@@ -11,7 +11,7 @@
 //   4. Ausliefern: die reparierte Version übernimmt nach vollständigem Precache von selbst.
 //   5. Mit der nächsten Version URGENT wieder auf false.
 //   Zweite Rückfallebene: ein Abschalt-Worker (ein sw.js, das alle Caches löscht und sich abmeldet).
-const VERSION = 'ttg-v39';
+const VERSION = 'ttg-v40';
 const URGENT = false;
 // Fassung wie in src/supabase.js:1 — wer sie hebt, hebt den Namen (tests/unit/sw.test.mjs prüft das)
 const EXT = 'ttg-ext-supabase-2.118.0';
