@@ -5,7 +5,11 @@
 // gleicher Merker „frisch gestartet“). Jedes gestartete Spiel wird verworfen.
 // Motto-Fälle hängen an mottoLive() (Spalte decks.motto in Prod?); vorher sichtbar übersprungen, dafür läuft der
 // Übergangsfall „Deckprofil ohne Spalte: kein Motto-Feld, keine Antwort ≥ 400“.
-import { ok, skip, ctx, waitHash, login, prepare, Abort, signIn, api, rest, get } from './harness.mjs';
+// P8 (Intro 2.0): Bühne „Tisch“ mit ganzer Karte; Start über #/spiel-neu lädt die normal-Adresse vor; Liegezeit aus
+// der Gruppe. Einstellungs-Fälle hängen an introSecondsLive() (Spalte playgroups.intro_seconds in Prod?); vorher
+// sichtbar übersprungen, dafür Übergangsfall: keine Intro-Karte auf #/gruppen, Liegezeit 4 s.
+import { ok, skip, ctx, waitHash, login, prepare, Abort, signIn, api, rest, get, rpc, fixtureIds } from './harness.mjs';
+import { normalFromArt } from '../../src/lib/card-images.js';
 
 const MOTTO = 'E2E: Kein Zug ohne Plan';
 
@@ -25,11 +29,30 @@ async function mottoLive() {
   return mLive;
 }
 
+let sLive = null;
+/** Gibt es playgroups.intro_seconds in der Ziel-Datenbank (P8-Migration in Prod)? Einmal je Lauf, als Konto A (Muster mottoLive). */
+async function introSecondsLive() {
+  if (sLive !== null) return sLive;
+  const s = await signIn('a');
+  try {
+    await api('GET', rest('playgroups?select=intro_seconds&limit=1'), { token: s.token });
+    sLive = true;
+  } catch (e) {
+    if (e instanceof Abort) throw e;
+    if (e.status === 400 && (e.code === '42703' || e.code === 'PGRST204')) sLive = false;
+    else throw new Abort('Intro-Dauer-Probe', `playgroups?select=intro_seconds antwortet unerwartet: ${e.message}`);
+  }
+  return sLive;
+}
+
 export default async function introE2e({ browser, base: BASE }) {
   const { decks } = await prepare({ members: ['b', 'c'], decks: [['a', 'tymna'], ['b', 'krenko']] });
   const tymna = decks['a:tymna'], krenko = decks['b:krenko'];
   const live = await mottoLive();
   console.log(`\nIntro: Motto-Spalte in Prod: ${live ? 'ja' : 'nein (Motto-Fälle werden übersprungen)'}`);
+  const secLive = await introSecondsLive();
+  console.log(`Intro: Spalte intro_seconds in Prod: ${secLive ? 'ja' : 'nein (Einstellungs-Fälle werden übersprungen)'}`);
+  const fx = fixtureIds();
 
   const A = await ctx(browser, 'IA');
   await A.goto(BASE);
@@ -62,6 +85,33 @@ export default async function introE2e({ browser, base: BASE }) {
     for (let k = 0; k < 8; k++) { seen += await introCount(P); await P.waitForTimeout(250); }
     return seen === 0;
   };
+  /** P8: Intro-Ereignisse im Seitenkontext mitschreiben (Karte eingefügt, data-phase → lie), Zeit = performance.now(). */
+  const watch = (P) => P.evaluate(() => {
+    if (!window.__ei) {
+      const L = (window.__ei = []);
+      new MutationObserver((ms) => {
+        const t = performance.now();
+        for (const m of ms) {
+          if (m.type === 'attributes' && m.target.matches?.('[data-intro-card]')) L.push({ ev: 'phase', i: Number(m.target.dataset.introCard), v: m.target.dataset.phase, t });
+          for (const n of m.addedNodes || []) {
+            if (n.nodeType !== 1) continue;
+            const c = n.matches?.('[data-intro-card]') ? n : n.querySelector?.('[data-intro-card]');
+            if (c) L.push({ ev: 'card', i: Number(c.dataset.introCard), v: c.dataset.phase, t });
+          }
+        }
+      }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-phase'] });
+    }
+    window.__ei.length = 0;
+  });
+  /** Karte 1 „liegt“ → Karte 2 erscheint (ohne Tippen), in ms. */
+  const lieGap = async (P) => {
+    await P.waitForSelector('[data-intro-card="1"]', { timeout: 20000 });
+    const L = await P.evaluate(() => window.__ei.slice());
+    const lie = L.find((e) => e.i === 0 && e.v === 'lie')?.t;
+    const next = L.find((e) => e.ev === 'card' && e.i === 1)?.t;
+    return lie !== undefined && next !== undefined ? Math.round(next - lie) : null;
+  };
+  const secondsOf = async () => (await get('a', `playgroups?select=intro_seconds&id=eq.${fx.group}`))[0]?.intro_seconds;
   const abortGame = async () => {
     await A.click('.lc-hub');
     await A.click('[data-sheet="menu"] [data-m="end"]');
@@ -90,10 +140,22 @@ export default async function introE2e({ browser, base: BASE }) {
   // C (ohne eigenes Deck) leiht eins; hätte B wider Erwarten keins, leiht B ebenfalls
   for (const m of [MC, MB]) if (await A.isDisabled('[data-act="start"]')) await A.click(`.su-row[data-mid="${m}"] [data-act="cycle"]`);
   await A.waitForFunction(() => { const b = document.querySelector('[data-act="start"]'); return b && !b.disabled; }, null, { timeout: 15000 });
+  // P8 K30: das Setup lädt die ganze Karte (normal, aus image_url abgeleitet) von Deck A vor der Antwort auf rpc/start_game
+  const wantNormal = normalFromArt((await get('a', `decks?select=image_url&id=eq.${tymna}`))[0]?.image_url);
+  const normals = []; let startRes = null;
+  const onReq = (r) => { if (/^https:\/\/cards\.scryfall\.io\/normal\//.test(r.url())) normals.push({ t: Date.now(), url: r.url() }); };
+  const onRes = (r) => { if (/\/rest\/v1\/rpc\/start_game(\?|$)/.test(r.url()) && startRes === null) startRes = Date.now(); };
+  A.on('request', onReq); A.on('response', onRes);
   await A.click('[data-act="start"]');
   await waitHash(A, '#/spiel/');
   const g1 = decodeURIComponent(new URL(A.url()).hash.slice('#/spiel/'.length));
   await A.waitForSelector('[data-intro-card="0"]', { timeout: 8000 });
+  A.off('request', onReq); A.off('response', onRes);
+  const early = normals.find((x) => x.url === wantNormal && startRes !== null && x.t <= startRes);
+  ok('P8 K30 #/spiel-neu: normal-Adresse von Deck A (aus image_url) angefragt vor der Antwort rpc/start_game', !!wantNormal && !!early,
+    `${wantNormal ? 'Soll abgeleitet' : 'keine art_crop-Adresse'} · Anfrage ${early ? `${startRes - early.t} ms vor` : 'nicht vor'} der Antwort`);
+  const img0 = await A.getAttribute('[data-intro-card="0"]', 'data-img');
+  console.log(`  (Messwert) Karte 1 data-img = ${img0}`);
   const segs = await A.locator('[data-intro-prog] > i').count();
   const c0 = await cardAt(A);
   ok('K29 Intro erscheint auf dem startenden Gerät, so viele Karten wie Spieler (3)', segs === 3 && (await A.locator('.lc-field').count()) === 3, `Segmente ${segs}`);
@@ -135,10 +197,15 @@ export default async function introE2e({ browser, base: BASE }) {
       players: a.players.map((p, i) => ({ memberId: p[0], deckId: p[1], seat: i })) });`, { gid, first: firstSeat, players });
   const g2 = await start([[MA, tymna], [MB, krenko], [MC, tymna]], 1);
   ok('Spiel 2 gestartet (Store, B beginnt)', typeof g2 === 'string' && g2.length > 10, String(g2));
+  await watch(A);
   await go('#/spiel/' + g2);
   await A.waitForSelector('[data-intro-card="0"]', { timeout: 8000 });
   const seen = [await cardAt(A)];
-  for (let k = 1; k < 3; k++) {
+  // P8 K30: Karte 1 liegen lassen ⇒ Karte 2 kommt nach der Liegezeit der Gruppe (Fixture: 4 s, ohne Spalte ebenfalls 4 s)
+  const gap4 = await lieGap(A);
+  ok(`P8 K30 ${secLive ? '' : 'Übergang: '}Intro-Karte 1 „liegt“ → Karte 2 nach 4000 ± 400 ms`, gap4 !== null && Math.abs(gap4 - 4000) <= 400, `${gap4} ms`);
+  seen.push(await cardAt(A));
+  for (let k = 2; k < 3; k++) {
     await A.click('[data-intro]', { position: { x: 195, y: 420 } });
     await A.waitForSelector(`[data-intro-card="${k}"]`, { timeout: 3000 });
     seen.push(await cardAt(A));
@@ -157,6 +224,62 @@ export default async function introE2e({ browser, base: BASE }) {
   await go('#/spiel/' + g3);
   ok('K29 startIntro false ⇒ kein Intro (Spiel frisch auf diesem Gerät gestartet)', await noIntro(A));
   await abortGame();
+
+  // ---------------------------------------------------------------- P8: Intro-Dauer der Gruppe bzw. Übergang
+  if (secLive) {
+    await pref('startIntro', true);
+    const B2 = await ctx(browser, 'IB2');
+    try {
+      ok('P8 K30 Fixture-Gruppe steht auf 4 s', (await secondsOf()) === 4, String(await secondsOf()));
+      await A.goto(BASE + '#/gruppen');
+      await A.waitForSelector('[data-intro-setting]', { timeout: 10000 });
+      ok('P8 K30 A (Admin) sieht die Intro-Karte mit „4 s“', (await A.textContent('[data-intro-seconds]')) === '4 s', await A.textContent('[data-intro-seconds]'));
+      await A.click('[data-act="intro-less"]');
+      await A.click('[data-act="intro-less"]');
+      await A.click('[data-act="intro-save"]');
+      for (let k = 0; k < 20 && (await secondsOf()) !== 2; k++) await A.waitForTimeout(250);
+      await A.reload();
+      await A.waitForSelector('[data-intro-setting]', { timeout: 10000 });
+      ok('P8 K30 A setzt 2 über die UI ⇒ Neuladen zeigt „2 s“', (await A.textContent('[data-intro-seconds]')) === '2 s' && (await secondsOf()) === 2, await A.textContent('[data-intro-seconds]'));
+      const g5 = await start([[MA, tymna], [MB, krenko]]);
+      await watch(A);
+      await go('#/spiel/' + g5);
+      await A.waitForSelector('[data-intro-card="0"]', { timeout: 8000 });
+      const gap2 = await lieGap(A);
+      ok('P8 K30 Spielstart ⇒ Karte 1 „liegt“ → Karte 2 nach 2000 ± 400 ms', gap2 !== null && Math.abs(gap2 - 2000) <= 400, `${gap2} ms`);
+      await A.click('[data-intro-skip]');
+      await A.waitForSelector('[data-intro]', { state: 'detached', timeout: 3000 });
+      await A.waitForTimeout(450);
+      await abortGame();
+      await B2.goto(BASE);
+      await waitHash(B2, '#/login');
+      await login(B2, 'b');
+      await waitHash(B2, '#/start');
+      await B2.goto(BASE + '#/gruppen');
+      await B2.waitForSelector('[data-invite-none]', { timeout: 10000 });
+      ok('P8 K30 B (Mitglied) sieht keine Intro-Karte', (await B2.locator('[data-intro-setting]').count()) === 0);
+      let rpcErr = null;
+      try { await rpc('b', 'set_intro_seconds', { p_group: fx.group, p_seconds: 9 }); } catch (e) { if (e instanceof Abort) throw e; rpcErr = e; }
+      ok('P8 K30 B ruft rpc/set_intro_seconds direkt ⇒ Fehler not_group_admin, Wert bleibt 2', /not_group_admin/.test(rpcErr?.message || '') && (await secondsOf()) === 2, `${rpcErr?.status} ${rpcErr?.body?.message ?? ''}`);
+      let patchErr = null;
+      try { await api('PATCH', rest(`playgroups?id=eq.${fx.group}`), { token: (await signIn('b')).token, body: { intro_seconds: 9 } }); } catch (e) { if (e instanceof Abort) throw e; patchErr = e; }
+      ok('P8 K30 B PATCH playgroups { intro_seconds: 9 } ⇒ Fehler 42501, Wert bleibt 2', patchErr?.code === '42501' && (await secondsOf()) === 2, `${patchErr?.status} ${patchErr?.code}`);
+      ok('Keine JS-Fehler bei B (Gruppen-Seite)', B2.errs.length === 0, B2.errs.join(' | '));
+    } finally {
+      await B2.context().close().catch(() => {});
+      await rpc('a', 'set_intro_seconds', { p_group: fx.group, p_seconds: 4 });
+    }
+    ok('P8 K30 Aufgeräumt: Fixture-Gruppe wieder 4 s', (await secondsOf()) === 4, String(await secondsOf()));
+  } else {
+    for (const n of ['P8 K30 A sieht die Intro-Karte mit „4 s“, setzt 2 ⇒ Neuladen „2 s“', 'P8 K30 Spielstart ⇒ Liegezeit 2000 ± 400 ms',
+      'P8 K30 B sieht keine Karte', 'P8 K30 B rpc/set_intro_seconds ⇒ not_group_admin', 'P8 K30 B PATCH playgroups ⇒ 42501', 'P8 K30 Aufgeräumt: wieder 4 s']) skip(n, 'Migration nicht in Prod');
+    const badBefore = A.bad.length;
+    await A.goto(BASE + '#/gruppen');
+    await A.waitForSelector('[data-invite]', { timeout: 10000 });
+    await A.waitForTimeout(800);
+    ok('P8 K30 Übergang: A (Admin) auf #/gruppen ohne Intro-Karte', (await A.locator('[data-intro-setting]').count()) === 0);
+    ok('P8 K30 Übergang: keine Antwort ≥ 400 auf #/gruppen', A.bad.length === badBefore, A.bad.slice(badBefore).join(' | '));
+  }
 
   // ---------------------------------------------------------------- Motto bzw. Übergang
   if (live) {
