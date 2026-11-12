@@ -178,6 +178,9 @@ export default {
     save: 'Save deck', saved: 'Deck saved.', none: 'No deck yet.', noneOther: '{name} has no deck yet.',
     games: 'Games', wins: 'Wins', winrate: 'Win rate', place: 'Avg place', noGames: 'No games yet', list: 'Decklist',
     open: 'Open', editLink: 'Change link', addLink: 'Add link', noLink: 'No link to a decklist yet.',
+    // P3 game-start intro: deck motto
+    motto: { show: '“{text}”', add: 'Add motto', edit: 'Change motto', label: 'Motto',
+      hint: 'Shown in the game-start intro. Empty = automatic line from the decklist.', count: '{n}/{max}', tooLong: 'At most {max} characters.' },
     changeBracket: 'Change bracket', remove: 'Remove deck', removed: 'Deck removed.', archived: 'Deck archived because it already appears in games.',
     removeConfirm: 'Really remove?', removeYes: 'Yes, remove', by: 'by {name}', notFound: 'This deck does not exist or is not visible to you.',
     art: 'Art: {artist} · Scryfall',

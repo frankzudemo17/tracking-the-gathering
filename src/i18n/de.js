@@ -178,6 +178,9 @@ export default {
     save: 'Deck speichern', saved: 'Deck gespeichert.', none: 'Noch kein Deck.', noneOther: '{name} hat noch kein Deck.',
     games: 'Spiele', wins: 'Siege', winrate: 'Siegquote', place: 'Ø Platz', noGames: 'Noch keine Spiele', list: 'Deckliste',
     open: 'Öffnen', editLink: 'Link ändern', addLink: 'Link hinzufügen', noLink: 'Noch kein Link zur Deckliste.',
+    // P3 Spielstart-Intro: Motto am Deck
+    motto: { show: '„{text}“', add: 'Motto hinzufügen', edit: 'Motto ändern', label: 'Motto',
+      hint: 'Erscheint im Spielstart-Intro. Leer = automatische Zeile aus der Deckliste.', count: '{n}/{max}', tooLong: 'Höchstens {max} Zeichen.' },
     changeBracket: 'Bracket ändern', remove: 'Deck entfernen', removed: 'Deck entfernt.', archived: 'Deck archiviert, weil es schon in Spielen vorkommt.',
     removeConfirm: 'Wirklich entfernen?', removeYes: 'Ja, entfernen', by: 'von {name}', notFound: 'Dieses Deck gibt es nicht oder du siehst es nicht.',
     art: 'Bild: {artist} · Scryfall',
