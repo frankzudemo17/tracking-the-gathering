@@ -283,7 +283,8 @@ Franco gibt keinen Schlüssel in den Chat, sondern meldet sich selbst an. Ablauf
    - E-Mail-Login an, Bestätigungsmail an
    - Site URL und Redirect-URLs: `https://<github-user>.github.io/<repo>/`, zusätzlich `http://localhost:5173` für lokal
    - **Anonymous Sign-ins an** (für Mitspieler ohne Konto im Live-Modus)
-   - E-Mail-Vorlagen auf Deutsch anpassen
+   - E-Mail-Vorlagen auf Deutsch anpassen — „Reset Password“: Betreff und Text aus `supabase/templates/recovery.html` im Dashboard eintragen (Authentication → Emails → Templates). **Nicht** per `config push`: `config.toml` weicht vom Dashboard ab und würde Einstellungen überschreiben.
+   - **Eigener Mailversand (SMTP):** Brevo (kostenlos, 300 Mails/Tag). Dashboard → Authentication → Emails → SMTP Settings: Host `smtp-relay.brevo.com`, Port `587`, Benutzer = SMTP-Login aus Brevo, Passwort = SMTP-Schlüssel (nur im Dashboard, nie ins Repo). Absender muss in Brevo bestätigt sein; Brevo ersetzt Freemail-Absender (z. B. Gmail) beim Versand durch eine eigene Adresse. Danach Authentication → Rate Limits → Mails pro Stunde auf ~30. Ohne eigenen SMTP schickt Supabase nur an Projekt-Mitglieder.
 5. **Frontend-Konfiguration:** URL und **anon key** (öffentlich, darf ins Repo) holen:
    ```bash
    npx supabase projects api-keys --project-ref <ref>

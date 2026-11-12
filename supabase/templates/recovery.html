@@ -1,0 +1,20 @@
+<!--
+  Vorlage „Reset Password“ (Passwort zurücksetzen) für Tracking the Gathering.
+  Gilt im gehosteten Projekt nur, wenn sie im Supabase-Dashboard eingetragen ist:
+  Authentication → Emails → Templates → „Reset Password“.
+  Betreff:  Dein Link für ein neues Passwort – Tracking the Gathering
+  Body:     alles unterhalb dieses Kommentars.
+  Nicht über `npx supabase config push` ausrollen: config.toml weicht vom Dashboard ab
+  (z. B. anonyme Anmeldung) und würde dort Einstellungen überschreiben.
+  Versand über eigenen SMTP (Brevo), siehe HANDOFF.md Abschnitt 7, Schritt 4.
+-->
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16px; line-height: 1.5; color: #1a1d24; max-width: 480px;">
+  <p style="margin: 0 0 16px;">Hallo,</p>
+  <p style="margin: 0 0 16px;">jemand hat für dein Konto bei <strong>Tracking the Gathering</strong> ein neues Passwort angefordert. Wenn du das warst, tipp auf den Knopf und leg ein neues Passwort fest:</p>
+  <p style="margin: 0 0 24px;">
+    <a href="{{ .ConfirmationURL }}" style="display: inline-block; padding: 12px 20px; border-radius: 10px; background: #1a1d24; color: #ffffff; text-decoration: none; font-weight: 600;">Neues Passwort festlegen</a>
+  </p>
+  <p style="margin: 0 0 16px;">Der Link gilt eine Stunde und nur einmal. Öffne ihn am besten auf dem Gerät und im Browser, mit dem du ihn angefordert hast.</p>
+  <p style="margin: 0 0 16px;">Wenn du kein neues Passwort angefordert hast, ignorier diese Mail einfach. Dein bisheriges Passwort bleibt gültig.</p>
+  <p style="margin: 24px 0 0; font-size: 13px; color: #5b6170;">Tracking the Gathering · Lifecounter und Statistik für eure Commander-Runde</p>
+</div>
