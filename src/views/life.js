@@ -153,14 +153,14 @@ export default async function life(el, { params, isStale }) {
       <div class="lc-inner" style="${innerStyle(sl.rot)}">
         <div class="lc-art">${arts.map((u) => html`<i style="--img:${cssUrl(u)}"></i>`)}</div><div class="lc-tint"></div><div class="lc-scrim"></div>
         <div class="lc-top"><span class="who"><b>${nm(p.id)}</b><span>${cmdLine(d)}</span></span>
-          <span class="lc-stat"><span class="lc-badges" data-part="badges"></span>
-            <button type="button" class="lc-more" data-act="counters" data-pid="${p.id}" aria-label="${t('life.moreFor', { name: nm(p.id) })}">${icon('dotsThree', 24)}</button></span></div>
+          <span class="lc-stat"><span class="lc-badges" data-part="badges"></span></span></div>
         <div class="lc-mid">
           <button type="button" class="lc-tap minus" data-act="tap" data-pid="${p.id}" data-v="-1" aria-label="${t('life.lifeLess', { name: nm(p.id) })}">${icon('minus', 26)}</button>
           <button type="button" class="lc-tap plus" data-act="tap" data-pid="${p.id}" data-v="1" aria-label="${t('life.lifeMore', { name: nm(p.id) })}">${icon('plus', 26)}</button>
           <div class="lc-num" data-part="num"></div>
         </div>
         <div class="lc-bot" data-part="bot"></div>
+        <button type="button" class="lc-more" data-act="counters" data-pid="${p.id}" aria-label="${t('life.moreFor', { name: nm(p.id) })}">${icon('dotsThree', 26)}</button>
         <div class="lc-plaque" data-part="plaque"></div>
       </div></div>`;
   }
@@ -231,7 +231,7 @@ export default async function life(el, { params, isStale }) {
     /** @param {Element} n @param {number} pad */
     const roundHit = (n, pad) => { const w = n.getBoundingClientRect(); return Math.hypot(Math.max(w.left, Math.min(cx, w.right)) - cx, Math.max(w.top, Math.min(cy, w.bottom)) - cy) < r + pad; };
     for (const top of $$('.lc-top', el)) {
-      const who = $('.who', top); const stat = $('.lc-stat', top); const more = $('.lc-more', top);
+      const who = $('.who', top); const stat = $('.lc-stat', top);
       top.style.paddingTop = ''; top.style.paddingLeft = ''; top.style.paddingRight = '';
       if (stat) stat.style.marginTop = '';
       const narrow = top.offsetWidth < 175;
@@ -240,13 +240,23 @@ export default async function life(el, { params, isStale }) {
         if (narrow) top.style.paddingTop = '46px';
         else { top.style.paddingLeft = '68px'; if (boxHit(who, 2)) { top.style.paddingLeft = ''; top.style.paddingTop = '52px'; } }
       }
-      // „⋯“ muss ganz frei bleiben: erst in der Zeile einrücken (breite Felder) bzw. nach unten (schmale), dann der andere Weg
-      if (stat && more && roundHit(more, 6)) {
+      // Abzeichen (Gift, Monarch …) bleiben frei: erst in der Zeile einrücken (breite Felder) bzw. nach unten (schmale), dann der andere Weg
+      if (stat && stat.offsetWidth > 0 && roundHit(stat, 6)) {
         const undo = () => { top.style.paddingRight = ''; stat.style.marginTop = ''; };
         const ways = [() => { top.style.paddingRight = '52px'; }, () => { stat.style.marginTop = '44px'; }];
         if (top.offsetWidth < 260) ways.reverse();
-        for (const way of ways) { undo(); way(); if (!roundHit(more, 4)) break; }
+        for (const way of ways) { undo(); way(); if (!roundHit(stat, 4)) break; }
       }
+    }
+    // „⋯“ (Spielermenü) unten in der Ecke aus Sicht des Spielers (Franco 12.11.): die Ecke, die weiter vom Mittelknopf weg ist
+    const far = (/** @type {Element} */ n) => { const w = n.getBoundingClientRect(); return Math.hypot(w.left + w.width / 2 - cx, w.top + w.height / 2 - cy); };
+    for (const f of $$('.lc-field', el)) {
+      const more = $('.lc-more', f);
+      if (!more) continue;
+      f.classList.toggle('more-left', false);
+      const right = far(more);
+      f.classList.toggle('more-left', true);
+      if (far(more) <= right) f.classList.toggle('more-left', false);
     }
     aimHub();
   }

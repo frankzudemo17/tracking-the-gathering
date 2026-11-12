@@ -39,8 +39,13 @@ html:has(.lc-screen), html:has(.lc-screen) body { overflow: hidden; overscroll-b
 .lc-badge { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 7px; border-radius: 12px; font-size: 12px; font-weight: 700;
   background: rgba(var(--scrim), .62); color: var(--hero-ink); font-variant-numeric: tabular-nums; }
 .lc-badge.monarch, .lc-badge.init, .lc-badge.city { color: var(--hi); padding: 0 5px; }
-.lc-more { width: 40px; height: 40px; border: 0; border-radius: 20px; background: transparent; color: var(--hero-ink); display: grid; place-items: center; cursor: pointer; }
-.lc-more:active { background: rgba(var(--scrim), .5); }
+.lc-more { position: absolute; bottom: 6px; right: 6px; z-index: 7; width: 48px; height: 48px; border: 0; border-radius: 24px;
+  background: rgba(var(--scrim), .42); color: var(--hero-ink); display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.lc-field.more-left .lc-more { right: auto; left: 6px; } /* Ecke weiter weg vom Mittelknopf (life.js clearHub) */
+.lc-field.lethal:not(.out) .lc-more { bottom: 56px; } /* über „Ausgeschieden?“ (.lc-bot, unten mittig, 40 px hoch) */
+.lc-field.out .lc-more { z-index: 8; } /* über der Platz-Plakette (z 7), die Plakette lässt Klicks ohnehin durch */
+.lc-more:active { background: rgba(var(--scrim), .7); }
+.lc-more:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
 .lc-field.out .lc-more { opacity: .6; }
 
 /* Mitte: Tippzonen + große Zahl */
