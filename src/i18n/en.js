@@ -232,6 +232,7 @@ export default {
     creditsTitle: 'Credits',
     scryfall: 'Card data and card images', icons: 'Icons', iconsLic: 'Phosphor Icons · MIT license',
     fonts: 'Fonts', fontsLic: 'Bricolage Grotesque, Geist, Unbounded · SIL Open Font License 1.1 · self-hosted',
+    operator: 'Tracking the Gathering is a private, non-commercial hobby project for a fixed circle of friends. For contact and requests about your data, reach out via your group admin.',
     imprintTitle: 'Imprint', privacyLink: 'Privacy policy', version: 'App version {v}',
   },
 

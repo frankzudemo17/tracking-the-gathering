@@ -7,11 +7,10 @@ import { backHead } from '../lib/parts.js';
 import { t } from '../i18n/index.js';
 import { APP_VERSION } from '../version.js';
 
-// Angaben von Franco (WELLE E5, 10.11.2026). Solange ein Wert mit {{ beginnt,
-// zeigt die App sichtbar „Angaben folgen“ statt erfundener Daten.
-const ANGABEN = '{{entfernt}}';
-const VERANTWORTLICHER = ANGABEN;
-const IMPRESSUM = ANGABEN;
+// Betreiber-Angabe ohne Name, Anschrift und private E-Mail (Entscheid 12.11.2026: privates Hobbyprojekt
+// im Freundeskreis). Text aus i18n `legal.operator`.
+const VERANTWORTLICHER = () => t('legal.operator');
+const IMPRESSUM = () => t('legal.operator');
 const filled = (v) => !/^\{\{.*\}\}$/.test(v);
 const pendingOr = (v) => (filled(v) ? html`<p class="pre">${v}</p>` : html`<p class="pending" data-pending>${icon('warn', 16)}${t('legal.pending')}</p>`);
 
@@ -50,7 +49,7 @@ function legalPage(el) {
 
     <section class="card legal" aria-labelledby="imp-h">
       <h3 class="section-title" id="imp-h">${t('legal.imprintTitle')}</h3>
-      ${pendingOr(IMPRESSUM)}
+      ${pendingOr(IMPRESSUM())}
     </section>
 
     <div class="list">
@@ -73,7 +72,7 @@ function privacyPage(el) {
 
     <section class="card legal" aria-labelledby="ctl-h">
       <h3 class="section-title" id="ctl-h">${t('privacy.controllerTitle')}</h3>
-      ${pendingOr(VERANTWORTLICHER)}
+      ${pendingOr(VERANTWORTLICHER())}
     </section>
 
     ${(Array.isArray(sections) ? sections : []).map((s, i) => html`
