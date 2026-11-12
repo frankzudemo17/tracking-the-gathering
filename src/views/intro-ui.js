@@ -4,8 +4,14 @@
 // `intro` der Sprache, src/i18n/de-intro.js / en-intro.js); einzige Ausnahme ist die Typ-Tabelle TRIBES_DE (Nachtrag 1).
 import { fmtAvg } from '../lib/format.js';
 
-export const INTRO_CARD_MS = 2500; // Standzeit je Karte (Entscheid 5)
-export const INTRO_WAIT_MS = 700; // spätestens so lange nach dem Öffnen erscheint die erste Karte (Entscheid 6)
+// P8 Intro 2.0 (spec-p8-intro2.md): die Standzeit je Karte ist eine Gruppen-Einstellung (playgroups.intro_seconds,
+// 2–10 s, Standard 4) = Liegezeit ab „Karte liegt“; der Anflug (INTRO_FLY_MS) kommt dazu (Entscheide 1, 9).
+export const INTRO_FLY_MS = 900; // Anflug + Aufprall bis „Karte liegt“ (Entscheid 8)
+export const INTRO_WAIT_MS = 1200; // spätestens so lange nach dem Öffnen erscheint die erste Karte (P3: 700 + 500 Bild-Budget, Entscheid 13)
+export const INTRO_SECONDS_DEFAULT = 4;
+export const INTRO_SECONDS_MIN = 2;
+export const INTRO_SECONDS_MAX = 10;
+export const INTRO_FADE_MS = 200; // Überblenden bei Weniger Bewegung (Entscheid 15)
 export const INTRO_FRESH_MS = 60000; // Merker „hier gestartet“ gilt so lange (Entscheid 1 d)
 export const AUTO_MAX = 60; // Auto-Zeile höchstens 60 Codepunkte, sonst hinten Fakten streichen
 const AUTO_FACTS = 3; // nach den Farben höchstens drei Fakten
@@ -120,4 +126,47 @@ export function cardLine(deck, traits, L, lang) {
   if (motto) return { kind: 'motto', text: motto };
   const auto = autoLine(traits, L, lang);
   return auto ? { kind: 'auto', text: auto } : null;
+}
+
+// ---------------------------------------------------------------- P8 Intro 2.0 (Entscheide 1, 9, 12; Bühne „Tisch“)
+
+/** Liegezeit in Sekunden (Entscheid 1): ganze Zahl 2–10, sonst der Standard 4 — keine Umwandlung von Texten. */
+export function introSeconds(v) {
+  return Number.isInteger(v) && v >= INTRO_SECONDS_MIN && v <= INTRO_SECONDS_MAX ? v : INTRO_SECONDS_DEFAULT;
+}
+
+/**
+ * Zeiten je Karte (Entscheid 9): Liegezeit = eingestellte Zeit, der Anflug kommt dazu; Weniger Bewegung ⇒ kein Anflug.
+ * @returns {{ flyMs: number, lieMs: number, cardMs: number }}
+ */
+export function introTiming(seconds, still) {
+  const flyMs = still ? 0 : INTRO_FLY_MS;
+  const lieMs = introSeconds(seconds) * 1000;
+  return { flyMs, lieMs, cardMs: flyMs + lieMs };
+}
+
+/**
+ * Startversatz des Anflugs (Entscheid 12): aus der Bildschirmmitte zur Mitte des Spielerfelds, normiert auf die
+ * Bildschirmdiagonale (Karte startet sicher außerhalb). Kein Feld oder Abstand < 1 px ⇒ von unten. dir = Drehsinn.
+ * @param {{ left: number, top: number, width: number, height: number } | null | undefined} rect
+ * @returns {{ x: number, y: number, dir: 1 | -1 }}
+ */
+export function flightFrom(rect, vw, vh) {
+  const D = Math.hypot(vw, vh);
+  let ux = 0, uy = 1;
+  if (rect && [rect.left, rect.top, rect.width, rect.height].every(Number.isFinite)) {
+    const dx = rect.left + rect.width / 2 - vw / 2;
+    const dy = rect.top + rect.height / 2 - vh / 2;
+    const len = Math.hypot(dx, dy);
+    if (len >= 1) { ux = dx / len; uy = dy / len; }
+  }
+  const x = Math.round(ux * D) || 0; // −0 ⇒ 0
+  const y = Math.round(uy * D) || 0;
+  return { x, y, dir: x < 0 ? -1 : 1 };
+}
+
+const TILTS = [-2, 1.5, -1, 2.5, -1.5, 1]; // Grad, fest je Sitz (kein Zufall, Lint L1)
+/** Leichte Neigung der liegenden Karte je Sitz (|w| ≤ 3°, Periode 6). */
+export function tiltFor(seat) {
+  return Number.isInteger(seat) ? TILTS[((seat % 6) + 6) % 6] : 0;
 }

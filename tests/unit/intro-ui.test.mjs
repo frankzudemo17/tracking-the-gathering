@@ -161,14 +161,68 @@ test('P3 recordText / saltText: Deck-Bilanz und Salz', async () => {
   assert.equal(saltText({ salt: { avgSalt: 2.4444 } }, 'en'), '2.4');
 });
 
-test('P3 Konstanten: Standzeit 2500 ms, Wartezeit 700 ms', async () => {
-  const { INTRO_CARD_MS, INTRO_WAIT_MS } = await ui();
-  assert.equal(INTRO_CARD_MS, 2500);
-  assert.equal(INTRO_WAIT_MS, 700);
+test('P8 Konstanten: Anflug 900 ms, Wartezeit 1200 ms, Dauer 2–10 s (Standard 4), Überblenden 200 ms, INTRO_CARD_MS entfällt', async () => {
+  const m = await ui();
+  assert.equal(m.INTRO_FLY_MS, 900);
+  assert.equal(m.INTRO_WAIT_MS, 1200);
+  assert.equal(m.INTRO_SECONDS_DEFAULT, 4);
+  assert.equal(m.INTRO_SECONDS_MIN, 2);
+  assert.equal(m.INTRO_SECONDS_MAX, 10);
+  assert.equal(m.INTRO_FADE_MS, 200);
+  assert.equal(m.INTRO_FRESH_MS, 60000);
+  assert.equal(m.INTRO_CARD_MS, undefined);
 });
 
 test('P3 Wörterbücher: de und en haben dieselben Blätter', async () => {
   const L = await dicts();
   const leaves = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' ? leaves(v, `${p}${k}.`) : [`${p}${k}`])).sort();
   assert.deepEqual(leaves(L.de), leaves(L.en));
+});
+
+// ---------------------------------------------------------------- P8 Intro 2.0 (spec-p8-intro2.md, Entscheide 1, 9, 12)
+test('P8 introSeconds: ganze Zahl 2–10, sonst 4 (keine Umwandlung)', async () => {
+  const { introSeconds } = await ui();
+  for (const v of [4, 2, 10]) assert.equal(introSeconds(v), v, String(v));
+  for (const v of [1, 11, 0, -3, 4.5, '6', null, undefined, NaN, Infinity, '4', [4], {}]) assert.equal(introSeconds(v), 4, String(v));
+});
+
+test('P8 introTiming: Liegezeit + Anflug, Weniger Bewegung ohne Anflug', async () => {
+  const { introTiming } = await ui();
+  assert.deepEqual(introTiming(4, false), { flyMs: 900, lieMs: 4000, cardMs: 4900 });
+  assert.deepEqual(introTiming(4, true), { flyMs: 0, lieMs: 4000, cardMs: 4000 });
+  assert.deepEqual(introTiming(10, false), { flyMs: 900, lieMs: 10000, cardMs: 10900 });
+  assert.deepEqual(introTiming(2, true), { flyMs: 0, lieMs: 2000, cardMs: 2000 });
+  assert.deepEqual(introTiming(99, false), { flyMs: 900, lieMs: 4000, cardMs: 4900 });
+});
+
+test('P8 flightFrom: Richtung zum Spielerfeld, Länge = Bildschirmdiagonale, < 1 px ⇒ unten', async () => {
+  const { flightFrom } = await ui();
+  const R = (left, top, width, height) => ({ left, top, width, height });
+  const f = (r, vw = 400, vh = 800) => flightFrom(r, vw, vh);
+  assert.deepEqual(f(R(0, 300, 100, 200)), { x: -894, y: 0, dir: -1 }, 'links');
+  assert.deepEqual(f(R(300, 300, 100, 200)), { x: 894, y: 0, dir: 1 }, 'rechts');
+  assert.deepEqual(f(R(100, 0, 200, 100)), { x: 0, y: -894, dir: 1 }, 'oben');
+  assert.deepEqual(f(R(100, 700, 200, 100)), { x: 0, y: 894, dir: 1 }, 'unten');
+  assert.deepEqual(f(R(0, 0, 100, 100)), { x: -352, y: -822, dir: -1 }, 'schräg');
+  assert.deepEqual(f(null), { x: 0, y: 894, dir: 1 }, 'kein Feld');
+  assert.deepEqual(f(R(150, 350, 100, 100)), { x: 0, y: 894, dir: 1 }, 'mittig');
+  assert.deepEqual(f(R(150.5, 350, 100, 100)), { x: 0, y: 894, dir: 1 }, 'Grenze < 1 px');
+  assert.deepEqual(f(R(151, 350, 100, 100)), { x: 894, y: 0, dir: 1 }, 'Grenze = 1 px');
+  assert.deepEqual(f(R(0, 0, 187.5, 406), 375, 812), { x: -375, y: -812, dir: -1 }, '375 × 812 Ecke');
+  for (const r of [R(100, 0, 200, 100), R(150.5, 350, 100, 100)]) {
+    const v = f(r);
+    assert.ok(!Object.is(v.x, -0) && !Object.is(v.y, -0), 'kein −0');
+  }
+});
+
+test('P8 tiltFor: fest je Sitz, |w| ≤ 3, ganze oder halbe Grad, Periode 6, nicht alle gleich', async () => {
+  const { tiltFor } = await ui();
+  const ws = Array.from({ length: 12 }, (_, s) => tiltFor(s));
+  for (const w of ws) {
+    assert.ok(Math.abs(w) <= 3, String(w));
+    assert.ok(Number.isInteger(w * 2), `ganz oder halb: ${w}`);
+  }
+  for (let s = 0; s < 6; s++) assert.equal(tiltFor(s), tiltFor(s + 6), `Sitz ${s}`);
+  assert.ok(new Set(ws).size > 1, 'nicht alle gleich');
+  assert.equal(tiltFor(3), tiltFor(3), 'kein Zufall');
 });

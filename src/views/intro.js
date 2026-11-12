@@ -24,7 +24,7 @@ import { loadDeckCards, deckTraits } from '../decks/cards.js';
 import { sortColors } from '../lib/decks.js';
 import { t, getLang } from '../i18n/index.js';
 import { cmdLine } from './life-ui.js';
-import { INTRO_CARD_MS, INTRO_WAIT_MS, recordText, saltText, cardLine, fill } from './intro-ui.js';
+import { introTiming, INTRO_WAIT_MS, recordText, saltText, cardLine, fill } from './intro-ui.js';
 
 const SHIELD_MS = 350;
 const cssUrl = (u) => `url('${String(u).replace(/'/g, '%27')}')`;
@@ -166,7 +166,7 @@ export function showIntro(host, { groupId, players, onDone }) {
     mount(stage, cardView(p, k, got, L, lang));
     paintProgress();
     live.textContent = p.deck ? fill(L.live, { i: k + 1, n, name: p.name, deck: cmdLine(p.deck) }) : fill(L.liveNoDeck, { i: k + 1, n, name: p.name });
-    timer = setTimeout(() => { timer = null; show(k + 1); }, INTRO_CARD_MS);
+    timer = setTimeout(() => { timer = null; show(k + 1); }, introTiming(4, still).cardMs); // Zwischenstand Schritt A; Schritt D liest die Gruppen-Einstellung
   }
 
   function onKey(e) {
