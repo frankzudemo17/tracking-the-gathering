@@ -27,9 +27,6 @@ alter table public.decks add constraint decks_motto_check check (
   motto is null or (char_length(motto) between 1 and 80 and motto = btrim(motto) and motto !~ '[[:cntrl:]]')
 );
 
-comment on column public.decks.motto is
-  'Optionales Motto des Decks (Spielstart-Intro), 1–80 Zeichen, ohne Rand-Leerzeichen und Steuerzeichen; null = automatische Zeile';
-
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen; Zeilen ohne „-- “ ausführen, Reihenfolge einhalten).
 -- Preis: alle Mottos gehen verloren.
