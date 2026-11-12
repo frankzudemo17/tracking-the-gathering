@@ -104,6 +104,17 @@ export const opened = [];
 /** Neuer Kontext 390×844, de-DE; sammelt pageerror, Konsolenfehler, HTTP ≥ 400. */
 export async function ctx(browser, name) {
   const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, locale: 'de-DE' });
+  // P3: Spielstart-Intro in allen bestehenden Dateien aus — startIntro: false nur, wenn der Schlüssel fehlt
+  // (ein gesetzter Wert, auch true aus intro.e2e.mjs, bleibt über Neuladen erhalten)
+  await c.addInitScript(() => {
+    try {
+      const K = 'ttg.prefs.v1';
+      const raw = localStorage.getItem(K);
+      const o = raw ? JSON.parse(raw) : {};
+      if (!o || typeof o !== 'object' || Array.isArray(o) || Object.hasOwn(o, 'startIntro')) return;
+      localStorage.setItem(K, JSON.stringify({ v: 1, ...o, startIntro: false }));
+    } catch { /* kein Speicher (about:blank) oder kaputtes JSON ⇒ nichts tun */ }
+  });
   const p = await c.newPage();
   p.errs = [];
   p.bad = [];
