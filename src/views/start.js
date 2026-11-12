@@ -21,8 +21,22 @@ import { deckArt } from './history-ui.js';
 import { recentGames, fmtShortDate } from './result-ui.js';
 import { pageCache, GROUP_MAX_AGE_MS } from '../lib/cache.js';
 
+// Zuletzt gezeigtes Commander-Bild der Startseite (öffentliche Scryfall-Adresse), je Konto + Gruppe, nur fürs Gerüst.
+// Geleert in clearCaches (Abmelden/Kontowechsel).
+export const HERO_ART_KEY = 'ttg.heroArt';
+function rememberedArt(/** @type {string} */ k) {
+  try { const o = JSON.parse(localStorage.getItem(HERO_ART_KEY) || 'null'); return o && o.k === k && typeof o.url === 'string' ? o.url : null; } catch { return null; }
+}
+function rememberArt(/** @type {string} */ k, /** @type {string|null} */ url) {
+  try {
+    if (url) { if (rememberedArt(k) !== url) localStorage.setItem(HERO_ART_KEY, JSON.stringify({ k, url })); }
+    else if (rememberedArt(k)) localStorage.removeItem(HERO_ART_KEY);
+  } catch { /* privat */ }
+}
+
 export default async function start(el, { isStale, fail }) {
   const sc = viewScope(state, isStale);
+  const heroKey = () => `${state.profile?.id || ''}|${sc.gid}`;
   const paint = painter(el);
   const stale = staleMark(el);
   const pageKey = sc.key('page:start');
@@ -59,8 +73,12 @@ export default async function start(el, { isStale, fail }) {
       <span class="brand-logo" role="img" aria-label="Tracking the Gathering"></span>
       <a href="#/profil" aria-label="${t('nav.me')}" class="avatar-link">${avHtml}</a>
     </div>`;
-    const hero = (/** @type {any} */ myDeck) => html`<div class="art-hero" ${myDeck?.image_url ? html`style="--art:url('${myDeck.image_url}')"` : ''}>
-      ${myDeck?.image_url ? '' : html`<span class="art-credit">Diabolic Tutor · Brain Dead</span>`}
+    // Gerüst (wait): nie das Standardbild (sonst blitzt Diabolic Tutor vor dem eigenen Commander auf),
+    // sondern das zuletzt gezeigte eigene Bild dieses Kontos in dieser Gruppe, sonst nur die Kartenfarbe.
+    const hero = (/** @type {any} */ myDeck, wait = false) => {
+      const url = wait ? rememberedArt(heroKey()) : myDeck?.image_url || null;
+      return html`<div class="art-hero${wait ? ' art-wait' : ''}" ${url ? html`style="--art:url('${url}')"` : ''}>
+      ${url || wait ? '' : html`<span class="art-credit">Diabolic Tutor · Brain Dead</span>`}
       <h2>${t('home.newRound')}</h2>
       <p>${t('home.newRoundSub')}</p>
       <div class="btns">
@@ -68,11 +86,12 @@ export default async function start(el, { isStale, fail }) {
         <button class="btn outline" type="button" data-act="live">${icon('live', 20)}${t('home.joinGame')}</button>
       </div>
     </div>`;
+    };
 
     // Gerüst (Entscheid 8): Kopfzeile, Karte „Neue Runde“, ruhige Platzhalter
     if (!page) {
       return html`${top0(avatar({ name: me?.display_name, url: urls[me?.avatar_path], size: 42 }))}
-    ${hero(null)}
+    ${hero(null, true)}
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('home.players')}</h3><a href="#/gruppen">${t('home.all')}</a></div>
       ${skel.people(5)}
@@ -86,6 +105,7 @@ export default async function start(el, { isStale, fail }) {
     const { members, latest, live } = page;
     const mine = members.find((m) => m.profile_id === me?.id);
     const myDeck = mine ? latest[mine.id] : null;
+    rememberArt(heroKey(), myDeck?.image_url || null);
     // Spielerbild: Foto, sonst Commander-Art des neuesten Decks, sonst Initialen
     const personAv = (m, size) => {
       const d = latest[m.id];

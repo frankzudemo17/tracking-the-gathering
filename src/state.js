@@ -23,7 +23,7 @@ export const state = {
 };
 
 /** P12 Entscheid 13: Abmelden, Kontowechsel, Konto löschen — alles Gemerkte weg (Daten + signierte Bild-Adressen). */
-export function clearCaches() { pageCache.clear(); clearSignedUrls(); }
+export function clearCaches() { pageCache.clear(); clearSignedUrls(); store('ttg.heroArt', null); }
 
 function store(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* privat */ } }
 function load(k) { try { return localStorage.getItem(k); } catch { return null; } }
