@@ -25,6 +25,7 @@ export const DEFAULTS = Object.freeze({
   layout: 'seiten',
   defaultPins: Object.freeze(['poison', 'tax']), // init.sql:123
   turnTime: true,
+  startIntro: true, // P3 Spielstart-Intro (Welle ttg-features, Entscheid 11)
 });
 
 const bool = (v) => (typeof v === 'boolean' ? v : undefined);
@@ -44,6 +45,7 @@ const CHECK = {
   layout: oneOf(LAYOUTS),
   defaultPins: subset(PIN_KEYS),
   turnTime: bool,
+  startIntro: bool,
 };
 
 let mem = null; // Speicher im Lauf, wenn localStorage fehlt oder wirft

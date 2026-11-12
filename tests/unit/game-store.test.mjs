@@ -691,3 +691,34 @@ test('K2 game-store.js importiert nur ../game/engine.js', async () => {
   assert.deepEqual(imports, ['../game/engine.js']);
   assert.ok(!/import\(/.test(src), 'kein dynamischer Import');
 });
+
+// ---------------------------------------------------------------------------
+// Spec P3 (Welle ttg-features, Entscheid 1 b): Merker „dieses Gerät hat das Spiel gestartet“ —
+// modulweit (setup.js und life.js haben verschiedene Store-Instanzen), einmal verbraucht, nur nach Erfolg.
+// Tabelle „Spec-Tests · takeFreshStart“.
+test('P3 takeFreshStart: nach Erfolg Zeitstempel, einmal verbraucht, fremde ID null', async () => {
+  const { takeFreshStart } = await load();
+  const { store } = await setup({ rpc: startRpc });
+  const id = await store.startGame(startInput());
+  const x = takeFreshStart(id);
+  assert.equal(typeof x, 'number');
+  assert.ok(Math.abs(Date.now() - x) < 1000, `Zeitstempel ${x}`);
+  assert.equal(takeFreshStart(id), null, 'einmal verbraucht');
+  assert.equal(takeFreshStart('andere'), null, 'fremde ID');
+});
+
+test('P3 takeFreshStart: zwei Store-Instanzen — Instanz 1 startet, Modul-Export liest (wie setup.js → life.js)', async () => {
+  const { takeFreshStart } = await load();
+  const one = await setup({ rpc: { start_game: () => ({ data: { id: 'g-zwei', started_at: STARTED, status: 'live' }, error: null, status: 200 }) } });
+  const two = await setup({ rpc: startRpc });
+  assert.notEqual(one.store, two.store);
+  await one.store.startGame(startInput());
+  assert.equal(typeof takeFreshStart('g-zwei'), 'number');
+});
+
+test('P3 takeFreshStart: RPC-Fehler ⇒ startGame wirft, kein Merker', async () => {
+  const { takeFreshStart } = await load();
+  const { store } = await setup({ rpc: { start_game: () => ({ data: null, error: { code: 'P0001', message: 'Deck nicht verfügbar' }, status: 400 }) } });
+  await assert.rejects(store.startGame(startInput()), /Deck nicht verfügbar/);
+  for (const id of ['g-new', 'g-zwei', 'undefined', 'null']) assert.equal(takeFreshStart(id), null, id);
+});

@@ -28,4 +28,5 @@ export default {
     check: '{deck} prüft als Bracket {n}',
   },
   koQuiet: { title: '{name} scheidet aus?' },
+  intro: { title: 'Intro beim Spielstart', sub: 'Stellt vor dem ersten Zug jedes Deck kurz vor' }, // P3 Welle ttg-features
 };

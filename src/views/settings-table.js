@@ -54,6 +54,7 @@ function view(p, open) {
         ${switchRow('vibration', 'vibrate', t('table.vibration.title'), t('table.vibration.sub'), p.vibration, !canVibrate())}
         ${segRow('reduceMotion', 'sliders', t('table.motion.title'), t(`table.motion.subs.${p.reduceMotion}`), MOTION_MODES, p.reduceMotion, (m) => t(`table.motion.modes.${m}`))}
         ${segRow('koScreens', 'skull', t('table.ko.title'), t(`table.ko.subs.${p.koScreens}`), KO_MODES, p.koScreens, (m) => t(`table.ko.modes.${m}`), variants)}
+        ${switchRow('startIntro', 'cards', t('table.intro.title'), t('table.intro.sub'), p.startIntro)}
       </div>
     </div>
 
@@ -76,7 +77,7 @@ function view(p, open) {
 function nextValue(p, key, b) {
   const v = b.dataset.v;
   switch (key) {
-    case 'wakeLock': case 'vibration': case 'turnTime': return !p[key];
+    case 'wakeLock': case 'vibration': case 'turnTime': case 'startIntro': return !p[key];
     case 'startLife': return Number(v);
     case 'koVariants': {
       if (!p.koVariants.includes(v)) return KO_VARIANTS.filter((x) => x === v || p.koVariants.includes(x));
