@@ -79,7 +79,8 @@
 .intro-fact { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .intro-fact svg { flex: none; opacity: .9; }
 .intro-line { margin: 4px 0 0; max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
-.intro-line.motto { -webkit-line-clamp: 3; line-clamp: 3; font: 600 italic 19px/1.32 var(--f-display); letter-spacing: -.01em; color: var(--hero-ink); }
+.intro-line.motto { -webkit-line-clamp: 3; line-clamp: 3; font: 600 italic 19px/1.32 var(--f-display); letter-spacing: -.01em; color: var(--hero-ink);
+  padding-inline-end: .3em; } /* Kursiv ragt rechts über die Box hinaus: ohne Rand schnitt overflow:hidden das schließende „“ ab (Review P3) */
 .intro-line.auto { -webkit-line-clamp: 2; line-clamp: 2; font: 500 14px/1.4 var(--f-body); color: var(--hero-mu); }
 
 /* ---------- Bewegung (wenn erlaubt): Bild 1.04 → 1 + Einblenden, Text gleitet ≤ 12 px; ≤ 450 ms */
