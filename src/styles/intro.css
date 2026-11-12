@@ -1,0 +1,103 @@
+/* intro.css · Spielstart-Intro (Spec P3, Welle ttg-features). Besitzer: P3.
+   Bühne wie die K.O.-Screens (fixed, inset 0, overflow hidden), z-index 26: über Tisch und .atk-layer (25),
+   unter Sheets (30), Schild (31), Toast (40). Farben nur aus Tokens: Bühne --hero, Text --hero-ink/--hero-mu,
+   „Beginnt“ --turn (einziges farbiges Element), Verlauf über dem Bild aus --scrim (Schreibweise wie
+   components.css: rgba(var(--scrim), a), da --scrim als „r, g, b“ hinterlegt ist). Bilder ungetönt.
+   Animiert werden nur transform und opacity; gesteuert wird über Zeitgeber in intro.js, nie über animationend. */
+
+.intro {
+  position: fixed; inset: 0; z-index: 26; overflow: hidden; overscroll-behavior: none;
+  background: var(--hero); color: var(--hero-ink); font-family: var(--f-body);
+  -webkit-tap-highlight-color: transparent; user-select: none; cursor: pointer;
+}
+.intro-shield { position: fixed; inset: 0; z-index: 31; background: transparent; }
+
+/* ---------- Kopf: Fortschritt + Überspringen */
+.intro-top {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 12px;
+  padding: calc(10px + var(--safe-t)) 8px 0 16px;
+}
+.intro-prog { flex: 1; display: flex; gap: 4px; min-width: 0; }
+.intro-prog i { flex: 1; height: 3px; border-radius: 2px; overflow: hidden; background: rgba(var(--scrim), .55);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hero-ink) 22%, transparent); }
+.intro-prog b { display: block; height: 100%; background: var(--hero-ink); transform-origin: 0 50%; transform: scaleX(0); }
+.intro-prog i.done b { transform: scaleX(1); }
+.intro-prog i.cur b { animation: intro-fill 2500ms linear forwards; }
+.intro-skip {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 44px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 22px;
+  background: rgba(var(--scrim), .55); color: var(--hero-ink);
+  font: 600 14px/1 var(--f-body); letter-spacing: .01em; cursor: pointer;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.intro-skip svg { opacity: .8; }
+.intro-skip:focus-visible { outline: 2px solid var(--hero-ink); outline-offset: 2px; }
+
+/* ---------- Karte */
+.intro-stage { position: absolute; inset: 0; }
+.intro-card { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; }
+.intro-art { position: absolute; inset: 0; display: flex; background: var(--hero); }
+.intro-img { flex: 1; min-width: 0; background-size: cover; background-position: center 22%; background-repeat: no-repeat; }
+.intro-art.split .intro-img + .intro-img { box-shadow: -1px 0 0 rgba(var(--scrim), .9); }
+.intro-art.none { align-items: center; justify-content: center; padding-bottom: 34vh; }
+.intro-ini {
+  display: grid; place-items: center; width: 128px; height: 128px; border-radius: 50%;
+  font: 700 48px/1 var(--f-display); letter-spacing: -.02em; color: var(--hero-ink);
+  background: color-mix(in srgb, var(--hero-ink) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hero-ink) 18%, transparent);
+}
+/* nur ein neutraler dunkler Verlauf unten (Lesbarkeit), kein Farbschleier über dem Bild */
+.intro-scrim {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(var(--scrim), .45) 0%, rgba(var(--scrim), 0) 18%, rgba(var(--scrim), 0) 38%,
+    rgba(var(--scrim), .72) 60%, rgba(var(--scrim), .94) 78%, rgba(var(--scrim), .97) 100%);
+}
+.intro-text {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  padding: 0 20px calc(28px + var(--safe-b)); max-width: 560px; width: 100%; margin: 0 auto; min-width: 0;
+}
+.intro-first {
+  display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px; border-radius: 13px;
+  font: 700 12px/1 var(--f-body); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--turn); box-shadow: inset 0 0 0 1.5px var(--turn); background: rgba(var(--scrim), .5);
+}
+.intro-first i { width: 7px; height: 7px; border-radius: 50%; background: var(--turn); }
+.intro-name {
+  max-width: 100%; margin: 2px 0 0; font: 800 clamp(34px, 10vw, 48px)/1.02 var(--f-display); letter-spacing: -.03em;
+  color: var(--hero-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.intro-deck { display: flex; align-items: center; gap: 8px; max-width: 100%; min-width: 0;
+  font: 600 16px/1.3 var(--f-body); color: var(--hero-ink); }
+.intro-deck .pips { flex: none; display: inline-flex; gap: 3px; }
+.intro-deck > span:last-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.intro-facts { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--hero-mu); font: 500 14px/1.3 var(--f-body);
+  font-variant-numeric: tabular-nums; }
+.intro-fact { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.intro-fact svg { flex: none; opacity: .9; }
+.intro-line { margin: 4px 0 0; max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.intro-line.motto { -webkit-line-clamp: 3; line-clamp: 3; font: 600 italic 19px/1.32 var(--f-display); letter-spacing: -.01em; color: var(--hero-ink); }
+.intro-line.auto { -webkit-line-clamp: 2; line-clamp: 2; font: 500 14px/1.4 var(--f-body); color: var(--hero-mu); }
+
+/* ---------- Bewegung (wenn erlaubt): Bild 1.04 → 1 + Einblenden, Text gleitet ≤ 12 px; ≤ 450 ms */
+.intro-card .intro-art { animation: intro-art 450ms cubic-bezier(.2, .7, .2, 1) both; }
+.intro-card .intro-text { animation: intro-rise 380ms cubic-bezier(.2, .7, .2, 1) 60ms both; }
+@keyframes intro-art { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
+@keyframes intro-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes intro-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ---------- Weniger Bewegung: statische Karten, Fortschritt ohne Füllbewegung (aktuelles Segment voll) */
+.intro-still .intro-card .intro-art, .intro-still .intro-card .intro-text, .intro-still .intro-prog i.cur b { animation: none; }
+.intro-still .intro-prog i.cur b { transform: scaleX(1); }
+@media (prefers-reduced-motion: reduce) {
+  .intro .intro-card .intro-art, .intro .intro-card .intro-text, .intro .intro-prog i.cur b { animation: none; }
+  .intro .intro-prog i.cur b { transform: scaleX(1); }
+}
+html[data-motion="reduce"] .intro .intro-card .intro-art, html[data-motion="reduce"] .intro .intro-card .intro-text,
+html[data-motion="reduce"] .intro .intro-prog i.cur b { animation: none; }
+html[data-motion="reduce"] .intro .intro-prog i.cur b { transform: scaleX(1); }
+
+/* ---------- Deckprofil: Motto (deck.js) */
+.deck-motto { margin: 0; color: var(--mu); font: 500 italic 16px/1.4 var(--f-display); overflow-wrap: anywhere; }
+.motto-count { font-variant-numeric: tabular-nums; color: var(--mu); }
+.motto-count.over { color: var(--danger); }

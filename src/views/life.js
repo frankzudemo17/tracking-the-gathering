@@ -11,7 +11,7 @@ import { html, mount, on, $, $$, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { empty, memberName } from '../lib/parts.js';
 import { errText, sheet, toast, copyText } from '../lib/ui.js';
-import { createStore } from '../lib/game-store.js';
+import { createStore, takeFreshStart } from '../lib/game-store.js';
 import { appRand } from '../lib/rand.js';
 import { fieldMode, modeColors, fieldStyle, styleText } from '../lib/field-color.js';
 import { act, isLethal, newlyLethal, canUndo, history, killerCandidates, results, COUNTER_MAX, POISON_MAX } from '../game/engine.js';
@@ -24,7 +24,9 @@ import { MEMBER_SELECT } from './groups.js';
 import { openFieldColor } from './setup.js';
 import { showKo } from './ko.js';
 import { attachAttack } from './attack.js';
-import { buzz } from '../lib/prefs.js';
+import { buzz, getPrefs } from '../lib/prefs.js';
+import { showIntro } from './intro.js';
+import { introDue, introOrder } from './intro-ui.js';
 import {
   mmss, signed, counterRows, togglePin, DEFAULT_PINS, rollText, logText, lowLife, cmdLine, shortCmd, byPlace, flickerValue, secondsSince, hitStep, hitDiff,
 } from './life-ui.js';
@@ -82,6 +84,8 @@ function otherQueues(id) {
 }
 
 export default async function life(el, { params, isStale }) {
+  // P3: Merker „hier gestartet“ als erste Anweisung, vor dem ersten await (einmal verbraucht, Entscheid 1 c)
+  const freshMark = takeFreshStart(params.id);
   const id = params.id;
   const back = html`<div class="head"><a class="icon-btn" href="#/start" aria-label="${t('common.back')}">${icon('back', 20)}</a></div>`;
   let g;
@@ -133,6 +137,7 @@ export default async function life(el, { params, isStale }) {
   let menu = null; // offenes Spielmenü { repaint, live, close }
   let ctrSheet = null; // offenes Zähler-Sheet { repaint, close }
   let stopped = false;
+  let closeIntro = null; // P3: Spielstart-Intro offen ⇒ Schließ-Funktion
   const timers = new Set();
   // Live (P6): Kanalstatus aus store.subscribe, Fremd-Zustand während einer Geste aufgeschoben
   let chan = null; // letzter Kanalstatus (SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, CLOSED)
@@ -743,6 +748,7 @@ export default async function life(el, { params, isStale }) {
   function stop() {
     if (stopped) return;
     stopped = true;
+    closeIntro?.(); closeIntro = null;
     clearInterval(clock);
     for (const h of timers) clearTimeout(h);
     if (rolling) { clearInterval(rolling.iv); clearTimeout(rolling.to); rolling = null; }
@@ -846,15 +852,21 @@ export default async function life(el, { params, isStale }) {
     menu?.live();
   });
   window.addEventListener('resize', clearHub);
-  {
+  // P3 (Entscheid 1): Intro nur auf dem Gerät, das gerade gestartet hat, solange nichts außer dem Startwurf geschah
+  const intro = introDue({ enabled: getPrefs().startIntro, mark: freshMark, now: Date.now(), status: g.game.status, finished: s.finished, events: s.events });
+  /** Haltetipp (die ersten drei Spiele); mit Intro erst nach dessen Ende (Entscheid 2). true ⇒ Tipp gesetzt. */
+  function startHoldTip() {
     const seen = lsGet(HOLD_TIP_KEY);
     if (seen !== 'done' && Number(seen || 0) < 3 && !s.finished) {
       holdTip = true;
       lsSet(HOLD_TIP_KEY, String(Number(seen || 0) + 1));
       const h = setTimeout(() => { timers.delete(h); dropTip(); }, HOLD_TIP_MS);
       timers.add(h);
+      return true;
     }
+    return false;
   }
+  if (!intro) startHoldTip();
 
   el.classList.add('lc-screen');
   mount(el, html`<div class="lc" data-game="${id}"></div>`);
@@ -874,4 +886,12 @@ export default async function life(el, { params, isStale }) {
   } catch (ex) { console.warn('Live-Abo', ex); }
   // Spiel schon entschieden (z. B. nach Neuladen): Abschluss-Sheet anbieten
   if (s.finished) openEnd();
+  if (intro && !stopped) {
+    const order = introOrder(s.players, s.turn).map((p) => ({ id: p.id, seat: p.seat, name: nm(p.id), deck: deckOf(p.id) }));
+    closeIntro = showIntro(el, {
+      groupId: g.game.playgroup_id,
+      players: order,
+      onDone: () => { closeIntro = null; if (!stopped && startHoldTip()) renderBoard(); },
+    });
+  }
 }

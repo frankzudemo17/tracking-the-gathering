@@ -6,6 +6,7 @@ export default {
   skip: 'Überspringen',
   first: 'Beginnt',
   live: 'Spieler {i} von {n}: {name}, {deck}',
+  liveNoDeck: 'Spieler {i} von {n}: {name}',
   record: { first: 'Erstes Spiel', won: '{w} von {g} gewonnen' },
   salt: 'Salz',
   bracket: 'Bracket {n}',

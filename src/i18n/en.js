@@ -4,6 +4,7 @@ import life from './en-life.js';
 import dice from './en-dice.js';
 import attack from './en-attack.js';
 import ko from './en-ko.js';
+import intro from './en-intro.js';
 // Namespaces of the wave ttg-live-feinschliff-decks (seam from P3): decklist = P5, live = P6, table = P7.
 import decklist from './en-decklist.js';
 import live from './en-live.js';
@@ -264,7 +265,7 @@ export default {
   common: { back: 'Back', close: 'Close', cancel: 'Cancel', loading: 'Loading …', error: 'Something went wrong.', reload: 'Reload',
     stale: 'Not updated – as of {time}' }, // P12
 
-  setup, life, dice, attack, ko,
+  setup, life, dice, attack, ko, intro, // intro: P3 Spielstart-Intro
   decklist, live, table, // seam P3 (wave ttg-live-feinschliff-decks)
 };
 

@@ -4,6 +4,7 @@ import life from './de-life.js';
 import dice from './de-dice.js';
 import attack from './de-attack.js';
 import ko from './de-ko.js';
+import intro from './de-intro.js';
 // Namensräume der Welle ttg-live-feinschliff-decks (Naht P3): decklist = P5, live = P6, table = P7.
 import decklist from './de-decklist.js';
 import live from './de-live.js';
@@ -264,7 +265,7 @@ export default {
   common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.', reload: 'Neu laden',
     stale: 'Nicht aktualisiert – Stand von {time} Uhr' }, // P12
 
-  setup, life, dice, attack, ko,
+  setup, life, dice, attack, ko, intro, // intro: P3 Spielstart-Intro
   decklist, live, table, // Naht P3 (Welle ttg-live-feinschliff-decks)
 };
 
