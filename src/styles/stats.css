@@ -76,3 +76,32 @@ a.st-hl:active { transform: scale(.99); }
 .st-place { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--sf2);
   font-family: var(--f-display); font-weight: 700; font-variant-numeric: tabular-nums; }
 .st-place.win { background: color-mix(in srgb, var(--hi) 22%, transparent); color: var(--hi); }
+
+/* Profil „Erweitert“ (Spec P1 Zug-Uhr): Vergleich Ø Zug, längster Zug, Ø Spieldauer.
+   Mitglied hervorgehoben in --acc2 + fett (+ aria-current), übrige Balken gedämpft in --mu; keine Spielerfarben, keine Bewegung. */
+.st-more .collapse-head .section-title { flex-wrap: wrap; row-gap: 2px; min-width: 0; }
+.st-more-body { display: flex; flex-direction: column; gap: 16px; padding-top: 4px; }
+.st-more-part { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.st-more-h { display: flex; flex-direction: column; gap: 1px; padding: 0 2px; }
+.st-more-h h4 { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink); }
+.st-more-note { margin: 0; padding: 0 2px; }
+
+/* Vergleich: Name · Wert, darunter Balken (Länge = Ø / größter Ø per --v) */
+.st-cmp { list-style: none; margin: 0; padding: 12px 14px; gap: 12px; }
+.st-cmp-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; row-gap: 5px; column-gap: 12px; align-items: baseline; min-width: 0; }
+.st-cmp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; color: var(--ink); }
+.st-cmp-val { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+.st-cmp-bar { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: transparent; box-shadow: inset 0 0 0 1px var(--ln); overflow: hidden; }
+.st-cmp-bar i { display: block; height: 100%; width: calc(var(--v) * 100%); max-width: 100%; border-radius: 4px; background: var(--mu); }
+.st-cmp-row.me .st-cmp-name, .st-cmp-row.me .st-cmp-val { font-weight: 800; }
+.st-cmp-row.me .st-cmp-bar i { background: var(--acc2); }
+
+/* Ø Spieldauer: Tabelle Zeile · Mitglied · Gruppe (feste Spalten, lange Namen gekürzt) */
+.st-dur { padding: 6px 12px; }
+.st-dur-t { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
+.st-dur-t th, .st-dur-t td { padding: 9px 4px; text-align: right; vertical-align: top; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-dur-t thead th { font-size: 13px; font-weight: 600; color: var(--mu); }
+.st-dur-t tbody tr + tr > * { box-shadow: 0 -1px 0 var(--ln); }
+.st-dur-t th[scope="row"] { text-align: left; font-weight: 600; color: var(--ink); width: 38%; }
+.st-dur-t td b { display: block; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+.st-dur-t td .tiny { display: block; }
