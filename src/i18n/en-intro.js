@@ -26,4 +26,18 @@ export default {
     few: 'few creatures',
     curve: { low: 'low curve', mid: 'mid curve', high: 'high curve' },
   },
+  // P8: group setting "time per player" (src/views/groups.js, admins/superadmin only)
+  setting: {
+    title: 'Game start intro',
+    row: 'Time per player',
+    value: '{n} s',
+    aria: '{n} seconds',
+    shorter: 'Shorter',
+    longer: 'Longer',
+    hint: 'How long each commander card stays on the table after it lands. The fly-in adds just under a second. Applies to every device in this group; each device can switch the intro on or off under Settings › At the table.',
+    save: 'Save',
+    saved: 'Saved',
+    notAdmin: 'Only group admins can change this.',
+    range: 'Allowed: 2 to 10 seconds.',
+  },
 };

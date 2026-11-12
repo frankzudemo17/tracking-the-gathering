@@ -13,6 +13,7 @@ import { t } from '../i18n/index.js';
 import { go } from '../router.js';
 import { rpcOrUnavailable, removedRow } from './member-remove.js';
 import { groupData } from '../lib/data.js';
+import { introSeconds, INTRO_SECONDS_MIN, INTRO_SECONDS_MAX } from './intro-ui.js';
 
 export const MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path)';
 
@@ -79,6 +80,73 @@ function openDeleteGroup(g, { games, members, guests }) {
   });
 }
 
+// ---------------------------------------------------------------- Spielstart-Intro: Zeit je Spieler (Spec P8 Entscheide 5, 10)
+// Karte nur für Admins/Superadmin und nur, wenn die Gruppenzeile die Spalte hat (Übergang: DB alt ⇒ keine Karte).
+
+function introCard(v) {
+  return html`
+    <div class="card intro-setting" data-intro-setting>
+      <h3 class="section-title intro-set-title">${icon('timer', 20)}<span>${t('intro.setting.title')}</span></h3>
+      <div class="intro-set-row">
+        <span class="grow">${t('intro.setting.row')}</span>
+        <div class="intro-stepper">
+          <button type="button" class="btn soft intro-step" data-act="intro-less" aria-label="${t('intro.setting.shorter')}"${v <= INTRO_SECONDS_MIN ? ' disabled' : ''}>−</button>
+          <output data-intro-seconds aria-live="polite" aria-label="${t('intro.setting.aria', { n: v })}">${t('intro.setting.value', { n: v })}</output>
+          <button type="button" class="btn soft intro-step" data-act="intro-more" aria-label="${t('intro.setting.longer')}"${v >= INTRO_SECONDS_MAX ? ' disabled' : ''}>+</button>
+        </div>
+      </div>
+      <span class="hint">${t('intro.setting.hint')}</span>
+      <p class="error" role="alert" hidden></p>
+      <button type="button" class="btn small" data-act="intro-save" disabled>${t('intro.setting.save')}</button>
+    </div>`;
+}
+
+const introErrText = (e) => {
+  const m = e?.message || '';
+  if (/not_group_admin/.test(m)) return t('intro.setting.notAdmin');
+  if (/intro_seconds_range/.test(m)) return t('intro.setting.range');
+  return errText(e);
+};
+
+/** Stepper und Speichern an die Karte binden (gespeicherter Wert `saved`). */
+function bindIntroCard(el, g, saved) {
+  const card = el.querySelector('[data-intro-setting]');
+  if (!card) return;
+  let v = saved;
+  const out = card.querySelector('[data-intro-seconds]');
+  const less = card.querySelector('[data-act="intro-less"]');
+  const more = card.querySelector('[data-act="intro-more"]');
+  const save = card.querySelector('[data-act="intro-save"]');
+  const box = card.querySelector('.error');
+  const show = () => {
+    out.textContent = t('intro.setting.value', { n: v });
+    out.setAttribute('aria-label', t('intro.setting.aria', { n: v }));
+    less.disabled = v <= INTRO_SECONDS_MIN;
+    more.disabled = v >= INTRO_SECONDS_MAX;
+    save.disabled = v === saved;
+  };
+  const step = (d) => { v = Math.min(INTRO_SECONDS_MAX, Math.max(INTRO_SECONDS_MIN, v + d)); box.hidden = true; show(); };
+  on(card, 'click', '[data-act="intro-less"]', () => step(-1));
+  on(card, 'click', '[data-act="intro-more"]', () => step(1));
+  on(card, 'click', '[data-act="intro-save"]', async (e, b) => {
+    if (v === saved) return;
+    box.hidden = true;
+    const want = v;
+    await busy(b, async () => {
+      try {
+        const r = await rpcOrUnavailable(sb, 'set_intro_seconds', { p_group: g.id, p_seconds: want });
+        if (r.unavailable) throw new Error(t('auth.errors.unavailable'));
+        must(r);
+        const cg = currentGroup();
+        if (cg && cg.id === g.id) cg.intro_seconds = want; // Rückfall des Intros (Entscheid 4) stimmt sofort
+        toast(t('intro.setting.saved'));
+        go('/gruppen');
+      } catch (ex) { box.textContent = introErrText(ex); box.hidden = false; }
+    });
+    if (b.isConnected) show();
+  });
+}
+
 // ---------------------------------------------------------------- Gruppe verlassen (Spec P10 F/H, Block K2/K7)
 
 function openLeave(g, { onlyAdmin }) {
@@ -114,10 +182,12 @@ function openLeave(g, { onlyAdmin }) {
 
 export default async function groups(el, { isStale }) {
   const ids = state.memberships.map((m) => m.playgroup_id);
-  const [counts, all] = await Promise.all([
+  const [counts, all, fresh] = await Promise.all([
     // '*' statt Spaltenliste: removed_at kommt mit, wenn es sie gibt (Übergangsregel P10 H)
     ids.length ? sb.from('members').select('*').in('playgroup_id', ids).then(must) : [],
     state.groupId ? sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', state.groupId).order('created_at').then(must) : [],
+    // P8: frische Gruppenzeile (Intro-Dauer); Fehler ⇒ still null, Rückfall currentGroup()
+    state.groupId ? sb.from('playgroups').select('*').eq('id', state.groupId).maybeSingle().then((r) => (r.error ? null : r.data), () => null) : null,
   ]);
   // P10: aktive Liste und Zählungen ohne Entfernte (Filter im Client); Entfernte nur im eigenen Abschnitt
   const members = all.filter((m) => !m.removed_at);
@@ -134,6 +204,8 @@ export default async function groups(el, { isStale }) {
     return guests ? t('groups.membersCountGuests', { n: rows.length, g: guests }) : rows.length === 1 ? t('groups.membersCountOne') : t('groups.membersCount', { n: rows.length });
   };
   const g = currentGroup();
+  const gRow = fresh || g;
+  const introSet = manage && !!gRow && Object.hasOwn(gRow, 'intro_seconds') ? introSeconds(gRow.intro_seconds) : null;
   // Admins zuerst, dann Mitglieder, dann Spieler ohne Konto; jeweils alphabetisch
   const rank = (m) => (!m.profile_id ? 2 : m.role === 'admin' ? 0 : 1);
   members.sort((a, b) => rank(a) - rank(b) || memberName(a).localeCompare(memberName(b), 'de'));
@@ -168,6 +240,8 @@ export default async function groups(el, { isStale }) {
       <button type="button" class="btn small ghost" data-act="renew">${icon('arrowCounterClockwise', 16)}${t('groups.renew')}</button>
     </div>` : html`
     <p class="hint invite-none" data-invite-none>${icon('lock', 16)}<span>${t('groups.inviteAdminsOnly')}</span></p>`}
+
+    ${introSet !== null ? introCard(introSet) : ''}
 
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('groups.members')}</h3><span class="tiny muted">${members.length}</span></div>
@@ -205,6 +279,7 @@ export default async function groups(el, { isStale }) {
       <button type="button" class="btn danger" data-act="delete-group">${icon('trash', 18)}${t('groups.deleteGroup')}</button>
     </div>` : ''}` : ''}`);
 
+  if (g && introSet !== null) bindIntroCard(el, g, introSet);
   on(el, 'click', '[data-group]', (e, b) => { setGroup(b.dataset.group); go('/gruppen'); });
   on(el, 'click', '[data-act="new"]', () => { if (isSuperadmin()) openNewGroup(); });
   on(el, 'click', '[data-act="code"]', () => openEnterCode());

@@ -106,3 +106,15 @@ html[data-motion="reduce"] .intro .intro-prog i.cur b { transform: scaleX(1); }
 .motto-hint { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .motto-count { flex: none; font-variant-numeric: tabular-nums; color: var(--mu); }
 .motto-count.over { color: var(--danger); }
+
+/* ---------- Gruppe: Intro-Dauer (groups.js, P8 Entscheid 5) — Stepper „− 4 s +“, Knöpfe 44 × 44 px */
+.intro-set-title { display: flex; align-items: center; gap: 8px; }
+.intro-set-title svg { flex: none; color: var(--acc2); }
+.intro-set-row { display: flex; align-items: center; gap: 12px; font-weight: 600; }
+.intro-stepper { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.intro-stepper .intro-step { min-width: 44px; min-height: 44px; width: 44px; height: 44px; padding: 0; border-radius: var(--r-sm);
+  background: var(--sf2); font: 700 22px/1 var(--f-body); }
+.intro-stepper .intro-step:disabled { opacity: .4; }
+.intro-stepper output { min-width: 4.2ch; text-align: center; font: 700 18px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.intro-setting [data-act="intro-save"] { align-self: flex-start; }
+.intro-setting [data-act="intro-save"]:disabled { opacity: .5; }
