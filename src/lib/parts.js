@@ -5,10 +5,78 @@ import { t, getLang } from '../i18n/index.js';
 import { pageCache, cacheKey } from './cache.js';
 import { toast } from './ui.js';
 
-/** Runder Avatar: Foto, sonst Initialen. ring = Farbring (z. B. Spielerfarbe), color = CSS-Farbe. */
-export function avatar({ name, url, size = 44, ring = false, color = '' }) {
-  const style = `--av:${size}px;${color ? `--c:${color};` : ''}${url ? `background-image:url('${String(url).replace(/'/g, '%27')}');` : ''}`;
-  return html`<span class="avatar ${ring ? 'ring' : ''}" style="${style}" aria-hidden="true">${url ? '' : initials(name)}</span>`;
+// P6 Entscheid 14: weiches Einblenden. Adressen, die in dieser Sitzung schon geladen wurden.
+/** @type {Set<string>} */
+const shownUrls = new Set();
+/** @type {Map<string, Promise<boolean>>} */
+const preloads = new Map();
+const cssUrl = (/** @type {string} */ u) => `url('${u.replace(/'/g, '%27')}')`;
+const instant = (/** @type {string} */ u) => /^(blob|data):/.test(u) || shownUrls.has(u);
+/** @param {string} u @returns {Promise<boolean>} */
+function preload(u) {
+  let p = preloads.get(u);
+  if (!p) {
+    p = new Promise((res) => {
+      const img = new Image();
+      img.onload = () => { shownUrls.add(u); res(true); };
+      img.onerror = () => { preloads.delete(u); res(false); };
+      img.src = u;
+    });
+    preloads.set(u, p);
+  }
+  return p;
+}
+/** Wartenden Avatar verdrahten: vorladen, dann Bild setzen und einblenden; Fehler ⇒ Initialen. @param {Element} el */
+function wireAvatar(el) {
+  const u = el.getAttribute('data-av-src');
+  if (!u) return;
+  const ini = el.getAttribute('data-av-ini') || '';
+  el.removeAttribute('data-av-src');
+  el.removeAttribute('data-av-ini');
+  preload(u).then((ok) => {
+    const s = /** @type {HTMLElement} */ (el);
+    s.classList.remove('av-wait');
+    if (ok) { s.style.backgroundImage = cssUrl(u); s.classList.add('av-in'); } else s.textContent = ini;
+  });
+}
+/** @param {Node} n */
+function scanAvatars(n) {
+  if (n.nodeType !== 1) return;
+  const e = /** @type {Element} */ (n);
+  if (e.hasAttribute('data-av-src')) wireAvatar(e);
+  for (const x of e.querySelectorAll('[data-av-src]')) wireAvatar(x);
+}
+let avObserver = /** @type {MutationObserver|null} */ (null);
+/** Einmal je Seite: jede Stelle, die avatar() zeichnet (auch ohne painter), wird verdrahtet. */
+function watchAvatars() {
+  if (avObserver || typeof MutationObserver === 'undefined' || typeof document === 'undefined') return;
+  avObserver = new MutationObserver((recs) => { for (const r of recs) for (const n of r.addedNodes) scanAvatars(n); });
+  avObserver.observe(document.documentElement, { childList: true, subtree: true });
+  setTimeout(() => scanAvatars(document.documentElement), 0);
+}
+
+/**
+ * Runder Avatar: Foto, sonst Initialen. ring = Farbring (z. B. Spielerfarbe), color = CSS-Farbe.
+ * P6 Entscheid 14: `blob:`/`data:` oder schon geladen ⇒ sofort; andere Adresse ⇒ leerer Kreis, vorladen, einblenden;
+ * `pending` (Pfad bekannt, Adresse offen) ⇒ leerer Kreis; Initialen nur ohne Bild.
+ */
+export function avatar({ name, url, size = 44, ring = false, color = '', pending = false }) {
+  const u = url ? String(url) : '';
+  const now = !!u && instant(u);
+  const wait = (!!u && !now) || (!u && pending);
+  if (u && !now) watchAvatars();
+  const style = `--av:${size}px;${color ? `--c:${color};` : ''}${now ? `background-image:${cssUrl(u)};` : ''}`;
+  return html`<span class="avatar ${ring ? 'ring' : ''} ${wait ? 'av-wait' : ''}" style="${style}" aria-hidden="true" ${u && !now ? html`data-av-src="${u}" data-av-ini="${initials(name)}"` : ''}>${u || pending ? '' : initials(name)}</span>`;
+}
+
+/**
+ * Avatar eines Mitglieds mit Bild-Pfad (P6): Pfad mit Adresse ⇒ Bild; Pfad ohne Schlüssel in `urls` ⇒ offen (leerer
+ * Kreis); Pfad mit `null` ⇒ endgültig gescheitert ⇒ Initialen. Ohne Pfad ⇒ `art` (Commander-Art), sonst Initialen.
+ * @param {{ name: string, path?: string|null, urls?: Record<string, string|null>, art?: string|null, size?: number, ring?: boolean, color?: string }} o
+ */
+export function pathAvatar({ name, path = null, urls = {}, art = null, size = 44, ring = false, color = '' }) {
+  if (!path) return avatar({ name, url: art, size, ring, color });
+  return avatar({ name, url: urls[path] || null, size, ring, color, pending: !(path in urls) });
 }
 
 export function backHead(title, href = '#/start') {

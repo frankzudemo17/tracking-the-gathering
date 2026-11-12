@@ -2,14 +2,14 @@
 // Daten nur über groupData (einmal geladen, Umschalter rechnen aus demselben Stand), Zahlen nur aus
 // stats.js, Anzeige nur über format.js (WELLE ttg-ende-statistik, UI-Regel 6). Quelle Ablauf: Prototyp
 // mockup/design-canvas-quellen/Main.dc.html:2708-2719 (dortige Zahlen sind Attrappen).
-import { avatarUrls } from '../supabase.js';
+import { avatarUrls, avatarUrlsNow } from '../supabase.js';
 import { state, currentMembership } from '../state.js';
 import { groupData } from '../lib/data.js';
 import { inRange, playerTable, deckTable, deckSaltTable } from '../lib/stats.js';
 import { fmtAvg, fmtPct } from '../lib/format.js';
 import { html, on, initials } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
-import { avatar, empty, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
+import { pathAvatar, empty, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
 import { GROUP_MAX_AGE_MS } from '../lib/cache.js';
 import { sheet } from '../lib/ui.js';
 import { t, getLang } from '../i18n/index.js';
@@ -44,7 +44,7 @@ export default async function board(el, { isStale, fail }) {
   const name = (id) => members.get(id)?.name || '–';
   const av = (id, size) => {
     const m = members.get(id);
-    return avatar({ name: m?.name || '?', url: m?.avatarPath ? urls[m.avatarPath] : null, size });
+    return pathAvatar({ name: m?.name || '?', path: m?.avatarPath || null, urls, size });
   };
   const deckName = (d) => d?.shortName || d?.commanderName || '–';
   const art = (d, cls) => html`<span class="${cls}" style="${artStyle(d?.imageUrl)}" role="img" aria-label="${t('board.art', { name: d?.commanderName || deckName(d) })}"><span aria-hidden="true">${initials(deckName(d))}</span></span>`;
@@ -180,9 +180,11 @@ export default async function board(el, { isStale, fail }) {
   if (g.cached) {
     setData(g.cached.value);
     const u = signed(data);
-    urls = (await settled(u)) || {};
+    const now = await settled(u);
     if (!sc.ok()) return;
-    u.then((x) => { if (sc.ok()) { urls = x; draw(); } });
+    // P6: noch offen ⇒ was ohne Netz bekannt ist (lokale Bilder, gültige Signaturen), Rest als leerer Kreis
+    urls = now || avatarUrlsNow((data?.members || []).map((m) => m.avatarPath));
+    if (!now) u.then((x) => { if (sc.ok()) { urls = x; draw(); } });
   }
   draw();
   stale.from(g.cached);

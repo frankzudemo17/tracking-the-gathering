@@ -3,11 +3,11 @@
 // P12: zuletzt geladener Stand (page:start) sofort, sonst Gerüst; Auffrischen bei jedem Besuch im Hintergrund.
 // Mitglieder ∥ laufende Spiele ∥ Gruppen-Daten; davon abhängig Decks ∥ Bild-Adressen. Das erste Zeichnen ohne
 // gemerkten Stand wartet nicht auf die Gruppen-Daten (Abschnitt „Rangliste“ zeigt solange Platzhalter).
-import { sb, must, avatarUrls } from '../supabase.js';
+import { sb, must, avatarUrls, avatarUrlsNow } from '../supabase.js';
 import { state, currentGroup } from '../state.js';
 import { html, on } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
-import { avatar, empty, memberName, memberAvatarPath, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
+import { avatar, pathAvatar, empty, memberName, memberAvatarPath, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
 import { sheet, toast } from '../lib/ui.js';
 import { go } from '../router.js';
 import { t, getLang } from '../i18n/index.js';
@@ -107,7 +107,7 @@ export default async function start(el, { isStale, fail }) {
 
     // Gerüst (Entscheid 8): Kopfzeile, Karte „Neue Runde“, ruhige Platzhalter
     if (!page) {
-      return html`${top0(avatar({ name: me?.display_name, url: urls[me?.avatar_path], size: 42 }))}
+      return html`${top0(pathAvatar({ name: me?.display_name, path: me?.avatar_path, urls, size: 42 }))}
     ${hero(null, true)}
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('home.players')}</h3><a href="#/gruppen">${t('home.all')}</a></div>
@@ -123,11 +123,9 @@ export default async function start(el, { isStale, fail }) {
     const mine = members.find((m) => m.profile_id === me?.id);
     const myDeck = mine ? latest[mine.id] : null;
     rememberArt(heroKey(), myDeck?.image_url || null);
-    // Spielerbild: Foto, sonst Commander-Art des neuesten Decks, sonst Initialen
-    const personAv = (m, size) => {
-      const d = latest[m.id];
-      return avatar({ name: memberName(m), url: urls[memberAvatarPath(m)] || d?.image_url || null, size });
-    };
+    // Spielerbild: Foto, sonst Commander-Art des neuesten Decks, sonst Initialen.
+    // P6 Entscheid 14: Mitglied mit Pfad zeigt nie die Commander-Art als Zwischenbild (offen ⇒ leerer Kreis).
+    const personAv = (m, size) => pathAvatar({ name: memberName(m), path: memberAvatarPath(m), urls, art: latest[m.id]?.image_url || null, size });
     const nameOf = new Map(members.map((m) => [m.id, memberName(m)]));
     // Anzeigetafel je laufendem Spiel (HANDOFF 4 Startseite): Kacheln aus games.live_state
     const boardCard = (gm) => {
@@ -179,7 +177,7 @@ export default async function start(el, { isStale, fail }) {
           : html`<div class="card">${empty('trophy', t('home.noGames'), t('home.noGamesSub'))}</div>`;
 
     return html`
-    ${top0(mine ? personAv(mine, 42) : avatar({ name: me?.display_name, url: urls[me?.avatar_path], size: 42 }))}
+    ${top0(mine ? personAv(mine, 42) : pathAvatar({ name: me?.display_name, path: me?.avatar_path, urls, size: 42 }))}
 
     ${hero(myDeck)}
 
@@ -237,11 +235,16 @@ export default async function start(el, { isStale, fail }) {
   if (p.cached) {
     page = p.cached.value;
     const u = signed(page.members);
-    urls = (await settled(u)) || {};
+    const now = await settled(u);
     if (!sc.ok()) return;
+    // P6: noch offen ⇒ was ohne Netz bekannt ist (lokale Bilder, gültige Signaturen), Rest als leerer Kreis
+    urls = now || avatarUrlsNow(paths(page.members));
+    if (!now) u.then((x) => { if (sc.ok()) { urls = { ...urls, ...x }; draw(); } });
   } else {
-    urls = (await settled(signed([]))) || {};
+    const u = signed([]);
+    const now = await settled(u);
     if (!sc.ok()) return;
+    urls = now || avatarUrlsNow(paths([]));
   }
   draw();
   stale.from(p.cached?.failed ? p.cached : g.cached?.failed ? { at: p.cached?.at ?? g.cached.at, failed: true } : undefined);
