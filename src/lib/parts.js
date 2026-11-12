@@ -190,6 +190,15 @@ export function painter(el) {
 // Ausfallserie App-weit: ein Toast beim ersten gescheiterten Auffrischen nach dem letzten Erfolg (Entscheid 15).
 let failing = false;
 const hhmm = (at) => new Date(at).toLocaleTimeString(getLang() === 'en' ? 'en-GB' : 'de-DE', { hour: '2-digit', minute: '2-digit' });
+// P6 Entscheid 17: Stand nicht von heute ⇒ Datum dazu (DE Tag.Monat., EN Tag Monat kurz).
+const dayMonth = (at) => (getLang() === 'en'
+  ? new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  : new Date(at).toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric' }));
+const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+/** Text des Toasts „nicht aktualisiert“: heute ⇒ common.stale, sonst common.staleDate. @param {number} at */
+export const staleText = (at) => (sameDay(at, Date.now())
+  ? t('common.stale', { time: hhmm(at) })
+  : t('common.staleDate', { date: dayMonth(at), time: hhmm(at) }));
 
 /**
  * Zustand „nicht aktualisiert“ je Seitenbesuch: `bad(at)` setzt #view[data-stale="1"] (+ Toast einmal je Serie);
@@ -201,7 +210,7 @@ const hhmm = (at) => new Date(at).toLocaleTimeString(getLang() === 'en' ? 'en-GB
 export function staleMark(el) {
   const bad = (/** @type {number} */ at) => {
     el.setAttribute('data-stale', '1');
-    if (!failing) { failing = true; toast(t('common.stale', { time: hhmm(at) })); }
+    if (!failing) { failing = true; toast(staleText(at)); }
   };
   return {
     bad,
