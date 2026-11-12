@@ -11,7 +11,7 @@
 //   4. Ausliefern: die reparierte Version übernimmt nach vollständigem Precache von selbst.
 //   5. Mit der nächsten Version URGENT wieder auf false.
 //   Zweite Rückfallebene: ein Abschalt-Worker (ein sw.js, das alle Caches löscht und sich abmeldet).
-const VERSION = 'ttg-v38';
+const VERSION = 'ttg-v39';
 const URGENT = false;
 // Fassung wie in src/supabase.js:1 — wer sie hebt, hebt den Namen (tests/unit/sw.test.mjs prüft das)
 const EXT = 'ttg-ext-supabase-2.118.0';
@@ -30,7 +30,7 @@ const SHELL = [
   './src/lib/prefs.js', // Naht P3 (Stub für P7)
   './src/lib/sw-update.js', // P11 Tempo
   './src/game/engine.js', './src/game/layouts.js', './src/game/rng.js', './src/game/ko.js', './src/game/dice.js',
-  './assets/icons/logo-light.png', './assets/icons/logo-dark.png', './assets/icons/favicon.png', './assets/icons/icon-192.png',
+  './assets/icons/logo.png', './assets/icons/favicon.png', './assets/icons/icon-192.png',
   './src/styles/result.css', './src/styles/history.css', './src/styles/board.css', './src/styles/recap.css', './src/styles/stats.css', './src/i18n/de-result.js', './src/i18n/en-result.js', './src/i18n/de-history.js', './src/i18n/en-history.js', './src/i18n/de-board.js', './src/i18n/en-board.js', './src/i18n/de-recap.js', './src/i18n/en-recap.js', './src/i18n/de-stats.js', './src/i18n/en-stats.js', './src/lib/stats.js', './src/lib/history-data.js', './src/lib/data.js', './src/lib/format.js',
   // P11 Tempo: Gate B4 verlangt jede Datei unter src/**, jeden Verweis aus index.html und jede url() aus den Stylesheets
   './assets/icons/apple-touch-icon.png',

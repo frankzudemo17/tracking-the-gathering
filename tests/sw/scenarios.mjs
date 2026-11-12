@@ -228,8 +228,8 @@ export async function S5() {
     const cases = [
       ['(i) 404', Bi, null],
       ['(ii) Abbruch im Rumpf', B, (req, res, rel) => {
-        if (rel !== '/assets/icons/logo-dark.png') return false;
-        const buf = fs.readFileSync(path.join(B.dir, 'assets/icons/logo-dark.png'));
+        if (rel !== '/assets/icons/logo.png') return false;
+        const buf = fs.readFileSync(path.join(B.dir, 'assets/icons/logo.png'));
         res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': buf.length, 'Cache-Control': 'no-store' });
         res.write(buf.subarray(0, buf.length >> 1));
         setTimeout(() => res.destroy(), 20);

@@ -325,12 +325,11 @@ export function drawCard(ctx, m, theme, imgs = {}) {
 export function readTheme() {
   const cs = getComputedStyle(document.documentElement);
   const v = (k) => cs.getPropertyValue(k).trim();
-  const logoFile = /logo-(light|dark)\.png/.exec(v('--logo'))?.[0] || 'logo-light.png';
   return {
     bg: v('--bg'), sf: v('--sf'), sf2: v('--sf2'), ink: v('--ink'), mu: v('--mu'), ln: v('--ln'), hi: v('--hi'),
     fDisplay: v('--f-display') || 'system-ui, sans-serif', fBody: v('--f-body') || 'system-ui, sans-serif',
     mana: { W: v('--mana-W'), U: v('--mana-U'), B: v('--mana-B'), R: v('--mana-R'), G: v('--mana-G') },
-    logo: `assets/icons/${logoFile}`,
+    logo: 'assets/icons/logo.png',
   };
 }
 

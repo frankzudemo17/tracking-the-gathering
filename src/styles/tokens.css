@@ -12,7 +12,7 @@
   --live: #22C55E; --danger: #F0716A; --turn: #F2C14E;
   --scrim: 12, 19, 36;                          /* RGB für Verläufe über Bildern */
   --nav-bg: rgba(26, 37, 64, .9);
-  --logo: url("../../assets/icons/logo-light.png");
+  --logo: url("../../assets/icons/logo.png");
   color-scheme: dark;
 }
 :root[data-theme="arktis"] {
@@ -25,7 +25,7 @@
   --live: #16A34A; --danger: #C8382E; --turn: #D99A0B;
   --scrim: 10, 18, 32;
   --nav-bg: rgba(246, 249, 252, .9);
-  --logo: url("../../assets/icons/logo-dark.png");
+  --logo: url("../../assets/icons/logo.png");
   color-scheme: light;
 }
 :root[data-theme="lachs"] {
@@ -39,7 +39,7 @@
   --live: #2E8B57; --danger: #C2412D; --turn: #D99A0B;
   --scrim: 40, 22, 18;
   --nav-bg: rgba(255, 247, 244, .9);
-  --logo: url("../../assets/icons/logo-dark.png");
+  --logo: url("../../assets/icons/logo.png");
   color-scheme: light;
 }
 
