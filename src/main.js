@@ -1,6 +1,6 @@
 // Start, Router, Auth-Status
 import { sb, configured } from './supabase.js';
-import { state, loadMe, applyPrefs, pendingCode } from './state.js';
+import { state, loadMe, applyPrefs, pendingCode, clearCaches } from './state.js';
 import { route, current, go } from './router.js';
 import { html, mount, $ } from './lib/dom.js';
 import { icon } from './lib/icons.js';
@@ -8,6 +8,7 @@ import { loading } from './lib/parts.js';
 import { t } from './i18n/index.js';
 import { applyDevicePrefs, onPrefs, keepAwake } from './lib/prefs.js';
 import { setupSwUpdate } from './lib/sw-update.js';
+import { pageCache } from './lib/cache.js';
 
 // ---------- Routen ----------
 const v = (name) => () => import(`./views/${name}.js`);
@@ -48,6 +49,12 @@ const NAV = [
   ['board', '#/rangliste', 'trophy'], ['me', '#/profil', 'user'],
 ];
 // Aktiver Tab zeigt das gefüllte Icon
+// P12: Tab-Routen (Entscheid 10) und Routen, die sofort gemerkten Stand oder Gerüst zeichnen.
+// Getrennt von den Routen-Optionen gehalten, damit der Naht-Block (Test K1) unverändert bleibt.
+const TABS = new Set(['/start', '/spielen', '/historie', '/rangliste', '/profil']);
+const SKELETON = new Set(['/start', '/historie', '/rangliste', '/profil']);
+const bare = (/** @type {string} */ p) => p.replace(/\/$/, '') || '/';
+// statt des Lade-Kreises (Entscheid 7) — der View meldet ein Scheitern des ersten Ladens über ctx.fail(e).
 
 const app = $('#app');
 let renderToken = 0;
@@ -57,6 +64,62 @@ const cameFromReset = new URLSearchParams(location.search).has('reset');
 function navHtml(active) {
   return html`<nav class="nav" aria-label="Hauptnavigation">${NAV.map(([k, href, ic]) =>
     html`<a href="${href}" ${active === k ? html`aria-current="page"` : ''}>${icon(active === k ? ic + 'Fill' : ic, 23)}<span>${t(`nav.${k}`)}</span></a>`)}</nav>`;
+}
+
+/** P12: Leiste bleibt derselbe Knoten — nur aria-current, Icon und (nach Sprachwechsel) Beschriftung wechseln. */
+function syncNav(nav, active) {
+  const links = nav.querySelectorAll(':scope > a');
+  NAV.forEach(([k, , ic], i) => {
+    const a = links[i];
+    if (!a) return;
+    const on = active === k;
+    if (on !== (a.getAttribute('aria-current') === 'page')) {
+      if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+      const tmp = document.createElement('span');
+      mount(tmp, icon(on ? ic + 'Fill' : ic, 23));
+      const svg = a.querySelector('svg');
+      if (svg && tmp.firstElementChild) svg.replaceWith(tmp.firstElementChild);
+    }
+    const label = a.querySelector('span');
+    if (label && label.textContent !== t(`nav.${k}`)) label.textContent = t(`nav.${k}`);
+  });
+}
+
+/** P12 Entscheid 7: neuer #view je Seitenwechsel, die Leiste bleibt stehen. */
+function frame(r) {
+  const view = document.createElement('main');
+  view.id = 'view';
+  view.className = `screen ${r.opts.nav ? 'with-nav' : ''}`;
+  if (SKELETON.has(bare(r.path))) view.setAttribute('aria-busy', 'true');
+  else mount(view, loading());
+  const old = app.querySelector(':scope > #view');
+  let nav = r.opts.nav ? app.querySelector(':scope > nav.nav') : null;
+  if (nav) syncNav(nav, r.opts.nav);
+  else if (r.opts.nav) { const tmp = document.createElement('div'); mount(tmp, navHtml(r.opts.nav)); nav = tmp.firstElementChild; }
+  for (const c of [...app.children]) if (c !== old && c !== nav) c.remove();
+  if (old) old.replaceWith(view); else app.prepend(view);
+  if (nav && nav.parentNode !== app) app.append(nav);
+  return view;
+}
+
+/** Fehlerweg wie bisher: Fehlerblock in #view, Leiste bleibt. */
+function showError(e) {
+  const view = $('#view');
+  if (!view) return;
+  view.removeAttribute('aria-busy');
+  mount(view, html`<div class="empty"><b>${t('common.error')}</b><span class="small">${e?.message || ''}</span>
+        <button class="btn outline" type="button" data-reload>${t('common.reload')}</button></div>`);
+  $('#view [data-reload]')?.addEventListener('click', () => location.reload());
+}
+
+// P12 Entscheid 10: page:*-Einträge überleben nur den Wechsel Tab-Route → andere Tab-Route.
+let lastPath = null;
+let lastTab = false;
+function tabRule(r) {
+  const tab = TABS.has(bare(r.path));
+  const keep = lastTab && tab && lastPath !== bare(r.path);
+  lastPath = bare(r.path); lastTab = tab;
+  if (!keep) pageCache.drop((p) => p.name.startsWith('page:'));
 }
 
 // Ein View-Modul ließ sich nicht laden (Netz kurz weg oder neue Version mitten im Betrieb):
@@ -81,22 +144,21 @@ export async function render() {
   if (state.session && ['/login', '/registrieren'].includes(r.path)) return go('/start', { replace: true });
   if (state.session && r.opts.group && !state.groupId) return go('/willkommen', { replace: true });
 
-  mount(app, html`<main id="view" class="screen ${r.opts.nav ? 'with-nav' : ''}">${loading()}</main>${r.opts.nav ? navHtml(r.opts.nav) : ''}`);
+  tabRule(r);
+  frame(r);
+  const isStale = () => token !== renderToken;
+  const fail = (e) => { console.error(e); if (!isStale()) showError(e); };
   try {
     let mod;
     const sw = swNext(r.opts.swap === true); if (sw !== 'go' && (await sw) === 'reload') return; // P11: neue Version nur an ruhiger Stelle
     try { mod = await r.load(); } catch (e) { if (reloadOnce()) return; throw e; }
     if (token !== renderToken) return;
     const view = $('#view');
-    await mod.default(view, { params: r.params, arg: r.opts.arg, isStale: () => token !== renderToken });
+    await mod.default(view, { params: r.params, arg: r.opts.arg, isStale, fail });
     if (token === renderToken) { view.focus?.({ preventScroll: true }); window.scrollTo(0, 0); }
   } catch (e) {
     console.error(e);
-    if (token === renderToken) {
-      mount($('#view'), html`<div class="empty"><b>${t('common.error')}</b><span class="small">${e.message || ''}</span>
-        <button class="btn outline" type="button" data-reload>${t('common.reload')}</button></div>`);
-      $('#view [data-reload]')?.addEventListener('click', () => location.reload());
-    }
+    if (token === renderToken) showError(e);
   }
 }
 
@@ -118,9 +180,14 @@ async function boot() {
   if (state.session) await loadMe().catch((e) => console.error(e));
 
   sb.auth.onAuthStateChange((event, session) => {
+    // P12 Entscheid 13: Abmelden (alle Wege inkl. Sitzungsablauf, zweiter Tab, Konto löschen) und Kontowechsel
+    // leeren alles Gemerkte sofort — vor loadMe() und vor jedem Zeichnen des neuen Kontos.
+    if (event === 'SIGNED_OUT' || (session && session.user.id !== state.session?.user?.id)) clearCaches();
     // Supabase empfiehlt: im Callback nichts awaiten, sonst blockiert der Client
     setTimeout(async () => {
       const was = state.session?.user?.id;
+      // Direkter Kontowechsel (ohne Abmelden, z. B. zweiter Tab): Inhalt des alten Kontos sofort weg
+      if (was && session && session.user.id !== was) $('#view')?.replaceChildren();
       state.session = session;
       if (event === 'PASSWORD_RECOVERY') { go('/passwort-neu'); return; }
       if (event === 'SIGNED_OUT') { state.profile = null; state.memberships = []; state.groupId = null; go('/login', { replace: true }); return; }

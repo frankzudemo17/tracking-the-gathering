@@ -7,28 +7,38 @@ import { state, currentMembership } from '../state.js';
 import { groupData } from '../lib/data.js';
 import { inRange, playerTable, deckTable, deckSaltTable } from '../lib/stats.js';
 import { fmtAvg, fmtPct } from '../lib/format.js';
-import { html, mount, on, initials } from '../lib/dom.js';
+import { html, on, initials } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
-import { avatar, empty } from '../lib/parts.js';
+import { avatar, empty, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
+import { GROUP_MAX_AGE_MS } from '../lib/cache.js';
 import { sheet } from '../lib/ui.js';
 import { t, getLang } from '../i18n/index.js';
 import { MODES, RANGES, readPrefs, writePrefs, pickNow, splitPodium, stepOf, saltFill, deckOwnerId, emptyKind, artStyle } from './board-ui.js';
 
 const store = () => { try { return sessionStorage; } catch { return null; } };
 
-export default async function board(el, { isStale }) {
-  const data = await groupData.loadGroup(state.groupId);
-  if (isStale()) return;
-  const members = new Map((data?.members || []).map((m) => [m.id, m]));
-  const decks = new Map((data?.decks || []).map((d) => [d.id, d]));
+export default async function board(el, { isStale, fail }) {
+  // P12: gemerkter Stand sofort (oder Gerüst), Auffrischen im Hintergrund; Zeichnen nur bei gleichem Konto + Gruppe
+  const sc = viewScope(state, isStale);
+  const paint = painter(el);
+  const stale = staleMark(el);
+  /** @type {any} */
+  let data = null;
+  let members = new Map();
+  let decks = new Map();
+  let allGames = 0;
   /** @type {Record<string, string|null>} */
   let urls = {};
-  try { urls = await avatarUrls((data?.members || []).map((m) => m.avatarPath)); } catch { urls = {}; }
-  if (isStale()) return;
+  const setData = (/** @type {any} */ d) => {
+    data = d;
+    members = new Map((d?.members || []).map((m) => [m.id, m]));
+    decks = new Map((d?.decks || []).map((x) => [x.id, x]));
+    allGames = (d?.games || []).length;
+  };
+  const signed = (/** @type {any} */ d) => avatarUrls((d?.members || []).map((m) => m.avatarPath)).catch(() => ({}));
 
   const meId = currentMembership()?.id ?? null;
   const lang = getLang();
-  const allGames = (data?.games || []).length;
   let prefs = readPrefs(store());
 
   const name = (id) => members.get(id)?.name || '–';
@@ -131,7 +141,15 @@ export default async function board(el, { isStale }) {
   };
 
   const draw = () => {
-    mount(el, html`<div class="brd">
+    if (!data) {
+      paint(html`<div class="brd">
+      <h2 class="title-xl">${t('board.title')}</h2>
+      ${segs()}${chips()}
+      <div class="brd-skel">${skel.block(true)}${skel.rows(4)}</div>
+    </div>`, { busy: true });
+      return;
+    }
+    paint(html`<div class="brd">
       <h2 class="title-xl">${t('board.title')}</h2>
       ${segs()}${chips()}
       <div class="brd-body">${body()}</div>
@@ -158,5 +176,23 @@ export default async function board(el, { isStale }) {
     </div>`);
   });
 
+  const g = fromCache(sc.key('group'), (o) => groupData.loadGroup(sc.gid, o), { maxAge: GROUP_MAX_AGE_MS, fits: ownNameFits(state) });
+  if (g.cached) {
+    setData(g.cached.value);
+    const u = signed(data);
+    urls = (await settled(u)) || {};
+    if (!sc.ok()) return;
+    u.then((x) => { if (sc.ok()) { urls = x; draw(); } });
+  }
   draw();
+  stale.from(g.cached);
+  g.promise?.then(async (d) => {
+    if (!sc.ok()) return;
+    const u = await signed(d);
+    if (!sc.ok()) return;
+    setData(d); urls = u; draw(); stale.good();
+  }, (e) => {
+    if (!sc.ok()) return;
+    if (g.cached) { console.warn('Rangliste auffrischen', e); stale.bad(g.cached.at); } else fail(e);
+  });
 }

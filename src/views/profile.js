@@ -1,9 +1,10 @@
 // Profil (eigenes oder fremdes Mitglied der aktuellen Playgroup)
 import { sb, must, avatarUrls, appUrl } from '../supabase.js';
 import { state, currentMembership, currentGroup, isAdmin, isSuperadmin, updateProfile, loadMe } from '../state.js';
-import { html, mount, on, busy } from '../lib/dom.js';
+import { html, on, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
-import { avatar, backHead, empty, memberName, memberAvatarPath, roleChip, manaPips } from '../lib/parts.js';
+import { avatar, backHead, empty, memberName, memberAvatarPath, roleChip, manaPips, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
+import { pageCache, cacheKey, GROUP_MAX_AGE_MS } from '../lib/cache.js';
 import { decksOf, sortColors, bracketName } from '../lib/decks.js';
 import { sheet, toast, errText, copyText, openPhoto } from '../lib/ui.js';
 import { setAvatar, removeAvatar } from '../lib/avatar.js';
@@ -22,47 +23,77 @@ const setDecksOpenPref = (v) => { try { localStorage.setItem(DECKS_KEY, v ? '1' 
 // Wie MEMBER_SELECT (groups.js) + is_superadmin des Zielprofils: kein Entfernen-Knopf beim Superadmin (P10 B1)
 const PROFILE_MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path, is_superadmin)';
 
-export default async function profile(el, { params, isStale }) {
+export default async function profile(el, { params, isStale, fail }) {
   const mineId = currentMembership()?.id;
   const memberId = params.memberId || mineId;
-  const m = await sb.from('members').select(PROFILE_MEMBER_SELECT).eq('id', memberId).maybeSingle().then(must);
-  if (isStale()) return;
-  if (!m) { mount(el, html`${backHead(t('nav.me'), '#/gruppen')}${empty('user', t('profile.notFound'), '')}`); return; }
+  // P12: eigenes Profil (#/profil) zeichnet sofort den Kopf und den gemerkten Stand (page:profil = Mitglieds-Zeile
+  // + Decks), sonst ein Gerüst; Auffrischen im Hintergrund. Fremdes Profil wie bisher (Lade-Kreis), aber mit den
+  // gemerkten Gruppen-Daten. Gezeichnet wird nur bei gleichem Konto + Gruppe (Riegel 14b).
+  const own = !params.memberId;
+  const sc = viewScope(state, isStale);
+  const paint = painter(el);
+  const stale = staleMark(el);
+  const pageKey = own ? sc.key('page:profil') : null;
+  const loadPage = async () => {
+    const row = await sb.from('members').select(PROFILE_MEMBER_SELECT).eq('id', memberId).maybeSingle().then(must);
+    return { m: row, decks: row ? await decksOf(row) : [] };
+  };
+  const avPathOf = (/** @type {any} */ x) => (x.profile_id && x.profile_id === state.profile?.id ? state.profile.avatar_path : memberAvatarPath(x));
+  const signed = (/** @type {any} */ x) => avatarUrls([avPathOf(x)]).catch(() => ({}));
+  const notFound = () => paint(html`${backHead(t('nav.me'), '#/gruppen')}${empty('user', t('profile.notFound'), '')}`);
 
-  // Statistik: eine Rechenquelle (stats.js über groupData, WELLE D3); ein Ausfall bricht das Profil nicht
-  const [data, urls, decks] = await Promise.all([
-    groupData.loadGroup(m.playgroup_id || state.groupId).catch((ex) => { console.warn('Statistik laden', ex); return null; }),
-    avatarUrls([memberAvatarPath(m)]),
-    decksOf(m),
-  ]);
-  if (isStale()) return;
-
-  const isMe = m.profile_id && m.profile_id === state.profile?.id;
-  const isGuest = !m.profile_id;
-  const removed = !!m.removed_at; // P10: entfernte Zeile ist eingefroren (kein Umbenennen, kein Bild, kein Code)
-  const canEdit = !removed && (isMe || isGuest); // Bild und Name: eigenes Profil und Spieler ohne Konto
-  // P10 H/K7: Entfernen-Knopf für Gruppen-Admins (und Superadmin), nicht bei Admins, nicht beim Superadmin, nicht bei sich selbst
-  const canRemove = canRemoveMember(m, { isMe: !!isMe, isAdmin: isAdmin(), isSuperadmin: isSuperadmin() });
-  const name = isMe ? state.profile.display_name : memberName(m);
-  const avPath = isMe ? state.profile.avatar_path : memberAvatarPath(m);
+  /** @type {any} */
+  let m = null;
+  /** @type {any[]|null} null = Decks noch nicht geladen (Gerüst) */
+  let decks = null;
+  /** @type {any} Statistik: eine Rechenquelle (stats.js über groupData, WELLE D3); ein Ausfall bricht das Profil nicht */
+  let data = null;
+  /** @type {'wait'|'ok'|'error'} */
+  let statsState = 'wait';
+  /** @type {Record<string, string|null>} */
+  let urls = {};
+  let isMe = false;
+  let isGuest = false;
+  let removed = false;
+  let canEdit = false;
+  let canRemove = false;
+  let name = '';
+  /** @type {string|null} */
+  let avPath = null;
+  /** @type {any} */
+  let target = null;
+  let avUrl = '';
   const lang = getLang();
-  const pr = data ? memberProfile(data, m.id) : null;
+  const showBack = !!params.memberId && params.memberId !== mineId;
   const deckLine = (id) => {
     if (!data) return '';
     const dp = deckProfile(data, id);
     return dp.games ? t('stats.deckLine', { games: gamesText(dp.games), rate: fmtPct(dp.winRate, lang) }) : t('decks.noGames');
   };
-  const statsHtml = pr ? await profileStats({ pr, data, isMe: !!isMe, name, lang }) : html`<p class="small muted st-err">${t('stats.loadError')}</p>`;
-  if (isStale()) return;
-  const group = state.memberships.find((x) => x.playgroup_id === m.playgroup_id)?.playgroups || currentGroup();
-  const target = isMe ? { kind: 'profile', id: state.profile.id } : { kind: 'member', id: m.id };
-  const showBack = !!params.memberId && params.memberId !== mineId;
-  const decksOpen = decksOpenPref();
 
-  const avUrl = urls[avPath] || '';
-  const av = avatar({ name, url: avUrl, size: 72 });
-  const avView = html`<button type="button" class="avatar-view" data-act="avatar-zoom" aria-label="${t('avatar.view', { name })}">${av}</button>`;
-  mount(el, html`
+  let drawSeq = 0;
+  const draw = async () => {
+    const seq = ++drawSeq;
+    isMe = m.profile_id && m.profile_id === state.profile?.id;
+    isGuest = !m.profile_id;
+    removed = !!m.removed_at; // P10: entfernte Zeile ist eingefroren (kein Umbenennen, kein Bild, kein Code)
+    canEdit = !removed && (isMe || isGuest); // Bild und Name: eigenes Profil und Spieler ohne Konto
+    // P10 H/K7: Entfernen-Knopf für Gruppen-Admins (und Superadmin), nicht bei Admins, nicht beim Superadmin, nicht bei sich selbst
+    canRemove = canRemoveMember(m, { isMe: !!isMe, isAdmin: isAdmin(), isSuperadmin: isSuperadmin() });
+    name = isMe ? state.profile.display_name : memberName(m);
+    avPath = avPathOf(m);
+    const pr = data ? memberProfile(data, m.id) : null;
+    const statsHtml = statsState === 'wait' ? skel.block(true)
+      : pr ? await profileStats({ pr, data, isMe: !!isMe, name, lang }) : html`<p class="small muted st-err">${t('stats.loadError')}</p>`;
+    if (!sc.ok() || seq !== drawSeq) return;
+    const group = state.memberships.find((x) => x.playgroup_id === m.playgroup_id)?.playgroups || currentGroup();
+    target = isMe ? { kind: 'profile', id: state.profile.id } : { kind: 'member', id: m.id };
+
+    avUrl = urls[avPath] || '';
+    const decksOpen = decksOpenPref(); // beim Neuzeichnen gilt der zuletzt gewählte Zustand
+    const av = avatar({ name, url: avUrl, size: 72 });
+    const avView = html`<button type="button" class="avatar-view" data-act="avatar-zoom" aria-label="${t('avatar.view', { name })}">${av}</button>`;
+    paint(html`
     ${showBack || isMe ? html`<div class="prof-top">
       ${showBack ? html`<a class="icon-btn" href="#/gruppen" aria-label="${t('common.back')}">${icon('back')}</a>` : html`<span></span>`}
       ${isMe ? html`<a class="icon-btn" href="#/einstellungen" aria-label="${t('profile.settings')}">${icon('gear', 22)}</a>` : ''}
@@ -92,7 +123,10 @@ export default async function profile(el, { params, isStale }) {
 
     ${statsHtml}
 
-    <div class="section">
+    ${decks == null ? html`<div class="section">
+      <div class="section-head"><h3 class="section-title">${t('profile.decks')}</h3></div>
+      ${skel.rows(2)}
+    </div>` : html`<div class="section">
       <button type="button" class="collapse-head" data-act="toggle-decks" aria-expanded="${decksOpen}" aria-controls="prof-decks">
         <h3 class="section-title">${t('profile.decks')} <span class="count">${decks.length}</span></h3>
         ${decks.length ? html`<span class="deck-minis" aria-hidden="true">${decks.slice(0, 5).map((d) => html`<i style="background-image:url('${d.image_url}')"></i>`)}</span>` : ''}
@@ -106,19 +140,75 @@ export default async function profile(el, { params, isStale }) {
         </a>`)}</div>` : html`<div class="card">${empty('play', t('decks.none'), isMe || isGuest ? '' : t('decks.noneOther', { name }))}</div>`}
       ${canEdit ? html`<a class="btn soft" href="#/deck-neu/${m.id}">${icon('plus', 20)}${t('decks.add')}</a>` : ''}
       </div>
-    </div>
+    </div>`}
 
     ${!isGuest && !isMe && (m.role === 'admin' ? isAdmin() || isSuperadmin() : isSuperadmin()) ? html`
     <button type="button" class="btn soft" data-act="role">${icon('shield', 18)}${m.role === 'admin' ? t('profile.removeAdmin') : t('profile.makeAdmin')}</button>` : ''}
     ${canRemove ? html`
     <button type="button" class="btn danger" data-act="remove-member">${icon('trash', 18)}${t('memberRemove.button')}</button>` : ''}
 
-`);
+`, { busy: decks == null });
+  };
+
+  const groupOf = (/** @type {string} */ gid) => fromCache(cacheKey(sc.uid, gid, 'group'), (o) => groupData.loadGroup(gid, o), { maxAge: GROUP_MAX_AGE_MS, fits: ownNameFits(state) });
+  const watchGroup = (/** @type {ReturnType<typeof groupOf>} */ g) => g.promise?.then((d) => {
+    if (!sc.ok()) return;
+    data = d; statsState = 'ok';
+    if (m) draw();
+  }, (ex) => {
+    if (!sc.ok()) return;
+    console.warn('Statistik laden', ex);
+    if (g.cached) stale.bad(g.cached.at);
+    else { statsState = 'error'; if (m) draw(); }
+  });
+
+  if (!own || !currentMembership()) {
+    // Fremdes Profil: wie bisher erst laden, dann zeichnen
+    const v = await loadPage();
+    if (isStale()) return;
+    m = v.m; decks = v.decks;
+    if (!m) { notFound(); return; }
+    const g = groupOf(m.playgroup_id || state.groupId);
+    if (g.cached) { data = g.cached.value; statsState = 'ok'; } else {
+      data = await g.promise.catch((ex) => { console.warn('Statistik laden', ex); return null; });
+      statsState = data ? 'ok' : 'error';
+    }
+    urls = await signed(m);
+    if (isStale()) return;
+    await draw();
+    if (g.cached) watchGroup(g);
+  } else {
+    const p = fromCache(pageKey, (o) => pageCache.load(pageKey, loadPage, o));
+    const g = groupOf(sc.gid);
+    // Kopf sofort: gemerkte Mitglieds-Zeile, sonst die eigene Mitgliedschaft (Name/Bild aus dem eigenen Profil)
+    m = p.cached?.value.m || currentMembership();
+    decks = p.cached?.value.decks ?? null;
+    if (g.cached) { data = g.cached.value; statsState = 'ok'; }
+    urls = (await settled(signed(m))) || {};
+    if (!sc.ok()) return;
+    await draw();
+    stale.from(p.cached?.failed ? p.cached : g.cached?.failed ? { at: p.cached?.at ?? g.cached.at, failed: true } : undefined);
+    p.promise?.then(async (v) => {
+      if (!sc.ok()) return;
+      if (!v.m) { notFound(); return; }
+      const u = await signed(v.m);
+      if (!sc.ok()) return;
+      m = v.m; decks = v.decks; urls = u;
+      draw();
+    }, (ex) => {
+      if (!sc.ok()) return;
+      if (p.cached) { console.warn('Profil auffrischen', ex); stale.bad(p.cached.at); } else fail(ex);
+    });
+    watchGroup(g);
+    Promise.allSettled([p.promise, g.promise].filter(Boolean)).then((rs) => {
+      if (sc.ok() && rs.every((r) => r.status === 'fulfilled')) stale.good();
+    });
+  }
 
   const rerender = () => go(location.hash.slice(1));
 
   on(el, 'click', '[data-act="avatar-zoom"]', () => { if (avUrl) openPhoto(avUrl, t('avatar.alt', { name }), { round: true }); });
-  on(el, 'click', '[data-act="photo"]', () => openAvatarSheet({ name, url: urls[avPath], has: !!avPath, target, isMe, onDone: rerender }));
+  on(el, 'click', '[data-act="photo"]', () => openAvatarSheet({ name, url: urls[avPath], has: !!avPath, target, isMe, onDone: () => { groupData.invalidate(m.playgroup_id || state.groupId); rerender(); } })); // P12 Nachtrag 1 (B2)
   on(el, 'click', '[data-act="rename"]', () => openRename({ name, isMe, member: m, onDone: rerender }));
   on(el, 'click', '[data-act="claim-link"]', () => copyText(appUrl(`#/code/${m.claim_code}`)));
   on(el, 'click', '[data-act="toggle-decks"]', (e, b) => {
@@ -322,6 +412,7 @@ function openRename({ name, isMe, member, onDone }) {
             await loadMe();
           } else {
             must(await sb.from('members').update({ display_name: v }).eq('id', member.id));
+            groupData.invalidate(member.playgroup_id); // P12 Nachtrag 1 (B2): eigener Schreibvorgang ⇒ Gruppen-Stand verworfen
           }
           close(); toast(t('profile.saved')); onDone();
         } catch (ex) { err.textContent = errText(ex); err.hidden = false; }

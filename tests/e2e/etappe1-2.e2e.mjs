@@ -215,8 +215,10 @@ export default async function etappe12({ browser, base: BASE }) {
   ok('Nach Anmeldung automatisch übernommen → Start', (await C.textContent('.group-switch')).includes(FIXTURE_NAME));
   await C.goto(BASE + '#/profil');
   await C.waitForSelector('.prof-head');
+  await C.waitForSelector('.prof-head .avatar[style*="background-image"]', { timeout: 10000 }).catch(() => {}); // P12: Kopf steht sofort, das Bild folgt nach dem Signieren
   ok('Übernommenes Profilbild da', (await C.locator('.prof-head .avatar[style*="background-image"]').count()) === 1);
   ok('Kein Gast-Hinweis mehr', (await C.locator('.guest-card .code').count()) === 0);
+  await C.waitForSelector('.deck-card', { timeout: 10000 }).catch(() => {}); // P12: Kopf steht sofort, Decks füllen danach
   await C.shot('09-tim-uebernommen');
   ok('Übernommenes Deck gehört jetzt C', (await C.locator('.deck-card').count()) === 1);
   await C.click('.deck-card');
@@ -225,6 +227,7 @@ export default async function etappe12({ browser, base: BASE }) {
   await C.click('.sheet [data-act="yes"]');
   await waitHash(C, '#/profil');
   await C.waitForSelector('.prof-head');
+  await C.waitForFunction(() => !document.querySelector('#view [data-skel]'), null, { timeout: 10000 }).catch(() => {}); // P12: erst wenn die Decks geladen sind
   await C.waitForTimeout(500);
   ok('Deck entfernt', (await C.locator('.deck-card').count()) === 0);
 

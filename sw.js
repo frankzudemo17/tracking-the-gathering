@@ -29,6 +29,7 @@ const SHELL = [
   './src/lib/dom.js', './src/lib/icons.js', './src/lib/ui.js', './src/lib/parts.js', './src/lib/avatar.js', './src/lib/group-actions.js', './src/lib/scryfall.js', './src/lib/decks.js', './src/lib/game-store.js', './src/lib/field-color.js', './src/lib/rand.js',
   './src/lib/prefs.js', // Naht P3 (Stub für P7)
   './src/lib/sw-update.js', // P11 Tempo
+  './src/lib/cache.js', // P12 Tempo Seitenwechsel
   './src/game/engine.js', './src/game/layouts.js', './src/game/rng.js', './src/game/ko.js', './src/game/dice.js',
   './assets/icons/logo.png', './assets/icons/favicon.png', './assets/icons/icon-192.png',
   './src/styles/result.css', './src/styles/history.css', './src/styles/board.css', './src/styles/recap.css', './src/styles/stats.css', './src/i18n/de-result.js', './src/i18n/en-result.js', './src/i18n/de-history.js', './src/i18n/en-history.js', './src/i18n/de-board.js', './src/i18n/en-board.js', './src/i18n/de-recap.js', './src/i18n/en-recap.js', './src/i18n/de-stats.js', './src/i18n/en-stats.js', './src/lib/stats.js', './src/lib/history-data.js', './src/lib/data.js', './src/lib/format.js',

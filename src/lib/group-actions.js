@@ -5,6 +5,7 @@ import { html, on, busy } from './dom.js';
 import { sheet, toast, errText } from './ui.js';
 import { t } from '../i18n/index.js';
 import { go } from '../router.js';
+import { groupData } from './data.js';
 
 export const normCode = (c) => String(c || '').trim().toUpperCase().replace(/\s+/g, '');
 
@@ -18,13 +19,14 @@ export async function redeemCode(raw) {
   if (code.startsWith('TTG-')) {
     const m = must(await sb.rpc('join_playgroup', { p_code: code }));
     if (m?.id) {
+      if (m.playgroup_id === state.groupId) groupData.invalidate(m.playgroup_id); // P12 Nachtrag 2 (B5): Beitritt in die aktuelle Gruppe ⇒ Gruppen-Stand verworfen (sonst verwirft der groupId-Setter)
       await loadMe(); setGroup(m.playgroup_id);
       const g = state.memberships.find((x) => x.playgroup_id === m.playgroup_id)?.playgroups;
       return { ok: true, message: t('groups.joined', { name: g?.name || '' }) };
     }
   }
   const c = must(await sb.rpc('claim_member', { p_code: code }));
-  if (c?.id) { await loadMe(); setGroup(c.playgroup_id); return { ok: true, message: t('groups.claimed') }; }
+  if (c?.id) { groupData.invalidate(c.playgroup_id); /* P12 Nachtrag 2 (B5): Übernehmen führt zusammen ⇒ Gruppen-Stand verworfen */ await loadMe(); setGroup(c.playgroup_id); return { ok: true, message: t('groups.claimed') }; }
   return { ok: false, message: t('groups.codeWrong') };
 }
 

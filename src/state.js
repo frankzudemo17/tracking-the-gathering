@@ -1,16 +1,29 @@
 // App-Zustand: Sitzung, eigenes Profil, Mitgliedschaften, aktuelle Playgroup
-import { sb, must } from './supabase.js';
+import { sb, must, clearSignedUrls } from './supabase.js';
+import { pageCache } from './lib/cache.js';
 import { setLang } from './i18n/index.js';
 
 const GROUP_KEY = 'ttg.group';
 const PENDING_KEY = 'ttg.pendingCode';
 
+let groupId = null;
+
 export const state = {
   session: null,
   profile: null,
   memberships: [], // members-Zeilen des eigenen Kontos inkl. playgroups
-  groupId: null,
+  // P12 Entscheid 12: die eine Stelle — jede Änderung der aktuellen Gruppe (Wechsel, Löschen, Verlassen,
+  // Beitreten, loadMe, Abmelden) verwirft alle gemerkten Einträge der verlassenen Gruppe.
+  get groupId() { return groupId; },
+  set groupId(id) {
+    const old = groupId;
+    groupId = id;
+    if (old && old !== id) pageCache.drop((p) => p.group === old);
+  },
 };
+
+/** P12 Entscheid 13: Abmelden, Kontowechsel, Konto löschen — alles Gemerkte weg (Daten + signierte Bild-Adressen). */
+export function clearCaches() { pageCache.clear(); clearSignedUrls(); }
 
 function store(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* privat */ } }
 function load(k) { try { return localStorage.getItem(k); } catch { return null; } }

@@ -109,7 +109,7 @@ export default async function deckView(el, { params, isStale }) {
       </div>
       <p class="error" role="alert" hidden></p>`, (sh, close) => {
       on(sh, 'click', '[data-br]', async (e, b) => {
-        try { await update({ bracket: Number(b.dataset.br) }); close(); toast(t('profile.saved')); rerender(); }
+        try { await update({ bracket: Number(b.dataset.br) }); groupData.invalidate(state.groupId); close(); toast(t('profile.saved')); rerender(); } // P12 Nachtrag 1 (B2): Gruppen-Stand verworfen
         catch (ex) { const er = sh.querySelector('.error'); er.textContent = errText(ex); er.hidden = false; }
       });
     });
@@ -128,7 +128,7 @@ export default async function deckView(el, { params, isStale }) {
           const { error } = await sb.from('decks').delete().eq('id', d.id);
           // Deck kommt schon in Spielen vor (Fremdschlüssel) → archivieren statt löschen
           if (error?.code === '23503') {
-            try { await update({ archived: true }); close(); toast(t('decks.archived')); go(backTo.slice(1), { replace: true }); }
+            try { await update({ archived: true }); groupData.invalidate(state.groupId); close(); toast(t('decks.archived')); go(backTo.slice(1), { replace: true }); } // P12 Nachtrag 1 (B2)
             catch (ex) { const er = sh.querySelector('.error'); er.textContent = errText(ex); er.hidden = false; }
             return;
           }

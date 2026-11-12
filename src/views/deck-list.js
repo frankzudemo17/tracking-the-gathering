@@ -4,6 +4,8 @@
 // Daten und Rechnen kommen aus src/decks/** (P1/P2); hier nur Oberfläche und Texte (Namensraum decklist).
 // Das Besitzer-Bracket wird nie automatisch geändert — nur per Knopf („Bracket auf N setzen“).
 import { sb } from '../supabase.js';
+import { state } from '../state.js';
+import { groupData } from '../lib/data.js';
 import { html, mount, on, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { empty, loading } from '../lib/parts.js';
@@ -264,6 +266,7 @@ export async function renderDeckList(slot, { deck, canEdit }) {
     await busy(btn, async () => {
       const { error } = await sb.from('decks').update({ bracket: n }).eq('id', st.deck.id).select('id').single();
       if (error) { console.warn('Bracket setzen', error.message); toast(t('decklist.bracket.saveFailed')); return; }
+      groupData.invalidate(state.groupId); // P12 Nachtrag 1 (B2): eigener Schreibvorgang ⇒ Gruppen-Stand verworfen
       toast(t('decklist.bracket.set', { n }));
       rerender();
     });
