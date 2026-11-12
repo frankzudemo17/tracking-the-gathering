@@ -96,6 +96,17 @@ function defaultStorage() {
 
 const pickGame = (row) => Object.fromEntries(GAME_KEYS.filter((k) => k in row).map((k) => [k, row[k]]));
 
+// Spec P3 (Welle ttg-features, Entscheid 1 b): „dieses Gerät hat das Spiel gestartet“ — modulweit, nicht je
+// Store-Instanz (setup.js und life.js haben verschiedene). Nur im Arbeitsspeicher: Neuladen vergisst ihn (gewollt).
+const freshStarts = new Map(); // gameId ⇒ Date.now() nach erfolgreichem start_game
+
+/** Zeitstempel des Starts auf diesem Gerät und Eintrag löschen (einmal verbraucht); sonst null. */
+export function takeFreshStart(gameId) {
+  const at = freshStarts.get(gameId);
+  freshStarts.delete(gameId);
+  return typeof at === 'number' ? at : null;
+}
+
 /**
  * @param {object} sb Supabase-Client (oder Attrappe)
  * @param {{ storage?: Storage, online?: () => boolean, timers?: { setTimeout: Function, clearTimeout: Function }, events?: EventTarget, realtime?: { channel: Function, removeChannel: Function } }} [opts]
@@ -557,6 +568,7 @@ export function createStore(sb, {
     if (res.error) fail(res, 'Spielstart');
     const game = res.data;
     const gameId = game.id;
+    freshStarts.set(gameId, Date.now()); // P3: Spielstart-Intro nur auf diesem Gerät
     if (startRoll) {
       const init = createGame({
         players: players.map((p) => ({ id: p.memberId, seat: p.seat })),

@@ -26,6 +26,7 @@ const SHELL = [
   './src/i18n/index.js', './src/i18n/de.js', './src/i18n/en.js',
   './src/i18n/de-setup.js', './src/i18n/en-setup.js', './src/i18n/de-life.js', './src/i18n/en-life.js', './src/i18n/de-dice.js', './src/i18n/en-dice.js', './src/i18n/de-attack.js', './src/i18n/en-attack.js', './src/i18n/de-ko.js', './src/i18n/en-ko.js',
   './src/i18n/de-decklist.js', './src/i18n/en-decklist.js', './src/i18n/de-live.js', './src/i18n/en-live.js', './src/i18n/de-table.js', './src/i18n/en-table.js', // Naht P3
+  './src/i18n/de-intro.js', './src/i18n/en-intro.js', './src/views/intro-ui.js', './src/views/intro.js', './src/styles/intro.css', // P3 Spielstart-Intro
   './src/lib/dom.js', './src/lib/icons.js', './src/lib/ui.js', './src/lib/parts.js', './src/lib/avatar.js', './src/lib/group-actions.js', './src/lib/scryfall.js', './src/lib/decks.js', './src/lib/game-store.js', './src/lib/field-color.js', './src/lib/rand.js',
   './src/lib/prefs.js', // Naht P3 (Stub für P7)
   './src/lib/sw-update.js', // P11 Tempo

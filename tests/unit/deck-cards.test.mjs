@@ -298,3 +298,60 @@ test('K2 Kennzahlen: leeres Deck ⇒ Nullen; Typ-Reihenfolge und Sonstige; Mehrf
   assert.equal(s.commanders, 2);
   assert.equal(s.total, 7);
 });
+
+// ---------------------------------------------------------------------------
+// Spec P3 (Welle ttg-features): deckTraits — Fakten für die automatische Zeile im Spielstart-Intro
+// (Entscheid 9). Tabelle „Spec-Tests · deckTraits“. Zeile = { section, qty, type_line, mana_value, game_changer }.
+const T = (type_line, qty = 1, mana_value = 3, extra = {}) => ({ section: 'main', qty, type_line, mana_value, game_changer: false, ...extra });
+const TC = (type_line) => ({ section: 'commander', qty: 1, type_line, mana_value: 4, game_changer: false });
+const traits = async (rows, deck = { color_identity: ['G'] }) => (await cards()).deckTraits(rows, deck);
+
+test('P3 deckTraits: leer, nur Commander, nur Länder ⇒ null (keine Zeile)', async () => {
+  assert.equal(await traits([]), null);
+  assert.equal(await traits([TC('Legendary Creature — Elf Druid')]), null);
+  assert.equal(await traits([T('Land', 36, 0)]), null);
+  assert.equal(await traits(null), null);
+});
+
+test('P3 deckTraits: Manakurve — Ø 2,8 niedrig, Ø 3,6 hoch, 3 mittel, MV fehlt/negativ ⇒ 0', async () => {
+  const mv = (...v) => v.map((x) => T('Instant', 1, x));
+  assert.equal((await traits(mv(2, 3, 3, 3, 3))).curve, 'low');
+  assert.equal((await traits(mv(3, 4, 4, 4, 3))).curve, 'high');
+  assert.equal((await traits(mv(3, 3, 3, 3, 3))).curve, 'mid');
+  const t = await traits(mv(null, -1, 4, 4));
+  assert.equal(t.avgMv, 2);
+  assert.equal(t.curve, 'low');
+});
+
+test('P3 deckTraits: Kreaturenanteil 40 % ohne gemeinsamen Typ', async () => {
+  const t = await traits([T('Creature — Elf'), T('Creature — Goblin'), T('Creature — Bird'), T('Creature — Rat'), T('Instant', 6)]);
+  assert.equal(t.creatureShare, 0.4);
+  assert.equal(t.tribe, null);
+});
+
+test('P3 deckTraits: Kreaturentyp — Grenze 8 / 50 % / echt größer, nur Vorderseite, qty zählt', async () => {
+  assert.equal((await traits([T('Creature — Elf', 8), T('Creature — Goblin', 7), T('Creature — Bird', 1)])).tribe, 'Elf');
+  assert.equal((await traits([T('Creature — Elf', 7)])).tribe, null, 'zu klein');
+  assert.equal((await traits([T('Creature — Elf Druid', 8)])).tribe, null, 'Gleichstand Elf = Druid');
+  assert.equal((await traits([T('Creature — Elf', 8), ...['Goblin', 'Bird', 'Rat', 'Cat', 'Dog', 'Ox', 'Ape', 'Bat', 'Fox'].map((x) => T(`Creature — ${x}`))])).tribe, null, 'unter 50 %');
+  assert.equal((await traits([T('Creature — Human // Creature — Werewolf', 9)])).tribe, 'Human', 'nur Vorderseite');
+  assert.equal((await traits([T('Creature — Rat', 30)])).tribe, 'Rat', 'qty zählt');
+});
+
+test('P3 deckTraits: Game Changer über alle Abschnitte, mit qty', async () => {
+  const t = await traits([T('Instant', 1, 3, { game_changer: true }), T('Sorcery', 1, 3, { game_changer: true }), { ...TC('Legendary Creature — Elf'), game_changer: true }, T('Instant', 5)]);
+  assert.equal(t.gameChangers, 3);
+});
+
+test('P3 deckTraits: Endlos-Kombos nur aus bracket_check.combos (\binfinite\b), sonst unbekannt', async () => {
+  const combos = [{ produces: ['Infinite mana'] }, { produces: ['Win the game'] }, { produces: ['infinite damage', 'x'] }];
+  assert.equal((await traits([T('Instant', 5)], { color_identity: [], bracket_check: { combos } })).infinite, 2);
+  assert.equal((await traits([T('Instant', 5)], { color_identity: [], bracket_check: null })).infinite, null);
+  assert.equal((await traits([T('Instant', 5)], { color_identity: [], bracket_check: { level: 2 } })).infinite, null);
+  assert.equal((await traits([T('Instant', 5)], { color_identity: [], bracket_check: { combos: [] } })).infinite, 0);
+});
+
+test('P3 deckTraits: Farben nur W U B R G, Dubletten weg', async () => {
+  assert.deepEqual((await traits([T('Instant', 5)], { color_identity: ['G', 'G', 'X'] })).colors, ['G']);
+  assert.deepEqual((await traits([T('Instant', 5)], null)).colors, []);
+});

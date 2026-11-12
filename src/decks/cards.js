@@ -218,3 +218,71 @@ export function deckSummary(rows) {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Spec P3 (Welle ttg-features, Entscheid 9): Fakten für die automatische Zeile im Spielstart-Intro.
+
+const WUBRG = ['W', 'U', 'B', 'R', 'G'];
+const TRIBE_MIN = 8; // häufigster Untertyp zählt ab 8 Karten …
+const TRIBE_SHARE = 0.5; // … und mindestens der Hälfte aller Kreaturen
+const CURVE_LOW = 2.8; // Ø Manawert ≤ 2,8 ⇒ niedrig
+const CURVE_HIGH = 3.6; // Ø Manawert ≥ 3,6 ⇒ hoch
+
+/** Untertypen der Vorderseite (Wörter nach „ — “ im Teil vor „ // “), je Karte einmal. */
+function frontSubtypes(typeLine) {
+  const front = String(typeLine ?? '').split(' // ')[0];
+  const i = front.indexOf(' — ');
+  return i < 0 ? [] : [...new Set(front.slice(i + 3).split(/\s+/).filter(Boolean))];
+}
+
+/**
+ * Fakten eines Decks aus seiner Kartenliste (rein, ohne Zufall).
+ * Grundlage nur section = 'main', gewichtet mit qty; Nicht-Länder nach cardType (Vorderseite).
+ * Ohne Nicht-Länder (leere Liste, nur Commander, nur Länder) ⇒ null (keine Zeile).
+ * - colors: deck.color_identity, nur W U B R G in dieser Reihenfolge, ohne Dubletten;
+ * - infinite: Kombos aus deck.bracket_check.combos mit einem produces-Eintrag /\binfinite\b/i; ohne Prüfung ⇒ null;
+ * - gameChangers: Summe qty aller Zeilen (alle Abschnitte) mit game_changer;
+ * - tribe: häufigster Untertyp der Kreaturen (≥ 8, ≥ 50 % der Kreaturen, echt größer als der zweite) oder null;
+ * - creatureShare: Kreaturen / Nicht-Länder; avgMv und curve 'low' | 'mid' | 'high'.
+ * @param {Pick<Row, 'section' | 'qty' | 'type_line' | 'mana_value' | 'game_changer'>[] | null | undefined} rows
+ * @param {{ color_identity?: string[] | null, bracket_check?: any } | null | undefined} deck
+ */
+export function deckTraits(rows, deck) {
+  let nonlands = 0;
+  let creatures = 0;
+  let mvSum = 0;
+  let gameChangers = 0;
+  /** @type {Map<string, number>} */
+  const subs = new Map();
+  for (const r of rows || []) {
+    const n = Number(r.qty) || 0;
+    if (r.game_changer === true) gameChangers += n;
+    if (r.section !== 'main') continue;
+    const type = cardType(r.type_line);
+    if (type === 'land') continue;
+    nonlands += n;
+    mvSum += Math.max(0, Number(r.mana_value) || 0) * n;
+    if (type !== 'creature') continue;
+    creatures += n;
+    for (const s of frontSubtypes(r.type_line)) subs.set(s, (subs.get(s) || 0) + n);
+  }
+  if (nonlands <= 0) return null;
+
+  const ranked = [...subs].sort((a, b) => b[1] - a[1]);
+  const [top, second] = ranked;
+  const tribe = top && top[1] >= TRIBE_MIN && top[1] >= TRIBE_SHARE * creatures && top[1] > (second ? second[1] : 0) ? top[0] : null;
+
+  const avgMv = Number((mvSum / nonlands).toFixed(9));
+  const curve = avgMv <= CURVE_LOW ? 'low' : avgMv >= CURVE_HIGH ? 'high' : 'mid';
+
+  const ci = Array.isArray(deck?.color_identity) ? deck.color_identity : [];
+  const colors = WUBRG.filter((c) => ci.includes(c));
+
+  const bc = deck?.bracket_check;
+  const combos = bc && typeof bc === 'object' && !Array.isArray(bc) && Array.isArray(bc.combos) ? bc.combos : null;
+  const infinite = combos
+    ? combos.filter((c) => Array.isArray(c?.produces) && c.produces.some((p) => /\binfinite\b/i.test(String(p)))).length
+    : null;
+
+  return { colors, infinite, gameChangers, tribe, creatureShare: creatures / nonlands, avgMv, curve, nonlands, creatures };
+}

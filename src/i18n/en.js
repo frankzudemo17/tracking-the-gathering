@@ -4,6 +4,7 @@ import life from './en-life.js';
 import dice from './en-dice.js';
 import attack from './en-attack.js';
 import ko from './en-ko.js';
+import intro from './en-intro.js';
 // Namespaces of the wave ttg-live-feinschliff-decks (seam from P3): decklist = P5, live = P6, table = P7.
 import decklist from './en-decklist.js';
 import live from './en-live.js';
@@ -177,6 +178,9 @@ export default {
     save: 'Save deck', saved: 'Deck saved.', none: 'No deck yet.', noneOther: '{name} has no deck yet.',
     games: 'Games', wins: 'Wins', winrate: 'Win rate', place: 'Avg place', noGames: 'No games yet', list: 'Decklist',
     open: 'Open', editLink: 'Change link', addLink: 'Add link', noLink: 'No link to a decklist yet.',
+    // P3 game-start intro: deck motto
+    motto: { show: '“{text}”', add: 'Add motto', edit: 'Change motto', label: 'Motto',
+      hint: 'Shown in the game-start intro. Empty = automatic line from the decklist.', count: '{n}/{max}', tooLong: 'At most {max} characters.' },
     changeBracket: 'Change bracket', remove: 'Remove deck', removed: 'Deck removed.', archived: 'Deck archived because it already appears in games.',
     removeConfirm: 'Really remove?', removeYes: 'Yes, remove', by: 'by {name}', notFound: 'This deck does not exist or is not visible to you.',
     art: 'Art: {artist} · Scryfall',
@@ -264,7 +268,7 @@ export default {
   common: { back: 'Back', close: 'Close', cancel: 'Cancel', loading: 'Loading …', error: 'Something went wrong.', reload: 'Reload',
     stale: 'Not updated – as of {time}' }, // P12
 
-  setup, life, dice, attack, ko,
+  setup, life, dice, attack, ko, intro, // intro: P3 Spielstart-Intro
   decklist, live, table, // seam P3 (wave ttg-live-feinschliff-decks)
 };
 

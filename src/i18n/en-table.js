@@ -28,4 +28,5 @@ export default {
     check: '{deck} checks as bracket {n}',
   },
   koQuiet: { title: 'Is {name} out?' },
+  intro: { title: 'Intro at game start', sub: 'Briefly introduces every deck before the first turn' }, // P3 wave ttg-features
 };

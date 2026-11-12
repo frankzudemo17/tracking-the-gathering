@@ -4,6 +4,7 @@ import life from './de-life.js';
 import dice from './de-dice.js';
 import attack from './de-attack.js';
 import ko from './de-ko.js';
+import intro from './de-intro.js';
 // Namensräume der Welle ttg-live-feinschliff-decks (Naht P3): decklist = P5, live = P6, table = P7.
 import decklist from './de-decklist.js';
 import live from './de-live.js';
@@ -177,6 +178,9 @@ export default {
     save: 'Deck speichern', saved: 'Deck gespeichert.', none: 'Noch kein Deck.', noneOther: '{name} hat noch kein Deck.',
     games: 'Spiele', wins: 'Siege', winrate: 'Siegquote', place: 'Ø Platz', noGames: 'Noch keine Spiele', list: 'Deckliste',
     open: 'Öffnen', editLink: 'Link ändern', addLink: 'Link hinzufügen', noLink: 'Noch kein Link zur Deckliste.',
+    // P3 Spielstart-Intro: Motto am Deck
+    motto: { show: '„{text}“', add: 'Motto hinzufügen', edit: 'Motto ändern', label: 'Motto',
+      hint: 'Erscheint im Spielstart-Intro. Leer = automatische Zeile aus der Deckliste.', count: '{n}/{max}', tooLong: 'Höchstens {max} Zeichen.' },
     changeBracket: 'Bracket ändern', remove: 'Deck entfernen', removed: 'Deck entfernt.', archived: 'Deck archiviert, weil es schon in Spielen vorkommt.',
     removeConfirm: 'Wirklich entfernen?', removeYes: 'Ja, entfernen', by: 'von {name}', notFound: 'Dieses Deck gibt es nicht oder du siehst es nicht.',
     art: 'Bild: {artist} · Scryfall',
@@ -264,7 +268,7 @@ export default {
   common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.', reload: 'Neu laden',
     stale: 'Nicht aktualisiert – Stand von {time} Uhr' }, // P12
 
-  setup, life, dice, attack, ko,
+  setup, life, dice, attack, ko, intro, // intro: P3 Spielstart-Intro
   decklist, live, table, // Naht P3 (Welle ttg-live-feinschliff-decks)
 };
 

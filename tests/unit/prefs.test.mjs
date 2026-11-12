@@ -25,7 +25,7 @@ test('leerer Speicher ⇒ DEFAULTS (Spec-Tabelle)', async () => {
   const P = await fresh(fakeStorage());
   assert.deepEqual(P.DEFAULTS, {
     wakeLock: true, vibration: true, koScreens: 'all', koVariants: ['A', 'B', 'C'], reduceMotion: 'system',
-    startLife: 40, layout: 'seiten', defaultPins: ['poison', 'tax'], turnTime: true,
+    startLife: 40, layout: 'seiten', defaultPins: ['poison', 'tax'], turnTime: true, startIntro: true,
   });
   assert.deepEqual(P.getPrefs(), P.DEFAULTS);
   // getPrefs liefert eine Kopie: Änderungen daran wirken nicht zurück
@@ -54,7 +54,7 @@ test('ungültige Einzelwerte ⇒ Standard je Feld (startLife 33 ⇒ 40), gültig
   const P = await fresh(fakeStorage({ [KEY]: JSON.stringify({ v: 1, ...stored }) }));
   assert.deepEqual(P.getPrefs(), {
     wakeLock: true, vibration: false, koScreens: 'all', koVariants: ['B'], reduceMotion: 'on',
-    startLife: 40, layout: 'seiten', defaultPins: ['energy', 'tax'], turnTime: true,
+    startLife: 40, layout: 'seiten', defaultPins: ['energy', 'tax'], turnTime: true, startIntro: true,
   });
   // unbekannte K.O.-Varianten (umbenannt/entfernt) werden ignoriert; bleibt nichts übrig ⇒ alle
   const Q = await fresh(fakeStorage({ [KEY]: JSON.stringify({ koScreens: 'some', koVariants: ['Z'] }) }));
@@ -170,4 +170,21 @@ test('koVariantFor(): all ⇒ gezogene Variante, some ⇒ nur erlaubte, determin
   assert.equal(P.koVariantFor({ variant: 'C', quote: 5 }), 'C');
   assert.ok(['A', 'C'].includes(P.koVariantFor({ variant: 'B', quote: 5 })));
   assert.equal(P.koVariantFor({ variant: 'B', quote: 5 }), P.koVariantFor({ variant: 'B', quote: 5 }));
+});
+
+// Spec P3 (Welle ttg-features, Entscheid 11): Schalter „Intro beim Spielstart“ — Tabelle „Spec-Tests · prefs“
+test('P3 startIntro: Standard an, ungültig ⇒ an, setPref false gespeichert, Unsinn abgelehnt', async () => {
+  const P = await fresh(fakeStorage());
+  assert.equal(P.DEFAULTS.startIntro, true);
+  const Q = await fresh(fakeStorage({ [KEY]: JSON.stringify({ v: 1, startIntro: 'ja' }) }));
+  assert.equal(Q.getPrefs().startIntro, true);
+  const st = fakeStorage();
+  const R = await fresh(st);
+  assert.equal(R.setPref('startIntro', false), true);
+  assert.equal(R.getPrefs().startIntro, false);
+  assert.ok(st.getItem(KEY).includes('"startIntro":false'), st.getItem(KEY));
+  const st2 = fakeStorage();
+  const S = await fresh(st2);
+  assert.equal(S.setPref('startIntro', 'x'), false);
+  assert.equal(st2.getItem(KEY), null, 'nichts geschrieben');
 });

@@ -14,6 +14,8 @@ import { fmtAvg, fmtPct } from '../lib/format.js';
 import { kpis, section, iconScale, fmtDay } from './stats-ui.js';
 import { renderDeckList } from './deck-list.js';
 
+const MOTTO_MAX = 80; // wie decks_motto_check (Migration 20261118000000_deck_motto.sql)
+
 export default async function deckView(el, { params, isStale }) {
   const d = await sb.from('decks').select('*').eq('id', params.id).maybeSingle().then(must);
   if (isStale()) return;
@@ -37,6 +39,9 @@ export default async function deckView(el, { params, isStale }) {
   const link = d.list_url ? linkInfo(d.list_url) : null;
   const arts = [d.image_url, d.partner_image_url].filter(Boolean);
   const names = [d.commander_name, d.partner_name].filter(Boolean);
+  // P3: Motto nur, wenn die Zeile die Spalte kennt (Datenbank nach der Migration; select('*'), nie eine Spaltenliste)
+  const hasMotto = Object.hasOwn(d, 'motto');
+  const motto = typeof d.motto === 'string' ? d.motto.trim() : '';
 
   mount(el, html`
     ${backHead('', backTo)}
@@ -48,6 +53,7 @@ export default async function deckView(el, { params, isStale }) {
         <span class="by">${t('decks.by', { name: ownerName })}</span>
       </div>
     </div>
+    ${hasMotto && motto ? html`<p class="deck-motto" data-motto>${t('decks.motto.show', { text: motto })}</p>` : ''}
 
     ${dp ? deckStats(dp, data, d.id, lang) : html`<p class="small muted st-err">${t('stats.loadError')}</p>`}
 
@@ -68,6 +74,7 @@ export default async function deckView(el, { params, isStale }) {
 
     ${canEdit ? html`
     <div class="section">
+      ${hasMotto ? html`<button type="button" class="btn soft" data-act="motto">${t(motto ? 'decks.motto.edit' : 'decks.motto.add')}</button>` : ''}
       <button type="button" class="btn soft" data-act="bracket">${t('decks.changeBracket')}</button>
       <button type="button" class="btn danger" data-act="remove">${icon('trash', 18)}${t('decks.remove')}</button>
     </div>` : ''}`);
@@ -96,6 +103,45 @@ export default async function deckView(el, { params, isStale }) {
         await busy(sh.querySelector('button[type=submit]'), async () => {
           try { await update({ list_url: v || null }); close(); toast(t('profile.saved')); rerender(); }
           catch (ex) { err.textContent = errText(ex); err.hidden = false; }
+        });
+      });
+    });
+  });
+
+  // P3: Motto (≤ MOTTO_MAX Codepunkte wie der Check decks_motto_check; getrimmt, leer ⇒ null)
+  on(el, 'click', '[data-act="motto"]', () => {
+    const cps = (s) => [...s.trim()].length;
+    sheet(t('decks.motto.label'), html`
+      <h2>${t(motto ? 'decks.motto.edit' : 'decks.motto.add')}</h2>
+      <form class="form" novalidate>
+        <div class="field"><label for="dm-motto">${t('decks.motto.label')}</label>
+          <input id="dm-motto" class="input" type="text" autocomplete="off" enterkeyhint="done" value="${motto}"></div>
+        <div class="motto-hint"><span class="hint">${t('decks.motto.hint')}</span><span class="hint motto-count" data-count aria-live="polite"></span></div>
+        <p class="error" role="alert" hidden></p>
+        <button class="btn block" type="submit">${t('profile.save')}</button>
+      </form>`, (sh, close) => {
+      const input = /** @type {HTMLInputElement} */ (sh.querySelector('#dm-motto'));
+      const count = sh.querySelector('[data-count]');
+      const err = sh.querySelector('.error');
+      const save = /** @type {HTMLButtonElement} */ (sh.querySelector('button[type=submit]'));
+      const paint = () => {
+        const n = cps(input.value);
+        const over = n > MOTTO_MAX;
+        count.textContent = t('decks.motto.count', { n, max: MOTTO_MAX });
+        count.classList.toggle('over', over);
+        save.disabled = over;
+        if (over) { err.textContent = t('decks.motto.tooLong', { max: MOTTO_MAX }); err.hidden = false; }
+        else if (err.dataset.kind !== 'write') err.hidden = true;
+      };
+      input.addEventListener('input', () => { delete err.dataset.kind; paint(); });
+      paint();
+      on(sh, 'submit', 'form', async (e) => {
+        e.preventDefault();
+        const v = input.value.trim();
+        if ([...v].length > MOTTO_MAX) { paint(); return; }
+        await busy(save, async () => {
+          try { await update({ motto: v || null }); close(); toast(t('profile.saved')); rerender(); }
+          catch (ex) { err.dataset.kind = 'write'; err.textContent = errText(ex); err.hidden = false; }
         });
       });
     });
