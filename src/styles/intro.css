@@ -32,15 +32,18 @@
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
 }
 .intro-skip svg { opacity: .8; }
-.intro-skip:focus-visible { outline: 2px solid var(--hero-ink); outline-offset: 2px; }
+.intro-skip:focus-visible { outline: 2px solid color-mix(in srgb, var(--hero-ink) 60%, transparent); outline-offset: 2px; }
 
 /* ---------- Karte */
 .intro-stage { position: absolute; inset: 0; }
 .intro-card { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; }
-.intro-art { position: absolute; inset: 0; display: flex; background: var(--hero); }
-.intro-img { flex: 1; min-width: 0; background-size: cover; background-position: center 22%; background-repeat: no-repeat; }
-.intro-art.split .intro-img + .intro-img { box-shadow: -1px 0 0 rgba(var(--scrim), .9); }
-.intro-art.none { align-items: center; justify-content: center; padding-bottom: 34vh; }
+/* Bild oben (Scryfall art_crop ist quer ⇒ nicht vollflächig hochziehen), unten weich in die Bühne auslaufend;
+   die Maske wirkt nur über die Deckkraft (Farbwert der Verläufe ohne Bedeutung) */
+.intro-art { position: absolute; left: 0; right: 0; top: 0; height: 76%; display: flex; gap: 2px; background: var(--hero);
+  -webkit-mask-image: linear-gradient(180deg, rgba(var(--scrim), 1) 50%, rgba(var(--scrim), 0) 100%);
+  mask-image: linear-gradient(180deg, rgba(var(--scrim), 1) 50%, rgba(var(--scrim), 0) 100%); }
+.intro-img { flex: 1; min-width: 0; background-size: cover; background-position: center 30%; background-repeat: no-repeat; }
+.intro-art.none { align-items: center; justify-content: center; -webkit-mask-image: none; mask-image: none; background: transparent; }
 .intro-ini {
   display: grid; place-items: center; width: 128px; height: 128px; border-radius: 50%;
   font: 700 48px/1 var(--f-display); letter-spacing: -.02em; color: var(--hero-ink);
@@ -50,8 +53,8 @@
 /* nur ein neutraler dunkler Verlauf unten (Lesbarkeit), kein Farbschleier über dem Bild */
 .intro-scrim {
   position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(180deg, rgba(var(--scrim), .45) 0%, rgba(var(--scrim), 0) 18%, rgba(var(--scrim), 0) 38%,
-    rgba(var(--scrim), .72) 60%, rgba(var(--scrim), .94) 78%, rgba(var(--scrim), .97) 100%);
+  background: linear-gradient(180deg, rgba(var(--scrim), .45) 0%, rgba(var(--scrim), 0) 16%, rgba(var(--scrim), 0) 34%,
+    rgba(var(--scrim), .55) 54%, rgba(var(--scrim), .7) 70%, rgba(var(--scrim), .7) 100%);
 }
 .intro-text {
   position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
@@ -99,5 +102,6 @@ html[data-motion="reduce"] .intro .intro-prog i.cur b { transform: scaleX(1); }
 
 /* ---------- Deckprofil: Motto (deck.js) */
 .deck-motto { margin: 0; color: var(--mu); font: 500 italic 16px/1.4 var(--f-display); overflow-wrap: anywhere; }
-.motto-count { font-variant-numeric: tabular-nums; color: var(--mu); }
+.motto-hint { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.motto-count { flex: none; font-variant-numeric: tabular-nums; color: var(--mu); }
 .motto-count.over { color: var(--danger); }

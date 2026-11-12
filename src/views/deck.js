@@ -116,7 +116,7 @@ export default async function deckView(el, { params, isStale }) {
       <form class="form" novalidate>
         <div class="field"><label for="dm-motto">${t('decks.motto.label')}</label>
           <input id="dm-motto" class="input" type="text" autocomplete="off" enterkeyhint="done" value="${motto}"></div>
-        <span class="hint">${t('decks.motto.hint')} <span class="motto-count" data-count aria-live="polite"></span></span>
+        <div class="motto-hint"><span class="hint">${t('decks.motto.hint')}</span><span class="hint motto-count" data-count aria-live="polite"></span></div>
         <p class="error" role="alert" hidden></p>
         <button class="btn block" type="submit">${t('profile.save')}</button>
       </form>`, (sh, close) => {
