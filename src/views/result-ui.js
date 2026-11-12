@@ -213,3 +213,19 @@ export function fmtShortDate(iso, lang = 'de') {
   if (!d || Number.isNaN(d.getTime())) return '–';
   return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'de-DE', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+/**
+ * P2 Revanche (spec-p2-revanche.md Entscheid 9): hat sich das Formular gegenüber dem Stand beim Öffnen geändert?
+ * Skalen, Stimmen, Siegbedingung direkt; Deck-Salz als Menge der Einträge mit Zahlwert; POTG-Text und Notiz nach trim().
+ * hadRating/hadDeckSalt zählen nicht. Fehlende Felder werfen nicht.
+ * @param {Partial<RateForm>|null|undefined} initial @param {Partial<RateForm>|null|undefined} form
+ */
+export function formDirty(initial, form) {
+  const a = initial || {};
+  const b = form || {};
+  for (const k of ['salt', 'fun', 'deckRating', 'potg', 'saltiest', 'wincon']) if ((a[k] ?? null) !== (b[k] ?? null)) return true;
+  const txt = (v) => String(v ?? '').trim();
+  if (txt(a.potgText) !== txt(b.potgText) || txt(a.note) !== txt(b.note)) return true;
+  const salts = (x) => Object.entries(x.deckSalt || {}).filter(([, n]) => typeof n === 'number' && Number.isFinite(n)).map(([d, n]) => `${d}:${n}`).sort().join('|');
+  return salts(a) !== salts(b);
+}
