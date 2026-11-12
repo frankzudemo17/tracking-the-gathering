@@ -687,6 +687,10 @@ test('P1 Z4a Replay neuer Ereignisse (gemischt) ergibt denselben Zugbeginn', asy
   assert.equal(s.turn, 2);
   assert.equal(s.turnStartedAt, 150000);
   assert.deepEqual(s, t.s);
+  // „gemischt“ auch als vertauschte Reihenfolge (Review P1): replay sortiert nach seq
+  const r = E.replay(t.init, t.all.slice().reverse());
+  assert.equal(r.turnStartedAt, 150000);
+  assert.deepEqual(r, t.s);
 });
 
 test('P1 Z4b Replay alter Ereignisse (ohne at) ergibt den alten Zugbeginn', async () => {
