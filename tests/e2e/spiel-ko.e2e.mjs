@@ -278,4 +278,55 @@ export default async function koE2e({ browser, base: BASE }) {
   }
   ok('Keine JS-Fehler im Bilder-Lauf', V.errs.length === 0, V.errs.join(' | '));
   await V.context().close();
+
+  // ---------------------------------------------------------------- Spec P1 (Welle ttg-features) E1: K.O. des Spielers am Zug
+  // Der Ausgeschiedene war am Zug ⇒ eliminate trägt payload.at, der Folgezug beginnt beim K.O. (nicht beim Spielstart).
+  // Ausgabe nur Wahrheitswerte und Sekunden (keine IDs, keine Adressen).
+  const Z = await ctx(browser, 'KOZ');
+  await Z.goto(BASE);
+  await waitHash(Z, '#/login');
+  await login(Z, 'a');
+  await waitHash(Z, '#/start');
+  const zdb = (fn, arg) => Z.evaluate(async ([src, a]) => {
+    const { sb } = await import('/src/supabase.js');
+    const { createStore } = await import('/src/lib/game-store.js');
+    // eslint-disable-next-line no-new-func
+    return new Function('sb', 'createStore', 'a', `return (async () => { ${src} })()`)(sb, createStore, a);
+  }, [fn, arg]);
+  const g3 = await zdb(`return createStore(sb).startGame({ groupId: a.gid, layout: 'seiten', startingLife: 20, firstSeat: 0,
+      players: a.ids.map((id, i) => ({ memberId: id, deckId: a.deck, seat: i })) });`, { gid, ids: [A, B, C], deck: deck.id });
+  ok('E1 Spiel gestartet', typeof g3 === 'string' && g3.length > 10);
+  await Z.goto(BASE + '#/spiel/' + g3);
+  await Z.waitForSelector('.lc-field');
+  await Z.waitForTimeout(4500); // Zug von Sitz 0 läuft ≥ 4 s
+  await force(Z, [0, 3]);
+  await tap(Z, A, 20); // Sitz 0 = am Zug, 20 ⇒ 0 Leben
+  await Z.waitForSelector('.ko[data-stage="9"]');
+  await Z.click('.ko [data-ko="ask"]');
+  await Z.waitForSelector(`.sheet-wrap [data-ko="by"][data-by="${C}"]`);
+  await Z.click(`.sheet-wrap [data-ko="by"][data-by="${C}"]`);
+  await Z.waitForFunction(() => !document.querySelector('.ko') && !document.querySelector('.sheet-wrap'));
+  const pageNow = await Z.evaluate(() => Date.now());
+  await Z.click('.lc-hub');
+  await Z.click('[data-sheet="menu"] [data-m="endturn"]');
+  const evs = await (async () => {
+    const end = Date.now() + 10000; let v;
+    do {
+      v = await zdb("const r = await sb.from('game_events').select('seq, type, payload').eq('game_id', a).order('seq'); return r.data;", g3);
+      if (v?.some((e) => e.type === 'turn_end')) return v;
+      await Z.waitForTimeout(300);
+    } while (Date.now() < end);
+    return v || [];
+  })();
+  const elim = evs.find((e) => e.type === 'eliminate');
+  const at = elim?.payload?.at;
+  const atOk = typeof at === 'number' && Number.isFinite(at) && Math.abs(at - pageNow) <= 10000;
+  ok('E1 (a) eliminate trägt payload.at als endliche Zahl, ≤ 10 s von der Uhr der Seite', atOk, `at endlich: ${typeof at === 'number' && Number.isFinite(at)}`);
+  const te = evs.filter((e) => e.type === 'turn_end' && e.seq > (elim?.seq ?? Infinity))[0];
+  const sec = te?.payload?.seconds;
+  console.log(`    E1 Sekunden des Folgezugs: ${sec}`);
+  ok('E1 (b) nächster turn_end ≤ 2 s (alter Stand ≥ 4 s)', typeof sec === 'number' && sec <= 2, `seconds=${sec}`);
+  await abort(Z);
+  ok('E1 keine JS-Fehler', Z.errs.length === 0, Z.errs.join(' | '));
+  await Z.context().close();
 }
