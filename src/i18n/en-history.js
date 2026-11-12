@@ -60,6 +60,7 @@ export default {
   photoAlt: 'Photo of the table, {date}',
   rate: 'Rate',
   toEvening: 'To the game night',
+  rematch: 'Rematch', // P2 Revanche
   live: 'Still running',
   liveSub: 'This game has not finished yet.',
   watch: 'Watch',
