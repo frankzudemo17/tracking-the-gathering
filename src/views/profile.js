@@ -212,7 +212,7 @@ export default async function profile(el, { params, isStale, fail }) {
   const rerender = () => go(location.hash.slice(1));
 
   on(el, 'click', '[data-act="avatar-zoom"]', () => { if (avUrl) openPhoto(avUrl, t('avatar.alt', { name }), { round: true }); });
-  on(el, 'click', '[data-act="photo"]', () => openAvatarSheet({ name, url: urls[avPath], has: !!avPath, target, isMe, onDone: () => { groupData.invalidate(m.playgroup_id || state.groupId); rerender(); } })); // P12 Nachtrag 1 (B2)
+  on(el, 'click', '[data-act="photo"]', () => openAvatarSheet({ name, url: urls[avPath], has: !!avPath, path: avPath, target, isMe, onDone: () => { groupData.invalidate(m.playgroup_id || state.groupId); rerender(); } })); // P12 Nachtrag 1 (B2)
   on(el, 'click', '[data-act="rename"]', () => openRename({ name, isMe, member: m, onDone: rerender }));
   on(el, 'click', '[data-act="claim-link"]', () => copyText(appUrl(`#/code/${m.claim_code}`)));
   on(el, 'click', '[data-act="toggle-decks"]', (e, b) => {
@@ -376,7 +376,7 @@ async function profileStats({ pr, data, isMe, name, lang, memberId, moreOpen }) 
   return html`${tiles}${mood}${salt}${line}${tempo}${highlights}${more}`;
 }
 
-function openAvatarSheet({ name, url, has, target, isMe, onDone }) {
+function openAvatarSheet({ name, url, has, path = null, target, isMe, onDone }) {
   sheet(t('avatar.title'), html`
     <div class="prof-head">
       ${avatar({ name, url, size: 64 })}
@@ -396,9 +396,9 @@ function openAvatarSheet({ name, url, has, target, isMe, onDone }) {
     };
     on(sh, 'change', 'input[type=file]', (e, input) => {
       const f = input.files?.[0];
-      if (f) done(() => setAvatar(target, f), t('avatar.saved'));
+      if (f) done(() => setAvatar(target, f, path), t('avatar.saved'));
     });
-    on(sh, 'click', '[data-act="remove"]', () => done(() => removeAvatar(target), t('avatar.removed')));
+    on(sh, 'click', '[data-act="remove"]', () => done(() => removeAvatar(target, path), t('avatar.removed')));
   });
 }
 

@@ -14,10 +14,51 @@ export const KONTO_KEY = 'ttg.konto';
 pageCache.setStore({
   mark: () => deviceStore.mark(),
   gen: () => deviceStore.generation(),
-  put: (key, value, at, riegel) => deviceStore.putData(key, value, at, riegel),
+  put: (key, value, at, riegel) => { deviceStore.putData(key, value, at, riegel); noteFresh(key); },
   del: (keys) => deviceStore.dropData(keys),
   clear: () => deviceStore.dropEntries(),
 });
+
+// P6 Entscheid 15: nach einer erfolgreichen frischen Ladung von `group` UND `page:start` derselben Gruppe fallen
+// Bilder, deren Pfad in keinem gespeicherten `me`/`page:*`/`group` mehr vorkommt. Nur, wenn beide Datensätze
+// tatsächlich im Gerätespeicher liegen (eine Schreibmarke dazwischen ⇒ nicht aufräumen).
+/** Gruppe → schon frisch gespiegelte Namen. @type {Map<string, Set<string>>} */
+const freshNames = new Map();
+/** @param {string} key */
+function noteFresh(key) {
+  const [a, g, ...rest] = key.split('|');
+  const name = rest.join('|');
+  if (name !== 'group' && name !== 'page:start') return;
+  const s = freshNames.get(g) || new Set();
+  s.add(name);
+  freshNames.set(g, s);
+  if (s.size < 2) return;
+  freshNames.delete(g);
+  gcImages(a, g, deviceStore.generation()).catch(() => {});
+}
+/** Alle Profilbild-Pfade in einem gespeicherten Wert (Felder `avatar_path`/`avatarPath`). */
+function avatarPaths(/** @type {any} */ v, /** @type {Set<string>} */ out, depth = 0) {
+  if (!v || typeof v !== 'object' || depth > 8) return out;
+  if (Array.isArray(v)) { for (const x of v) avatarPaths(x, out, depth + 1); return out; }
+  for (const [k, x] of Object.entries(v)) {
+    if ((k === 'avatar_path' || k === 'avatarPath') && typeof x === 'string' && x) out.add(x);
+    else if (x && typeof x === 'object') avatarPaths(x, out, depth + 1);
+  }
+  return out;
+}
+/** @param {string} a @param {string} g @param {number} gen */
+async function gcImages(a, g, gen) {
+  await deviceStore.flush();
+  if (deviceStore.account() !== a || deviceStore.generation() !== gen) return;
+  const recs = await deviceStore.ownData();
+  const here = new Set(recs.filter((r) => r.group === g).map((r) => r.name));
+  if (!here.has('group') || !here.has('page:start')) return;
+  const keep = new Set();
+  for (const r of recs) avatarPaths(r.value, keep);
+  if (deviceStore.account() === a && deviceStore.generation() === gen) deviceStore.keepImages(keep);
+}
+/** Kehrt die Merkliste des Aufräumens (Abmelden/Kontowechsel). */
+const resetFresh = () => freshNames.clear();
 
 let groupId = null;
 
@@ -47,6 +88,7 @@ export function clearCaches() {
   deviceStore.setAccount(null);
   store(KONTO_KEY, null);
   clearLocalAvatars();
+  resetFresh();
   pageCache.clear(); clearSignedUrls(); store('ttg.heroArt', null);
 }
 

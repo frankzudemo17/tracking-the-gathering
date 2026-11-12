@@ -1,5 +1,6 @@
 // Profilbilder: im Client quadratisch mittig zuschneiden, 256×256 JPEG (~0,85), hochladen.
-import { sb, must, forgetAvatar } from '../supabase.js';
+import { sb, must, forgetAvatar, rememberAvatar } from '../supabase.js';
+import { avatarFileName, sameFolder } from './device-store.js';
 
 const SIZE = 256;
 
@@ -30,20 +31,43 @@ export async function squareJpeg(file) {
 }
 
 /** target: { kind: 'profile' | 'member', id } */
-const pathFor = (target) => `${target.kind === 'profile' ? 'profiles' : 'members'}/${target.id}/avatar.jpg`;
+const folderFor = (target) => `${target.kind === 'profile' ? 'profiles' : 'members'}/${target.id}`;
 const table = (target) => (target.kind === 'profile' ? 'profiles' : 'members');
+/** 4 Hex-Zeichen aus crypto (kein Math.random). */
+const rand4 = () => [...crypto.getRandomValues(new Uint8Array(2))].map((b) => b.toString(16).padStart(2, '0')).join('');
 
-export async function setAvatar(target, file) {
-  const blob = await squareJpeg(file);
-  const path = pathFor(target);
-  must(await sb.storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/jpeg', cacheControl: '60' }));
-  forgetAvatar(path);
-  return sb.from(table(target)).update({ avatar_path: path }).eq('id', target.id).select().single().then(must);
+/** Altes Objekt entfernen — nur im eigenen Ordner und nur ein anderer Name (P6 Entscheid 13). Fehler ⇒ console.warn. */
+async function removeOld(target, oldPath, newPath) {
+  if (!oldPath || oldPath === newPath || !oldPath.startsWith(`${folderFor(target)}/`) || (newPath && !sameFolder(oldPath, newPath))) return;
+  try {
+    const { error } = await sb.storage.from('avatars').remove([oldPath]);
+    if (error) console.warn('Altes Profilbild', error);
+  } catch (e) { console.warn('Altes Profilbild', e); }
+  forgetAvatar(oldPath);
 }
 
-export async function removeAvatar(target) {
-  const path = pathFor(target);
-  await sb.storage.from('avatars').remove([path]);
-  forgetAvatar(path);
-  return sb.from(table(target)).update({ avatar_path: null }).eq('id', target.id).select().single().then(must);
+/**
+ * P6 Entscheid 13: jedes Hochladen schreibt eine neue Datei (versionierter Name, upsert: false), setzt danach
+ * avatar_path, legt das Bild sofort lokal ab und entfernt danach das alte Objekt im selben Ordner.
+ * @param {{ kind: 'profile'|'member', id: string }} target @param {File} file @param {string|null} [currentPath]
+ */
+export async function setAvatar(target, file, currentPath = null) {
+  const blob = await squareJpeg(file);
+  const path = `${folderFor(target)}/${avatarFileName(Date.now(), rand4())}`;
+  must(await sb.storage.from('avatars').upload(path, blob, { upsert: false, contentType: 'image/jpeg', cacheControl: '60' }));
+  const row = await sb.from(table(target)).update({ avatar_path: path }).eq('id', target.id).select().single().then(must);
+  await rememberAvatar(path, blob).catch(() => {});
+  await removeOld(target, currentPath, path);
+  return row;
+}
+
+/**
+ * Entfernt den AKTUELLEN Pfad (nur im eigenen Ordner), nicht `avatar.jpg`. P6 Entscheid 13.
+ * @param {{ kind: 'profile'|'member', id: string }} target @param {string|null} [currentPath]
+ */
+export async function removeAvatar(target, currentPath = null) {
+  const row = await sb.from(table(target)).update({ avatar_path: null }).eq('id', target.id).select().single().then(must);
+  await removeOld(target, currentPath, null);
+  if (currentPath) forgetAvatar(currentPath);
+  return row;
 }
