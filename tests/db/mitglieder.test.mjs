@@ -140,7 +140,10 @@ const row = async (id) => { await su(); return (await q(`select * from members w
 const counts = async () => { await su(); return allCounts(db); };
 
 before(async () => {
-  db = await freshDb({ migrations: migrations() });
+  // Stand bis einschließlich dieser Migration: spätere Migrationen (z. B. 20261118000000_deck_motto.sql) fielen sonst in K12 auf
+  // (Entscheid Dirigent 12.11., Vorschlag Bau P3)
+  const next = fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql') && f > FILE).sort()[0];
+  db = await freshDb({ migrations: migrations(), until: next });
   ({ as, su, q, err, seedUser, mkGroup } = tools(db));
   if (GEGEN === 'trigger') await db.exec('alter table public.game_players disable trigger ttg_gp_member_active;');
 });
