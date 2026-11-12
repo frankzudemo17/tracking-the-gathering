@@ -46,6 +46,7 @@ const TAP_HOLD_MS = 500; // + oder − so lange halten ⇒ ±TAP_STEP (Franco 12
 const TAP_REPEAT_MS = 400; // weiter halten ⇒ alle 400 ms noch einmal ±TAP_STEP
 const TAP_STEP = 5;
 const TAP_MOVE_FIRED = 40; // px: nach dem ersten Schritt darf der Daumen etwas wandern
+const TAP_MOVE = 8; // px: vor dem ersten Schritt weiter verrutscht ⇒ kein Halten, bleibt ein Tippen (Ziehen beginnt erst ab 14 px, attack-ui DRAG_PX)
 const HIT_CLS = ['hit-dmg', 'hit-gain', 'hit-big'];
 const HIT_MS = { dmg: 700, gain: 700, big: 1150 }; // Klasse weg nach dem Effekt (650/1100 ms in life.css)
 const ROLL_KINDS = ['w6', 'w6x2', 'w20', 'coin', 'player'];
@@ -468,7 +469,7 @@ export default async function life(el, { params, isStale }) {
   });
   el.addEventListener('pointermove', (e) => {
     if (tapHold && e.pointerId === tapHold.pointer
-      && Math.hypot(e.clientX - tapHold.x, e.clientY - tapHold.y) > (tapHold.fired ? TAP_MOVE_FIRED : HOLD_MOVE)) tapHoldEnd();
+      && Math.hypot(e.clientX - tapHold.x, e.clientY - tapHold.y) > (tapHold.fired ? TAP_MOVE_FIRED : TAP_MOVE)) tapHoldEnd();
   });
   // Loslassen: release() unten (window pointerup/pointercancel, abgemeldet in stop())
 

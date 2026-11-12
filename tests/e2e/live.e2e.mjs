@@ -205,9 +205,11 @@ export default async function liveE2e({ browser, base: BASE }) {
       const x0 = await lifeOf(PB, X), y0 = await lifeOf(PB, Y);
       const box = await PB.locator(`${field(X)} .lc-tap.plus`).boundingBox();
       const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
-      // (1) Finger unten, A tippt, ≥ 1 s warten, loslassen
+      // (1) Finger unten, A tippt, ≥ 1 s warten, loslassen. Finger 10 px verrutscht (> 8 px: kein Halten = ±5,
+      //     < 14 px: kein Ziehen) ⇒ bleibt ein Tippen +1 (seit v42 wäre ruhig gehalten ±5)
       await PB.mouse.move(cx, cy);
       await PB.mouse.down();
+      await PB.mouse.move(cx + 10, cy);
       await tap(PA, Y, -1);
       await until(async () => (await events(g1)).length >= ev0.length + 1, 5000);
       await PB.waitForTimeout(1200);
@@ -224,9 +226,10 @@ export default async function liveE2e({ browser, base: BASE }) {
       ok('B1 während Finger unten: Fremd-Tipp aufgeschoben (Y unverändert)', yDuring === y0, `Y ${y0} → ${yDuring}`);
       ok('B1 nach Loslassen: eigener Tipp ohne Lücke (erste Messung ≤ 100 ms, alle X+1, Y−1)',
         samples[0].ms <= 100 && samples.every((v) => v.x === x0 + 1 && v.y === y0 - 1), `X0=${x0} Y0=${y0} · ${sTxt}`);
-      // (2) noch einmal: Finger unten, A tippt, loslassen, sofort noch ein Tipp auf B
+      // (2) noch einmal: Finger unten (10 px verrutscht, siehe oben), A tippt, loslassen, sofort noch ein Tipp auf B
       await PB.mouse.move(cx, cy);
       await PB.mouse.down();
+      await PB.mouse.move(cx + 10, cy);
       await tap(PA, Y, -1);
       await until(async () => (await events(g1)).length >= ev0.length + 3, 5000);
       await PB.waitForTimeout(800);
