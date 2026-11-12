@@ -192,3 +192,97 @@ test('Z4 pageCache ist eine Instanz mit leerem Start; GROUP_MAX_AGE_MS = 60 000'
   assert.equal(typeof pageCache.load, 'function');
   assert.equal(GROUP_MAX_AGE_MS, 60000);
 });
+
+// ---------------------------------------------------------------------------
+// Spec P6 Vertrag (Spiegel in den Gerätespeicher): C1–C8. Speicher-Attrappe zeichnet Aufrufe auf.
+function fakeStore() {
+  const s = { m: 0, g: 0, calls: [] };
+  return Object.assign(s, {
+    mark: () => s.m, gen: () => s.g,
+    put: (key, value, at, r) => { s.calls.push(['put', key, value, at, r]); },
+    del: (keys) => { s.calls.push(['del', keys]); },
+    clear: () => { s.calls.push(['clear']); },
+    of: (k) => s.calls.filter((c) => c[0] === k),
+  });
+}
+
+test('C1 seed legt Eintrag an, ruft store.put nicht', async () => {
+  const { createCache } = await load();
+  const st = fakeStore(); const c = createCache({ store: st });
+  c.seed('k', { v: 1 }, 7);
+  assert.deepEqual(c.peek('k'), { value: { v: 1 }, at: 7, failed: false });
+  assert.equal(st.of('put').length, 0);
+});
+
+test('C2 seed auf vorhandenen Wert bzw. laufende Ladung ändert nichts', async () => {
+  const { createCache } = await load();
+  const k = clock(); const c = createCache({ now: k.now }); const L = manual();
+  await c.load('a', () => 'frisch');
+  c.seed('a', 'alt', 1);
+  assert.deepEqual(c.peek('a'), { value: 'frisch', at: 1000, failed: false });
+  const p = c.load('b', L.fn);
+  c.seed('b', 'alt', 1);
+  assert.equal(c.peek('b'), undefined);
+  L.runs[0].resolve('neu');
+  assert.equal(await p, 'neu');
+  assert.equal(c.peek('b').value, 'neu');
+});
+
+test('C3 erfolgreiche Ladung ⇒ store.put genau einmal mit mark/gen vom Beginn', async () => {
+  const { createCache } = await load();
+  const k = clock(5000); const st = fakeStore(); const c = createCache({ now: k.now, store: st }); const L = manual();
+  st.m = 3; st.g = 2;
+  const p = c.load('k', L.fn);
+  st.m = 4; st.g = 9; // Marke/Generation ändern sich während der Ladung
+  L.runs[0].resolve({ v: 1 });
+  await p;
+  const puts = st.of('put');
+  assert.equal(puts.length, 1);
+  assert.deepEqual(puts[0].slice(1), ['k', { v: 1 }, 5000, { mark: 3, gen: 2 }]);
+});
+
+test('C4 Ladung läuft, drop(k), Ladung löst auf ⇒ store.put nicht gerufen', async () => {
+  const { createCache } = await load();
+  const st = fakeStore(); const c = createCache({ store: st }); const L = manual();
+  const p = c.load('k', L.fn);
+  c.drop('k');
+  L.runs[0].resolve({ v: 1 });
+  await p;
+  assert.equal(st.of('put').length, 0);
+});
+
+test('C5 drop(match) mit zwei Treffern ⇒ store.del([k1, k2])', async () => {
+  const { createCache } = await load();
+  const st = fakeStore(); const c = createCache({ store: st });
+  for (const key of ['a|g|page:start', 'a|g|page:profil', 'a|g|group']) await c.load(key, () => 1);
+  assert.equal(c.drop((p) => p.name.startsWith('page:')), 2);
+  assert.deepEqual(st.of('del').map((x) => [...x[1]].sort()), [['a|g|page:profil', 'a|g|page:start']]);
+});
+
+test('C6 drop(match, { keepStored: true }) ⇒ store.del nicht gerufen, Arbeitsspeicher verworfen', async () => {
+  const { createCache } = await load();
+  const st = fakeStore(); const c = createCache({ store: st });
+  for (const key of ['a|g|page:start', 'a|g|group']) await c.load(key, () => 1);
+  assert.equal(c.drop((p) => p.name.startsWith('page:'), { keepStored: true }), 1);
+  assert.equal(st.of('del').length, 0);
+  assert.equal(c.peek('a|g|page:start'), undefined);
+  assert.ok(c.peek('a|g|group'));
+});
+
+test('C7 clear() ⇒ store.clear() einmal', async () => {
+  const { createCache } = await load();
+  const st = fakeStore(); const c = createCache({ store: st });
+  await c.load('k', () => 1);
+  c.clear();
+  assert.equal(st.of('clear').length, 1);
+});
+
+test('C8 load(null, L) ⇒ kein store-Aufruf; ohne store kein Wurf; setStore an pageCache', async () => {
+  const { createCache, pageCache } = await load();
+  const st = fakeStore(); const c = createCache({ store: st });
+  assert.equal(await c.load(null, () => 5), 5);
+  assert.equal(st.calls.length, 0);
+  const bare = createCache();
+  await bare.load('k', () => 1); bare.seed('s', 2, 1); bare.drop('k'); bare.drop('s', { keepStored: true }); bare.clear();
+  assert.equal(typeof pageCache.setStore, 'function');
+});
