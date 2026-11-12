@@ -8,6 +8,16 @@ export function route(pattern, load, opts = {}) {
   routes.push({ pattern, rx, keys, load, opts });
 }
 
+// Vorherige Route (für „Zurück“ in Unterseiten, die von mehreren Orten aus erreichbar sind, z. B. Profil).
+// Läuft vor dem Zeichnen: router.js wird vor dem hashchange-Handler in main.js geladen.
+let nowHash = location.hash;
+let prevHash = null;
+window.addEventListener('hashchange', () => { if (location.hash !== nowHash) { prevHash = nowHash; nowHash = location.hash; } });
+/** Ziel für „Zurück“: die vorige Route, wenn sie in der App lag und `ok(hash)` sie zulässt, sonst `fallback`. */
+export function backTarget(fallback, ok = () => true) {
+  return prevHash && prevHash.startsWith('#/') && ok(prevHash) ? prevHash : fallback;
+}
+
 export function current() {
   const path = (location.hash.replace(/^#/, '') || '/start').split('?')[0];
   for (const r of routes) {

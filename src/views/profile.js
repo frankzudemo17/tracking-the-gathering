@@ -9,7 +9,7 @@ import { decksOf, sortColors, bracketName } from '../lib/decks.js';
 import { sheet, toast, errText, copyText, openPhoto } from '../lib/ui.js';
 import { setAvatar, removeAvatar } from '../lib/avatar.js';
 import { t, fmtDate, getLang } from '../i18n/index.js';
-import { go } from '../router.js';
+import { go, backTarget } from '../router.js';
 import { groupData } from '../lib/data.js';
 import { memberProfile, deckProfile, memberTimes } from '../lib/stats.js';
 import { fmtAvg, fmtPct, fmtMmss } from '../lib/format.js';
@@ -99,7 +99,7 @@ export default async function profile(el, { params, isStale, fail }) {
     const avView = html`<button type="button" class="avatar-view" data-act="avatar-zoom" aria-label="${t('avatar.view', { name })}">${av}</button>`;
     paint(html`
     ${showBack || isMe ? html`<div class="prof-top">
-      ${showBack ? html`<a class="icon-btn" href="#/gruppen" aria-label="${t('common.back')}">${icon('back')}</a>` : html`<span></span>`}
+      ${showBack ? html`<a class="icon-btn" href="${backTarget('#/gruppen', (h) => !/^#\/(profil\/|login|registrieren|beitreten|passwort)/.test(h))}" aria-label="${t('common.back')}">${icon('back')}</a>` : html`<span></span>`}
       ${isMe ? html`<a class="icon-btn" href="#/einstellungen" aria-label="${t('profile.settings')}">${icon('gear', 22)}</a>` : ''}
     </div>` : ''}
     <div class="prof-head">
