@@ -24,6 +24,7 @@ import { openDiceTable } from './dice.js';
 import { bracketHint } from './bracket-hint.js';
 import { getPrefs } from '../lib/prefs.js';
 import { readDraft, writeDraft, clearDraft, rematchLoss } from '../lib/setup-draft.js';
+import { cardImages, preloadCardImages } from '../lib/card-images.js';
 
 const MAX = 6;
 const LIVES = [20, 25, 30, 40];
@@ -253,6 +254,7 @@ export default async function setup(el, { isStale }) {
     s.starting = true; s.error = ''; render();
     try {
       const n = s.sel.length;
+      if (getPrefs().startIntro) for (const id of s.sel) preloadCardImages(cardImages(decks.get(s.deck[id]), null, null) || []); // P8: Kartenbilder fürs Intro
       const gameId = await store.startGame({
         groupId: gid,
         layout: layoutFor(n, s.layout).layout,

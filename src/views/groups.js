@@ -135,7 +135,7 @@ function bindIntroCard(el, g, saved) {
     await busy(b, async () => {
       try {
         const r = await rpcOrUnavailable(sb, 'set_intro_seconds', { p_group: g.id, p_seconds: want });
-        if (r.unavailable) throw new Error(t('auth.errors.unavailable'));
+        if (r.unavailable) { box.textContent = t('auth.errors.unavailable'); box.hidden = false; return; }
         must(r);
         const cg = currentGroup();
         if (cg && cg.id === g.id) cg.intro_seconds = want; // Rückfall des Intros (Entscheid 4) stimmt sofort
