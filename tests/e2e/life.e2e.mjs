@@ -70,6 +70,18 @@ export default async function lifeE2e({ browser, base: BASE }) {
 
   await tap(A, -1, 5);
   ok('K3 A −5 ⇒ 15, Delta −5', (await lifeOf(A)) === 15 && (await P.textContent(`${field(A)} .lc-delta`)).trim() === '−5');
+  // + / − halten = ±5, weiter halten wiederholt (Franco 12.11.): 700 ms ⇒ ein Schritt, 1150 ms ⇒ zwei; Loslassen zählt nicht ±1
+  const hold = async (id, sign, ms) => {
+    const bx = await P.locator(`${field(id)} .lc-tap.${sign < 0 ? 'minus' : 'plus'}`).boundingBox();
+    await P.mouse.move(bx.x + bx.width / 2, bx.y + bx.height / 2); await P.mouse.down(); await P.waitForTimeout(ms); await P.mouse.up();
+    await P.waitForTimeout(150);
+  };
+  await hold(A, 1, 700);
+  ok('Halten + 700 ms ⇒ A +5 (15 → 20), kein +1 beim Loslassen', (await lifeOf(A)) === 20, String(await lifeOf(A)));
+  await hold(A, -1, 1150);
+  ok('Halten − 1150 ms ⇒ A −10 (20 → 10), Wiederholen alle 400 ms', (await lifeOf(A)) === 10, String(await lifeOf(A)));
+  await tap(A, 1, 5);
+  ok('A per Tippen zurück auf 15', (await lifeOf(A)) === 15);
   await P.click(`${field(B)} [data-act="counters"]`);
   await P.waitForSelector('[data-sheet="counters"]');
   for (let i = 0; i < 3; i++) await P.click('[data-sheet="counters"] .lc-ctr[data-key="poison"] [data-v="1"]');

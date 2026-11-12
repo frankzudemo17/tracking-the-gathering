@@ -40,6 +40,10 @@ const HOLD_MS = 550; // Mitte so lange halten ⇒ Zug beenden (Ring in life.css 
 const HOLD_MOVE = 14; // px: weiter verrutscht ⇒ kein Halten mehr
 const HOLD_TIP_KEY = 'ttg.hint.hold'; // Zahl der gezeigten Hinweise bzw. 'done' nach dem ersten gehaltenen Zug
 const HOLD_TIP_MS = 6000;
+const TAP_HOLD_MS = 500; // + oder − so lange halten ⇒ ±TAP_STEP (Franco 12.11.)
+const TAP_REPEAT_MS = 400; // weiter halten ⇒ alle 400 ms noch einmal ±TAP_STEP
+const TAP_STEP = 5;
+const TAP_MOVE_FIRED = 40; // px: nach dem ersten Schritt darf der Daumen etwas wandern
 const HIT_CLS = ['hit-dmg', 'hit-gain', 'hit-big'];
 const HIT_MS = { dmg: 700, gain: 700, big: 1150 }; // Klasse weg nach dem Effekt (650/1100 ms in life.css)
 const ROLL_KINDS = ['w6', 'w6x2', 'w20', 'coin', 'player'];
@@ -364,6 +368,7 @@ export default async function life(el, { params, isStale }) {
     takePending(); // Prüfungen unten (ausgeschieden, beendet) auf dem aktuellen Stand
     const a = b.dataset.act; const mid = b.dataset.pid;
     if (a === 'tap') {
+      if (tapFired) { tapFired = false; return; } // Loslassen nach gehaltenem ±5 zählt nicht noch ±1
       const p = pl(mid);
       if (!p || p.out || s.finished) return;
       doAct({ type: 'life', target: mid, d: Number(b.dataset.v) });
@@ -410,7 +415,47 @@ export default async function life(el, { params, isStale }) {
   el.addEventListener('pointermove', (e) => {
     if (hold && e.pointerId === hold.pointer && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > HOLD_MOVE) holdEnd();
   });
-  el.addEventListener('contextmenu', (e) => { if (e.target.closest?.('.lc-hub')) e.preventDefault(); });
+  el.addEventListener('contextmenu', (e) => { if (e.target.closest?.('.lc-hub, .lc-tap')) e.preventDefault(); });
+
+  // ---------- + / − halten = ±5, weiter halten wiederholt (Franco 12.11.); kurz tippen bleibt ±1
+  let tapHold = null; // { timer, btn, pointer, x, y, fired }
+  let tapFired = false; // der click nach gehaltenem ±5 wird verschluckt
+  function tapHoldEnd() {
+    if (!tapHold) return;
+    clearTimeout(tapHold.timer); timers.delete(tapHold.timer);
+    tapHold.btn.classList.remove('stepping');
+    tapHold = null;
+  }
+  function tapStep() {
+    if (!tapHold) return;
+    const { btn } = tapHold;
+    if (stopped || koOpen || sheetOpen()) { tapHoldEnd(); return; }
+    takePending();
+    const p = pl(btn.dataset.pid);
+    if (!p || p.out || s.finished) { tapHoldEnd(); return; }
+    tapFired = true; tapHold.fired = true;
+    if (!doAct({ type: 'life', target: p.id, d: Math.sign(Number(btn.dataset.v)) * TAP_STEP })) { tapHoldEnd(); return; }
+    buzz(12);
+    btn.classList.add('stepping');
+    if (koOpen || pl(p.id)?.out || s.finished) { tapHoldEnd(); return; } // tödlich ⇒ K.O.-Bildschirm übernimmt
+    const timer = setTimeout(() => { timers.delete(timer); if (tapHold && tapHold.timer === timer) tapStep(); }, TAP_REPEAT_MS);
+    timers.add(timer); tapHold.timer = timer;
+  }
+  el.addEventListener('pointerdown', (e) => {
+    const btn = e.target.closest?.('.lc-tap');
+    if (!btn || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    tapFired = false;
+    tapHoldEnd();
+    if (stopped || s.finished || koOpen || sheetOpen()) return;
+    const timer = setTimeout(() => { timers.delete(timer); if (tapHold && tapHold.timer === timer) tapStep(); }, TAP_HOLD_MS);
+    timers.add(timer);
+    tapHold = { timer, btn, pointer: e.pointerId, x: e.clientX, y: e.clientY, fired: false };
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (tapHold && e.pointerId === tapHold.pointer
+      && Math.hypot(e.clientX - tapHold.x, e.clientY - tapHold.y) > (tapHold.fired ? TAP_MOVE_FIRED : HOLD_MOVE)) tapHoldEnd();
+  });
+  // Loslassen: release() unten (window pointerup/pointercancel, abgemeldet in stop())
 
   // ---------- Spielmenü
   let rollKind = 'w6';
@@ -752,6 +797,7 @@ export default async function life(el, { params, isStale }) {
 
   function release() {
     holdEnd(); // Finger weg vor Ablauf ⇒ bleibt ein Tippen (Menü)
+    tapHoldEnd(); // + / − losgelassen ⇒ Wiederholen endet
     if (!gesture) return;
     gesture = false;
     // Geste ohne click (Ziehen, Wischen): nach dem click-Zeitpunkt nachziehen. Mit click hat doAct

@@ -50,6 +50,8 @@ html:has(.lc-screen), html:has(.lc-screen) body { overflow: hidden; overscroll-b
 .lc-tap.minus { left: 0; justify-content: flex-start; }
 .lc-tap.plus { right: 0; justify-content: flex-end; }
 .lc-tap:active { background: rgba(255,255,255,.06); opacity: 1; }
+.lc-tap { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } /* Halten (±5) ohne Lupe/Kontextmenü */
+.lc-tap.stepping { background: rgba(255,255,255,.1); opacity: 1; }
 .lc-tap:focus-visible { outline: 2px solid var(--hi); outline-offset: -4px; }
 .lc-field.out .lc-tap, .lc-field.lethal .lc-tap { display: none; }
 .lc-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; gap: 2px; }
