@@ -326,6 +326,8 @@ export default async function koE2e({ browser, base: BASE }) {
   const sec = te?.payload?.seconds;
   console.log(`    E1 Sekunden des Folgezugs: ${sec}`);
   ok('E1 (b) nächster turn_end ≤ 2 s (alter Stand ≥ 4 s)', typeof sec === 'number' && sec <= 2, `seconds=${sec}`);
+  await Z.keyboard.press('Escape'); // Menü bleibt nach „Zug beenden“ offen (life.js) — schließen wie life.e2e.mjs closeSheet
+  await Z.waitForFunction(() => !document.querySelector('.sheet-wrap'));
   await abort(Z);
   ok('E1 keine JS-Fehler', Z.errs.length === 0, Z.errs.join(' | '));
   await Z.context().close();
