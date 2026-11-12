@@ -1,6 +1,6 @@
 // Start, Router, Auth-Status
 import { sb, configured } from './supabase.js';
-import { state, loadMe, applyPrefs, pendingCode, clearCaches, prestartSession, bootState, hydrateCapped, seedFrom } from './state.js';
+import { state, loadMe, applyPrefs, pendingCode, clearCaches, prestartSession, bootState, hydrateCapped, seedFrom, isAdmin, isSuperadmin } from './state.js';
 import { route, current, go } from './router.js';
 import { html, mount, $ } from './lib/dom.js';
 import { icon } from './lib/icons.js';
@@ -29,10 +29,10 @@ route('/start', v('start'), { nav: 'start', group: true, swap: true });
 route('/spielen', v('setup'), { nav: 'play', group: true });
 route('/profil', v('profile'), { nav: 'me', group: true, swap: true });
 route('/profil/:memberId', v('profile'), { nav: 'me', group: true, swap: true });
-route('/gruppen', v('groups'), { swap: true });
+route('/gruppen', v('groups'), { swap: true, rights: true });
 route('/einstellungen', v('settings'), { nav: 'me', swap: true });
 route('/einstellungen/konto', v('settings-account'), { nav: 'me' });
-route('/einstellungen/verwaltung', v('admin'), { nav: 'me' });
+route('/einstellungen/verwaltung', v('admin'), { nav: 'me', rights: true });
 // Rechtliches und Datenschutz auch ohne Anmeldung lesbar (ohne Navigationsleiste)
 route('/einstellungen/rechtliches', v('legal'), { public: true, swap: true });
 route('/datenschutz', v('legal'), { public: true, arg: 'privacy', swap: true });
@@ -180,10 +180,12 @@ async function boot() {
 
   // P6 Entscheid 5: Vorstart aus dem Gerätespeicher — erstes Bild vor der Netz-Bestätigung der Sitzung.
   // (d) keine Rückkehr aus einem Mail-Link, (e) Zielroute nicht öffentlich, (a)+(b) prestartSession, (c) bootState.
+  // (f) Zielroute fragt beim Zeichnen keine Rechte am Server ab (rights: Verwaltung, Gruppen) — gespeicherte Rechte
+  // können veraltet sein; diese Routen nehmen den heutigen Weg mit frischem loadMe().
   const q = new URLSearchParams(location.search);
   const fromLink = ['code', 'reset', 'error'].some((k) => q.has(k)) || /(^|[#&?])(error|error_code|access_token)=/.test(location.hash);
   const target = current();
-  const stored = !fromLink && !(target?.opts.public) ? prestartSession() : null;
+  const stored = !fromLink && !(target?.opts.public) && !(target?.opts.rights) ? prestartSession() : null;
   if (stored) {
     // Hörer vor dem ersten await: ein Abmelden/Kontowechsel während des Vorstarts leert sofort.
     state.session = stored;
@@ -229,9 +231,12 @@ async function confirmPrestart(uid) {
   if (state.session?.user?.id !== uid) return; // der Hörer hat schon gewechselt/abgemeldet
   if (s && s.user.id === uid) {
     state.session = s;
-    const before = state.groupId;
+    // Gruppe und Rechte des gespeicherten Standes: ändert loadMe() eins davon (Gruppe weg, Admin/Superadmin entzogen
+    // oder neu), zeichnet die Route neu — Zugriffsregeln und Weiterleitungen der Views greifen dann mit dem frischen Stand.
+    const seen = () => `${state.groupId}|${isAdmin()}|${isSuperadmin()}`;
+    const before = seen();
     await loadMe().catch((e) => console.error(e));
-    if (state.session?.user?.id === uid && (state.groupId !== before || !state.groupId)) render();
+    if (state.session?.user?.id === uid && (seen() !== before || !state.groupId)) render();
     return;
   }
   if (!s && error && (error.name === 'AuthRetryableFetchError' || /** @type {any} */ (error).status === 0)) return;
