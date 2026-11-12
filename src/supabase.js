@@ -57,6 +57,47 @@ export function appUrl(hash = '') {
 
 // ---------------- Profilbilder (privater Bucket → signierte URLs, gecacht) ----------------
 const urlCache = new Map(); // path -> { url, until }
+
+// P6 Entscheid 12: Bild-Zuordnung im Arbeitsspeicher für lokal liegende Profilbilder (Lesestelle L4):
+// Pfad → { url: blob:…, checked }. Nur für deviceStore.account(); geleert in clearLocalAvatars (clearCaches).
+/** @type {Map<string, { url: string, checked: number }>} */
+const localAv = new Map();
+/** Konto, dem die Zuordnung gehört. @type {string|null} */
+let localAcct = null;
+/** @param {string} path @param {{ type: string, bytes: ArrayBuffer, checked?: number }} img */
+function setLocal(path, img) {
+  const acct = deviceStore.account();
+  if (!acct) return null;
+  if (localAcct !== acct) { revokeLocal(); localAcct = acct; }
+  let url;
+  try { url = URL.createObjectURL(new Blob([img.bytes], { type: img.type || 'image/jpeg' })); } catch { return null; }
+  const old = localAv.get(path);
+  if (old) { try { URL.revokeObjectURL(old.url); } catch { /* egal */ } }
+  localAv.set(path, { url, checked: img.checked ?? Date.now() });
+  return url;
+}
+function revokeLocal() {
+  for (const { url } of localAv.values()) { try { URL.revokeObjectURL(url); } catch { /* egal */ } }
+  localAv.clear();
+}
+/** Lokale Bild-Adresse eines Pfads, nur für das Konto des Gerätespeichers. @param {string} path */
+const localUrl = (path) => (localAcct && localAcct === deviceStore.account() ? localAv.get(path)?.url || null : null);
+
+/**
+ * P6 Säen: Bilder aus dem Gerätespeicher (hydrate) als Blob-Adressen bereitstellen und bis zu `max` vorab dekodieren
+ * (höchstens `capMs`). Nur für das Konto des Gerätespeichers.
+ * @param {Array<{ path: string, type: string, bytes: ArrayBuffer, checked: number }>} images
+ * @param {{ max?: number, capMs?: number }} [o]
+ */
+export async function seedAvatars(images, { max = 60, capMs = 150 } = {}) {
+  const urls = [];
+  for (const img of images || []) { const u = setLocal(img.path, img); if (u) urls.push(u); }
+  if (!urls.length || typeof Image === 'undefined') return;
+  const decode = Promise.allSettled(urls.slice(0, max).map((u) => { const i = new Image(); i.src = u; return i.decode(); }));
+  await Promise.race([decode, new Promise((r) => { setTimeout(r, capMs); })]);
+}
+/** P6: lokale Bild-Adressen widerrufen und die Zuordnung leeren (clearCaches). */
+export function clearLocalAvatars() { revokeLocal(); localAcct = null; }
 const TTL = 55 * 60 * 1000;
 
 // P12 Nachtrag 1 (B1): Riegel. Eine Signier-Antwort schreibt nur, wenn seit Beginn ihrer Anfrage

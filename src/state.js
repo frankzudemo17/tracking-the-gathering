@@ -1,7 +1,7 @@
 // App-Zustand: Sitzung, eigenes Profil, Mitgliedschaften, aktuelle Playgroup
-import { sb, must, clearSignedUrls } from './supabase.js';
+import { sb, must, clearSignedUrls, seedAvatars, clearLocalAvatars } from './supabase.js';
 import { pageCache } from './lib/cache.js';
-import { deviceStore } from './lib/device-store.js';
+import { deviceStore, HYDRATE_MAX_MS, DECODE_MAX_MS } from './lib/device-store.js';
 import { setLang } from './i18n/index.js';
 
 const GROUP_KEY = 'ttg.group';
@@ -46,6 +46,7 @@ export function clearCaches() {
   deviceStore.clearAll();
   deviceStore.setAccount(null);
   store(KONTO_KEY, null);
+  clearLocalAvatars();
   pageCache.clear(); clearSignedUrls(); store('ttg.heroArt', null);
 }
 
@@ -110,6 +111,66 @@ export async function updateProfile(patch) {
   applyPrefs(row);
   rememberMe(row.id, gen);
   return row;
+}
+
+// ---------------------------------------------------------------------------
+// P6 Kaltstart (spec-p6-kaltstart.md Entscheide 5/6)
+
+/** Gespeicherte Sitzung aus ttg-auth, nur mit user.id und refresh_token (Bedingung a). */
+export function storedSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem('ttg-auth') || 'null');
+    return s && typeof s === 'object' && s.user?.id && s.refresh_token ? s : null;
+  } catch { return null; }
+}
+
+/** Vorstart-Kandidat (Lesestelle L5): Sitzung (a) und Marke ttg.konto = genau diese Konto-ID (b). */
+export function prestartSession() {
+  const s = storedSession();
+  return s && load(KONTO_KEY) === s.user.id ? s : null;
+}
+
+/**
+ * Gerätespeicher lesen, höchstens HYDRATE_MAX_MS; später ⇒ null (Ergebnis verworfen). Leeren dazwischen ⇒ null.
+ * @param {string} uid @param {{ group?: string|null }} [o]
+ */
+export async function hydrateCapped(uid, o = {}) {
+  const gen = deviceStore.generation();
+  let timer;
+  const late = new Promise((r) => { timer = setTimeout(() => r(null), HYDRATE_MAX_MS); });
+  const res = await Promise.race([deviceStore.hydrate(uid, o).catch(() => null), late]);
+  clearTimeout(timer);
+  return res && deviceStore.generation() === gen && deviceStore.account() === uid ? res : null;
+}
+
+/**
+ * Säen (Lesestelle L6): nur Einträge `konto|aktuelle Gruppe|…`, nur wo der Zwischenspeicher nichts hat;
+ * Profilbilder als Blob-Adressen (+ Vorab-Dekodieren mit Deckel).
+ * @param {string} uid @param {{ entries: Array<{ key: string, value: any, at: number }>, images: any[] }} res
+ */
+export async function seedFrom(uid, res) {
+  if (state.session?.user?.id !== uid || deviceStore.account() !== uid) return;
+  const pre = `${uid}|${state.groupId}|`;
+  if (state.groupId) for (const e of res.entries) if (e.key.startsWith(pre)) pageCache.seed(e.key, e.value, e.at);
+  await seedAvatars(res.images, { capMs: DECODE_MAX_MS });
+}
+
+/**
+ * Vorstart (Entscheid 5): Zustand aus dem Gerätespeicher setzen, bevor die Sitzung über das Netz bestätigt ist.
+ * Bedingung (c): `me` dieses Kontos in der aktuellen Format-Version. Liefert false ⇒ heutiger Weg.
+ * @param {any} stored gespeicherte Sitzung (prestartSession)
+ */
+export async function bootState(stored) {
+  const uid = stored.user.id;
+  deviceStore.setAccount(uid);
+  const res = await hydrateCapped(uid);
+  if (!res?.me || res.me.profile?.id !== uid || state.session?.user?.id !== uid) return false;
+  state.profile = res.me.profile;
+  state.memberships = res.me.memberships;
+  state.groupId = res.me.groupId;
+  applyPrefs(state.profile);
+  await seedFrom(uid, res);
+  return state.session?.user?.id === uid;
 }
 
 // Code aus einem Einladungslink merken, bis der Nutzer angemeldet ist

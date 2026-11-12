@@ -1,6 +1,6 @@
 // Start, Router, Auth-Status
 import { sb, configured } from './supabase.js';
-import { state, loadMe, applyPrefs, pendingCode, clearCaches } from './state.js';
+import { state, loadMe, applyPrefs, pendingCode, clearCaches, prestartSession, bootState, hydrateCapped, seedFrom } from './state.js';
 import { route, current, go } from './router.js';
 import { html, mount, $ } from './lib/dom.js';
 import { icon } from './lib/icons.js';
@@ -9,6 +9,7 @@ import { t } from './i18n/index.js';
 import { applyDevicePrefs, onPrefs, keepAwake } from './lib/prefs.js';
 import { setupSwUpdate } from './lib/sw-update.js';
 import { pageCache } from './lib/cache.js';
+import { startRefill } from './lib/refill.js';
 
 // ---------- Routen ----------
 const v = (name) => () => import(`./views/${name}.js`);
@@ -114,7 +115,9 @@ function showError(e) {
 
 // P12 Entscheid 10: page:*-Einträge überleben nur den Wechsel Tab-Route → andere Tab-Route.
 let lastPath = null;
-let lastTab = false;
+// P6: der erste Seitenaufruf nach dem Start gilt als „von einer Tab-Route“ — sonst verwürfe die Regel die eben aus dem
+// Gerätespeicher gesäten page:*-Einträge (in P12 war der Speicher beim Start leer, dort ohne Wirkung).
+let lastTab = true;
 function tabRule(r) {
   const tab = TABS.has(bare(r.path));
   const keep = lastTab && tab && lastPath !== bare(r.path);
@@ -175,37 +178,103 @@ async function boot() {
   awake.check();
   if (!configured) { mount(app, html`<main class="screen"><p>Supabase ist noch nicht konfiguriert (src/config.js).</p></main>`); return; }
 
+  // P6 Entscheid 5: Vorstart aus dem Gerätespeicher — erstes Bild vor der Netz-Bestätigung der Sitzung.
+  // (d) keine Rückkehr aus einem Mail-Link, (e) Zielroute nicht öffentlich, (a)+(b) prestartSession, (c) bootState.
+  const q = new URLSearchParams(location.search);
+  const fromLink = ['code', 'reset', 'error'].some((k) => q.has(k)) || /(^|[#&?])(error|error_code|access_token)=/.test(location.hash);
+  const target = current();
+  const stored = !fromLink && !(target?.opts.public) ? prestartSession() : null;
+  if (stored) {
+    // Hörer vor dem ersten await: ein Abmelden/Kontowechsel während des Vorstarts leert sofort.
+    state.session = stored;
+    sb.auth.onAuthStateChange(onAuth);
+    if (await bootState(stored)) {
+      startUi();
+      confirmPrestart(stored.user.id);
+      return;
+    }
+    // (c) nicht erfüllt oder Deckel gerissen ⇒ heutiger Weg (Hörer steht schon)
+    const { data } = await sb.auth.getSession();
+    state.session = data.session;
+    await afterSession();
+    startUi();
+    return;
+  }
+
   // Nach Klick auf einen Passwort-Link: ?code=… wird von supabase-js eingelöst
   const { data } = await sb.auth.getSession();
   state.session = data.session;
-  if (state.session) await loadMe().catch((e) => console.error(e));
+  await afterSession();
 
-  sb.auth.onAuthStateChange((event, session) => {
-    // P12 Entscheid 13: Abmelden (alle Wege inkl. Sitzungsablauf, zweiter Tab, Konto löschen) und Kontowechsel
-    // leeren alles Gemerkte sofort — vor loadMe() und vor jedem Zeichnen des neuen Kontos.
-    if (event === 'SIGNED_OUT' || (session && session.user.id !== state.session?.user?.id)) clearCaches();
-    // Supabase empfiehlt: im Callback nichts awaiten, sonst blockiert der Client
-    setTimeout(async () => {
-      const was = state.session?.user?.id;
-      // Direkter Kontowechsel (ohne Abmelden, z. B. zweiter Tab): Inhalt des alten Kontos sofort weg
-      if (was && session && session.user.id !== was) $('#view')?.replaceChildren();
-      state.session = session;
-      if (event === 'PASSWORD_RECOVERY') { go('/passwort-neu'); return; }
-      if (event === 'SIGNED_OUT') { state.profile = null; state.memberships = []; state.groupId = null; go('/login', { replace: true }); return; }
-      if (session && session.user.id !== was) {
-        await loadMe().catch((e) => console.error(e));
-        const code = pendingCode.get();
-        go(code ? `/code/${encodeURIComponent(code)}` : '/start', { replace: true });
-      }
-    }, 0);
-  });
+  sb.auth.onAuthStateChange(onAuth);
+  startUi();
+}
 
+/** Heutiger Weg nach getSession(): loadMe() ∥ Gerätespeicher lesen (Deckel), dann säen — vor render(). */
+async function afterSession() {
+  const uid = state.session?.user?.id;
+  if (!uid) return;
+  const [, res] = await Promise.all([loadMe().catch((e) => console.error(e)), hydrateCapped(uid)]);
+  if (res) await seedFrom(uid, res);
+}
+
+/**
+ * Vorstart bestätigen (Entscheid 5, Nachtrag 1 O1): gleiche Konto-ID ⇒ frische Sitzung, loadMe() im Hintergrund;
+ * keine Sitzung ohne Netzfehler ⇒ wie Abmelden; Netzfehler ⇒ Vorstart-Zustand bleibt; andere Konto-ID ⇒ wie Kontowechsel.
+ * @param {string} uid
+ */
+async function confirmPrestart(uid) {
+  const { data, error } = await sb.auth.getSession();
+  const s = data?.session || null;
+  if (state.session?.user?.id !== uid) return; // der Hörer hat schon gewechselt/abgemeldet
+  if (s && s.user.id === uid) {
+    state.session = s;
+    const before = state.groupId;
+    await loadMe().catch((e) => console.error(e));
+    if (state.session?.user?.id === uid && (state.groupId !== before || !state.groupId)) render();
+    return;
+  }
+  if (!s && error && (error.name === 'AuthRetryableFetchError' || /** @type {any} */ (error).status === 0)) return;
+  clearCaches();
+  $('#view')?.replaceChildren();
+  if (!s) { state.session = null; state.profile = null; state.memberships = []; state.groupId = null; go('/login', { replace: true }); return; }
+  state.session = s; state.profile = null; state.memberships = []; state.groupId = null;
+  await loadMe().catch((e) => console.error(e));
+  go('/start', { replace: true });
+}
+
+/** @param {string} event @param {any} session */
+function onAuth(event, session) {
+  // P6: INITIAL_SESSION bestätigt nur, was getSession() schon liefert (Vorstart: dort ausgewertet, auch bei Netzfehler).
+  if (event === 'INITIAL_SESSION') return;
+  // P12 Entscheid 13: Abmelden (alle Wege inkl. Sitzungsablauf, zweiter Tab, Konto löschen) und Kontowechsel
+  // leeren alles Gemerkte sofort — vor loadMe() und vor jedem Zeichnen des neuen Kontos.
+  if (event === 'SIGNED_OUT' || (session && session.user.id !== state.session?.user?.id)) clearCaches();
+  // Supabase empfiehlt: im Callback nichts awaiten, sonst blockiert der Client
+  setTimeout(async () => {
+    const was = state.session?.user?.id;
+    // Direkter Kontowechsel (ohne Abmelden, z. B. zweiter Tab): Inhalt des alten Kontos sofort weg
+    if (was && session && session.user.id !== was) $('#view')?.replaceChildren();
+    state.session = session;
+    if (event === 'PASSWORD_RECOVERY') { go('/passwort-neu'); return; }
+    if (event === 'SIGNED_OUT') { state.profile = null; state.memberships = []; state.groupId = null; go('/login', { replace: true }); return; }
+    if (session && session.user.id !== was) {
+      await loadMe().catch((e) => console.error(e));
+      const code = pendingCode.get();
+      go(code ? `/code/${encodeURIComponent(code)}` : '/start', { replace: true });
+    }
+  }, 0);
+}
+
+/** Router, Gesten-Sperre, Nachfüllen, erstes Zeichnen. */
+function startUi() {
   // Query-Parameter vom Mail-Link aufräumen (der #-Teil bleibt)
   if (location.search) history.replaceState(null, '', location.pathname + (cameFromReset && state.session ? '#/passwort-neu' : location.hash));
 
   window.addEventListener('hashchange', render);
   // iOS: Zwei-Finger-Zoom abfangen (Safari ignoriert user-scalable=no; die App soll sich nicht zoomen lassen)
   for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+  startRefill(); // P6 Entscheid 10
   render();
 }
 

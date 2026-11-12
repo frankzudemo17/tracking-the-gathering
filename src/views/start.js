@@ -19,7 +19,8 @@ import { groupData } from '../lib/data.js';
 import { playerTable } from '../lib/stats.js';
 import { deckArt } from './history-ui.js';
 import { recentGames, fmtShortDate } from './result-ui.js';
-import { pageCache, GROUP_MAX_AGE_MS } from '../lib/cache.js';
+import { pageCache, cacheKey, GROUP_MAX_AGE_MS } from '../lib/cache.js';
+import { registerRefill } from '../lib/refill.js';
 
 // Zuletzt gezeigtes Commander-Bild der Startseite (öffentliche Scryfall-Adresse), je Konto + Gruppe, nur fürs Gerüst.
 // Geleert in clearCaches (Abmelden/Kontowechsel).
@@ -33,6 +34,28 @@ function rememberArt(/** @type {string} */ k, /** @type {string|null} */ url) {
     else if (rememberedArt(k)) localStorage.removeItem(HERO_ART_KEY);
   } catch { /* privat */ }
 }
+
+/**
+ * page:start einer Gruppe laden (Daten, nie HTML): Mitglieder ∥ laufende Spiele, dann neuestes Deck je Mitglied.
+ * P6: Modul-Funktion, damit das Nachfüllen (src/lib/refill.js) sie ohne offene Startseite nutzen kann.
+ * `prevLive`: zuletzt gemerkte Liste laufender Spiele — mit ihr zählt ein Ausfall der Anzeigetafel als gescheitertes
+ * Auffrischen (nie eine alte Liste mit neuem Zeitstempel). `withMembers` läuft parallel zu den Decks (Bild-Adressen).
+ * @param {string} gid
+ * @param {{ prevLive?: any[]|null, withMembers?: ((members: any[]) => Promise<any>)|null }} [o]
+ */
+export async function loadStartPage(gid, { prevLive = null, withMembers = null } = {}) {
+  // Anzeigetafel: ein Fehler hier lässt die Startseite unverändert (bisherige Liste, sonst keine)
+  const liveP = createStore(sb).liveGames(gid).catch((e) => { console.warn('Laufende Spiele', e); if (prevLive) throw e; return []; });
+  liveP.catch(() => {}); // scheitern die Mitglieder zuerst, wartet niemand mehr auf liveP
+  const members = await sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', gid).order('created_at').then(must);
+  const [latest, live] = await Promise.all([latestDeckByMember(members), liveP, withMembers ? withMembers(members) : null]);
+  return { members, latest, live };
+}
+// P6 Entscheid 10: Nachfüllen nach eigenen Schreibvorgängen (auch ohne offene Startseite, sobald das Modul geladen ist)
+registerRefill('page:start', (gid) => {
+  const key = cacheKey(state.session?.user?.id, gid, 'page:start');
+  return pageCache.load(key, () => loadStartPage(gid, { prevLive: pageCache.peek(key)?.value?.live || null }), { force: true });
+});
 
 export default async function start(el, { isStale, fail }) {
   const sc = viewScope(state, isStale);
@@ -53,16 +76,10 @@ export default async function start(el, { isStale, fail }) {
   const signed = (/** @type {any[]} */ members) => avatarUrls(paths(members)).catch(() => ({}));
 
   const loadPage = async () => {
-    const gid = sc.gid;
-    const prevLive = pageCache.peek(pageKey)?.value?.live;
-    // Anzeigetafel: ein Fehler hier lässt die Startseite unverändert (bisherige Liste, sonst keine)
-    // Mit gemerktem Stand zählt ein Ausfall als gescheitertes Auffrischen (nie eine alte Liste mit neuem Zeitstempel).
-    const liveP = createStore(sb).liveGames(gid).catch((e) => { console.warn('Laufende Spiele', e); if (prevLive) throw e; return []; });
-    liveP.catch(() => {}); // scheitern die Mitglieder zuerst, wartet niemand mehr auf liveP
     const ownUrl = signed([]);
-    const members = await sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', gid).order('created_at').then(must);
-    const [latest, live] = await Promise.all([latestDeckByMember(members), liveP, signed(members), ownUrl]);
-    return { members, latest, live };
+    const v = await loadStartPage(sc.gid, { prevLive: pageCache.peek(pageKey)?.value?.live || null, withMembers: signed });
+    await ownUrl;
+    return v;
   };
 
   const view = () => {
