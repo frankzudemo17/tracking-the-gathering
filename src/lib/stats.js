@@ -545,3 +545,70 @@ export function deckProfile(data, deckId) {
     recentGameIds: rows.map((p) => p.gameId).reverse().slice(0, 5),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Zug-Uhr „Erweitert“ im Profil (Spec P1, Welle ttg-features): Vergleich Ø Zug, längster Zug, Ø Spieldauer.
+// Ohne Zeitraum (alle beendeten Spiele, wie jede Profil-Kennzahl). Vergleich = dieselben Zeilen wie die Tempo-Zeile.
+
+/** @typedef {{ avgMin: number|null, games: number }} DurationAvg */
+/** @typedef {{ memberId: string, seconds: number, gameId: string, startedAt: string }} TurnRecord */
+/** @typedef {{ compare: { memberId: string, avgTurnSec: number, share: number }[],
+ *   longest: { group: TurnRecord|null, own: TurnRecord|null, ownIsGroup: boolean },
+ *   duration: { all: { member: DurationAvg, group: DurationAvg },
+ *               byPlayers: { players: number, member: DurationAvg, group: DurationAvg }[] } }} MemberTimes */
+
+/** Spieldauer in Minuten, ungerundet; ohne gültige Zeiten oder Dauer ≤ 0 ⇒ null (zählt nirgends mit). */
+function spanMinutes(g) {
+  const a = typeof g?.startedAt === 'string' ? Date.parse(g.startedAt) : NaN;
+  const b = typeof g?.endedAt === 'string' ? Date.parse(g.endedAt) : NaN;
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return null;
+  return (b - a) / 60_000;
+}
+
+/** @param {number[]} xs @returns {DurationAvg} */
+const durationAvg = (xs) => ({ avgMin: xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null, games: xs.length });
+
+/**
+ * Zugzeiten und Spieldauer aus Sicht eines Mitglieds.
+ * compare: alle Mitglieder mit Zugzeiten (tempoRows, langsamster zuerst), share = Ø / größter Ø (größter 0 ⇒ 0).
+ * longest: Rekord = größtes longestSec ≥ 1, Gleichstand ⇒ früheres Spiel, dann Name, dann ID (Regel wie recap).
+ * duration: Ø Minuten je Spiel, gesamt und je Spielerzahl; member = Spiele mit einer players-Zeile des Mitglieds.
+ * @param {GroupData} data
+ * @param {string} memberId
+ * @returns {MemberTimes}
+ */
+export function memberTimes(data, memberId) {
+  const c = ctx(data);
+  const rows = tempoRows(c);
+  let max = 0;
+  for (const r of rows) if (r.avgTurnSec > max) max = r.avgTurnSec;
+  const compare = rows.map((r) => ({ memberId: r.memberId, avgTurnSec: r.avgTurnSec, share: max > 0 ? r.avgTurnSec / max : 0 }));
+
+  const byName = (a, b) => COLLATOR.compare(c.name(a), c.name(b)) || cmpStr(a, b);
+  const recs = c.turns.filter((t) => isNum(t.longestSec) && t.longestSec >= 1);
+  const top = (list) => list.sort((a, b) => b.longestSec - a.longestSec || c.pos(a.gameId) - c.pos(b.gameId) || byName(a.memberId, b.memberId))[0];
+  /** @returns {TurnRecord|null} */
+  const record = (t) => (t ? { memberId: t.memberId, seconds: t.longestSec, gameId: t.gameId, startedAt: c.gameById.get(t.gameId)?.startedAt ?? '' } : null);
+  const group = record(top(recs.slice()));
+  const own = record(top(recs.filter((t) => t.memberId === memberId)));
+  const ownIsGroup = own != null && group != null && own.gameId === group.gameId && own.memberId === group.memberId;
+
+  const spans = [];
+  for (const g of c.games) {
+    const min = spanMinutes(g);
+    if (min == null) continue;
+    const ps = c.byGame.get(g.id) || [];
+    spans.push({ min, players: ps.length, mine: ps.some((p) => p.memberId === memberId) });
+  }
+  const avgPair = (list) => ({ member: durationAvg(list.filter((x) => x.mine).map((x) => x.min)), group: durationAvg(list.map((x) => x.min)) });
+  const counts = [...new Set(spans.map((x) => x.players))].filter((n) => n > 0).sort((a, b) => a - b);
+
+  return {
+    compare,
+    longest: { group, own, ownIsGroup },
+    duration: {
+      all: avgPair(spans),
+      byPlayers: counts.map((n) => ({ players: n, ...avgPair(spans.filter((x) => x.players === n)) })),
+    },
+  };
+}
