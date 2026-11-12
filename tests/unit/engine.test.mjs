@@ -633,3 +633,154 @@ test('Hinweis: replay von 2000 Ereignissen (Zeitmessung, kein harter Fall)', asy
   console.log(`# replay ${t.all.length} Ereignisse: ${ms.toFixed(1)} ms`);
   assert.deepEqual(s, t.s);
 });
+
+// ---------------------------------------------------------------------------
+// Spec P1 (Welle ttg-features): Messfehler „K.O. des Spielers am Zug“ — eliminate mit optionalem payload.at.
+// Sollwerte von Hand: Sekunden = (at − Zugbeginn) / 1000 (spec-p1-zuguhr.md, Tabelle „Spec-Tests · Engine“).
+
+/** Letzter turn_end der Ereignisliste. */
+const lastTurnEnd = (t) => t.all.filter((e) => e.type === 'turn_end').at(-1);
+
+test('P1 Z1 K.O. am Zug: Folgezug beginnt beim K.O. (at), nicht beim alten Zugbeginn', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'endTurn', at: 60000 });
+  t.do({ type: 'eliminate', target: 'B', by: 'C', at: 150000 });
+  assert.equal(t.s.turn, 2);
+  assert.equal(t.s.turnStartedAt, 150000);
+  t.do({ type: 'endTurn', at: 210000 });
+  const te = lastTurnEnd(t);
+  assert.equal(te.actor, 'C');
+  assert.equal(te.payload.seconds, 60);
+});
+
+test('P1 Z2 K.O. nicht am Zug: Zugbeginn bleibt', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'eliminate', target: 'C', at: 30000 });
+  assert.equal(t.s.turnStartedAt, 0);
+  t.do({ type: 'endTurn', at: 90000 });
+  const te = lastTurnEnd(t);
+  assert.equal(te.actor, 'A');
+  assert.equal(te.payload.seconds, 90);
+});
+
+test('P1 Z3 altes Ereignis ohne at: Verhalten wie bisher, payload ohne at', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'endTurn', at: 60000 });
+  const ev = t.do({ type: 'eliminate', target: 'B', by: 'C' });
+  assert.deepEqual(ev[0].payload, { place: 4, act: ev[0].payload.act });
+  assert.equal('at' in ev[0].payload, false);
+  assert.equal(t.s.turnStartedAt, 60000);
+  t.do({ type: 'endTurn', at: 210000 });
+  const te = lastTurnEnd(t);
+  assert.equal(te.actor, 'C');
+  assert.equal(te.payload.seconds, 150);
+});
+
+test('P1 Z4a Replay neuer Ereignisse (gemischt) ergibt denselben Zugbeginn', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'life', target: 'C', d: -3 });
+  t.do({ type: 'endTurn', at: 60000 });
+  t.do({ type: 'counter', target: 'B', key: 'energy', d: 2 }, 'B');
+  t.do({ type: 'life', target: 'B', d: -40 }, 'B');
+  t.do({ type: 'eliminate', target: 'B', by: 'C', at: 150000 });
+  const s = E.replay(t.init, t.all);
+  assert.equal(s.turn, 2);
+  assert.equal(s.turnStartedAt, 150000);
+  assert.deepEqual(s, t.s);
+  // „gemischt“ auch als vertauschte Reihenfolge (Review P1): replay sortiert nach seq
+  const r = E.replay(t.init, t.all.slice().reverse());
+  assert.equal(r.turnStartedAt, 150000);
+  assert.deepEqual(r, t.s);
+});
+
+test('P1 Z4b Replay alter Ereignisse (ohne at) ergibt den alten Zugbeginn', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'endTurn', at: 60000 });
+  t.do({ type: 'eliminate', target: 'B', by: 'C' });
+  const s = E.replay(t.init, t.all);
+  assert.equal(s.turnStartedAt, 60000);
+  assert.equal(s.turn, 2);
+});
+
+test('P1 Z5 Rückgängig über das K.O.: B zurück, Zug und Zugbeginn wie vorher', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'endTurn', at: 60000 });
+  t.do({ type: 'eliminate', target: 'B', by: 'C', at: 150000 });
+  t.do({ type: 'undo' });
+  assert.equal(t.p('B').out, false);
+  assert.equal(t.s.turn, 1);
+  assert.equal(t.s.turnStartedAt, 60000);
+});
+
+test('P1 Z6 Uhr-Versatz: at vor dem Zugbeginn ⇒ Zugbeginn bleibt (Math.max)', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'endTurn', at: 60000 });
+  t.do({ type: 'eliminate', target: 'B', at: 50000 });
+  assert.equal(t.s.turnStartedAt, 60000);
+  t.do({ type: 'endTurn', at: 120000 });
+  const te = lastTurnEnd(t);
+  assert.equal(te.actor, 'C');
+  assert.equal(te.payload.seconds, 60);
+});
+
+test('P1 Z7 Spielende durch K.O.: Zugbeginn unverändert', async () => {
+  const E = await load();
+  const init = E.createGame({ players: [
+    { id: 'X', name: 'Xaver', seat: 0, partner: false },
+    { id: 'Y', name: 'Yara', seat: 1, partner: false },
+  ], startingLife: 40, firstSeat: 0, startedAt: 0 });
+  const r = E.act(init, { type: 'eliminate', target: 'X', at: 40000 }, { actor: 'Y' });
+  const s = r.state;
+  assert.equal(s.finished, true);
+  assert.equal(s.players.find((p) => p.id === 'Y').place, 1);
+  assert.equal(s.turn, 0);
+  assert.equal(s.turnStartedAt, 0);
+});
+
+test('P1 Z8 ungültiges at: kein Wurf, kein at im payload, Zugbeginn bleibt', async () => {
+  const E = await load();
+  for (const at of [NaN, Infinity, '150000', null]) {
+    const t = table(E);
+    t.do({ type: 'endTurn', at: 60000 });
+    let ev;
+    assert.doesNotThrow(() => { ev = t.do({ type: 'eliminate', target: 'B', by: 'C', at }); }, `at=${String(at)}`);
+    assert.deepEqual(ev[0].payload, { place: 4, act: ev[0].payload.act }, `at=${String(at)}`);
+    assert.equal('at' in ev[0].payload, false, `at=${String(at)}`);
+    assert.equal(t.s.turnStartedAt, 60000, `at=${String(at)}`);
+  }
+});
+
+test('P1 Z9 Feldbelegung eliminate mit at', async () => {
+  const E = await load(); const t = table(E);
+  const ev = t.do({ type: 'eliminate', target: 'D', by: 'A', at: 12345 });
+  assert.equal(ev.length, 1);
+  assert.deepEqual(ev[0].payload, { place: 4, at: 12345, act: ev[0].payload.act });
+});
+
+test('P1 Z10 zwei K.O. hintereinander am Zug: Folgezug ab dem zweiten K.O.', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'endTurn', at: 60000 });
+  t.do({ type: 'eliminate', target: 'B', at: 100000 });
+  t.do({ type: 'eliminate', target: 'C', at: 130000 });
+  t.do({ type: 'endTurn', at: 160000 });
+  assert.equal(t.s.turn, 0);
+  const te = lastTurnEnd(t);
+  assert.equal(te.actor, 'D');
+  assert.equal(te.payload.seconds, 30);
+});
+
+test('P1 Z11 K.O. am Zug beim Rundenwechsel', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'endTurn', at: 1000 });
+  t.do({ type: 'endTurn', at: 2000 });
+  t.do({ type: 'endTurn', at: 3000 });
+  assert.equal(t.s.turn, 3);
+  t.do({ type: 'eliminate', target: 'D', at: 9000 });
+  assert.equal(t.s.turn, 0);
+  assert.equal(t.s.round, 2);
+  assert.equal(t.s.turnStartedAt, 9000);
+  t.do({ type: 'endTurn', at: 10000 });
+  const te = lastTurnEnd(t);
+  assert.equal(te.actor, 'A');
+  assert.equal(te.payload.seconds, 1);
+});

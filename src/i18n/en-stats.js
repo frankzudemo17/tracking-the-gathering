@@ -23,4 +23,16 @@ export default {
   rating: 'Rating', ownRating: 'Own deck rating', fun: 'Fun at the table', salt: 'Salt from opponents',
   saltLine1: 'Avg {v} from 1 rating', saltLineN: 'Avg {v} from {n} ratings', noSalt: 'No salt rating yet',
   recent: 'Recent games', win: 'Win', place: 'Place {n}', rounds: '{n} rounds',
+  // Profile "Advanced": turn times and game length (Spec P1 turn clock)
+  more: {
+    title: 'Advanced', hint: 'Turn times and game length',
+    compare: 'Avg turn time compared', compareHint: 'Everyone in the group, slowest first',
+    compareFew: 'A comparison needs turn times from at least two players.',
+    compareNone: 'No turn times for {name} yet.',
+    longest: 'Longest turn', longestGroup: 'Longest turn in the group', longestMe: 'Your longest turn', longestOther: "{name}'s longest turn",
+    noTurns: 'No turn times recorded yet.',
+    duration: 'Avg game length', durationAll: 'All games', durationPlayers: '{n} players',
+    colMe: 'You', colGroup: 'Group',
+    durationNone: 'No game length recorded yet.',
+  },
 };

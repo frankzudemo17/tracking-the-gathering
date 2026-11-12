@@ -11,15 +11,19 @@ import { setAvatar, removeAvatar } from '../lib/avatar.js';
 import { t, fmtDate, getLang } from '../i18n/index.js';
 import { go } from '../router.js';
 import { groupData } from '../lib/data.js';
-import { memberProfile, deckProfile } from '../lib/stats.js';
+import { memberProfile, deckProfile, memberTimes } from '../lib/stats.js';
 import { fmtAvg, fmtPct, fmtMmss } from '../lib/format.js';
 import { runMemberRemoval, canRemoveMember } from './member-remove.js';
-import { kpis, section, moodRows, saltBars, pointsLine, highlight, deckThumb, iconDisc } from './stats-ui.js';
+import { kpis, section, moodRows, saltBars, pointsLine, highlight, deckThumb, iconDisc, moreStats } from './stats-ui.js';
 
 // Decks auf- oder zugeklappt: pro Gerät gemerkt (reine Ansichtssache)
 const DECKS_KEY = 'ttg.decksOpen';
 const decksOpenPref = () => { try { return localStorage.getItem(DECKS_KEY) !== '0'; } catch { return true; } };
 const setDecksOpenPref = (v) => { try { localStorage.setItem(DECKS_KEY, v ? '1' : '0'); } catch { /* egal */ } };
+// „Erweitert“ (Zugzeiten, Spieldauer; Spec P1): Standard zu, pro Gerät gemerkt, gilt für alle Profile
+const MORE_KEY = 'ttg.statsMore';
+const moreOpenPref = () => { try { return localStorage.getItem(MORE_KEY) === '1'; } catch { return false; } };
+const setMoreOpenPref = (v) => { try { localStorage.setItem(MORE_KEY, v ? '1' : '0'); } catch { /* egal */ } };
 // Wie MEMBER_SELECT (groups.js) + is_superadmin des Zielprofils: kein Entfernen-Knopf beim Superadmin (P10 B1)
 const PROFILE_MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path, is_superadmin)';
 
@@ -84,7 +88,7 @@ export default async function profile(el, { params, isStale, fail }) {
     avPath = avPathOf(m);
     const pr = data ? memberProfile(data, m.id) : null;
     const statsHtml = statsState === 'wait' ? skel.block(true)
-      : pr ? await profileStats({ pr, data, isMe: !!isMe, name, lang }) : html`<p class="small muted st-err">${t('stats.loadError')}</p>`;
+      : pr ? await profileStats({ pr, data, isMe: !!isMe, name, lang, memberId: m.id, moreOpen: moreOpenPref() }) : html`<p class="small muted st-err">${t('stats.loadError')}</p>`;
     if (!sc.ok() || seq !== drawSeq) return;
     const group = state.memberships.find((x) => x.playgroup_id === m.playgroup_id)?.playgroups || currentGroup();
     target = isMe ? { kind: 'profile', id: state.profile.id } : { kind: 'member', id: m.id };
@@ -217,6 +221,12 @@ export default async function profile(el, { params, isStale, fail }) {
     el.querySelector('#prof-decks').hidden = !open;
     setDecksOpenPref(open);
   });
+  on(el, 'click', '[data-act="toggle-more"]', (e, b) => {
+    const open = b.getAttribute('aria-expanded') !== 'true';
+    b.setAttribute('aria-expanded', String(open));
+    el.querySelector('#prof-more').hidden = !open;
+    setMoreOpenPref(open);
+  });
   on(el, 'click', '[data-act="role"]', async (e, b) => {
     await busy(b, async () => {
       try {
@@ -286,9 +296,10 @@ const gamesText = (n) => t(n === 1 ? 'stats.games1' : 'stats.gamesN', { n });
 /**
  * Statistik-Teil des Profils (Kacheln, Stimmung, Verläufe, Tempo, Highlights) aus memberProfile.
  * Ohne Spiele nur die Kacheln (0/–), keine leeren Diagramme (Spec P18, Kriterium 4).
- * @param {{ pr: import('../lib/stats.js').MemberProfile, data: import('../lib/history-data.js').GroupData, isMe: boolean, name: string, lang: string }} o
+ * Danach „Erweitert“ (Spec P1: Zugzeiten, Spieldauer; auf/zu nach moreOpen).
+ * @param {{ pr: import('../lib/stats.js').MemberProfile, data: import('../lib/history-data.js').GroupData, isMe: boolean, name: string, lang: string, memberId: string, moreOpen: boolean }} o
  */
-async function profileStats({ pr, data, isMe, name, lang }) {
+async function profileStats({ pr, data, isMe, name, lang, memberId, moreOpen }) {
   const tiles = kpis([
     { v: pr.games, l: t('profile.stats.games') },
     { v: pr.wins, l: t('profile.stats.wins') },
@@ -360,7 +371,9 @@ async function profileStats({ pr, data, isMe, name, lang }) {
   }));
   const highlights = hl.length ? section(t('stats.highlights'), html`<div class="st-hls">${hl}</div>`) : '';
 
-  return html`${tiles}${mood}${salt}${line}${tempo}${highlights}`;
+  const more = moreStats({ times: memberTimes(data, memberId), memberId, name, isMe, who, open: moreOpen, lang });
+
+  return html`${tiles}${mood}${salt}${line}${tempo}${highlights}${more}`;
 }
 
 function openAvatarSheet({ name, url, has, target, isMe, onDone }) {

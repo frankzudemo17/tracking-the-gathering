@@ -374,3 +374,148 @@ test('P10 K15 deckTable, deckSaltTable, gameSummary, evenings, recap vor = nach;
   assert.ok(s.gameSummary(b, 'g1').placements.some((p) => p.memberId === 'm-F'), 'm-F steht in g1');
   assert.equal(b.members.find((m) => m.id === 'm-F').name, 'Franco', 'Name löst weiter auf');
 });
+
+// ---------------------------------------------------------------------------
+// Spec P1 (Welle ttg-features): memberTimes — Vergleich Ø Zug, längster Zug, Ø Spieldauer.
+// Eigene Fixture „F-Zeit“; Sollwerte von Hand aus spec-p1-zuguhr.md (Tabelle „Spec-Tests · memberTimes“).
+
+/** F-Zeit: fünf Mitglieder, sechs beendete Spiele (g5 ohne Ende, g6 Dauer 0). */
+function fZeit() {
+  const members = [['a', 'Anna'], ['b', 'Ben'], ['c', 'Cem'], ['d', 'Dana'], ['x', 'Xaver']]
+    .map(([id, name]) => ({ id, name, profileId: null, avatarPath: null, isPlaceholder: false }));
+  const g = (id, day, end, who) => ({
+    game: { id, sessionId: null, status: 'finished', startedAt: `2026-11-0${day}T18:00:00Z`, endedAt: end, round: 5, wincon: null, note: null, photoPath: null, startingLife: 40 },
+    players: who.map((memberId, i) => ({ gameId: id, memberId, deckId: null, seat: i, place: i + 1, eliminatedRound: null, eliminatedBy: null, finalLife: null })),
+  });
+  const spec = [
+    g('g1', 1, '2026-11-01T19:30:00Z', ['a', 'b', 'c', 'd']),
+    g('g2', 2, '2026-11-02T18:45:00Z', ['a', 'b', 'c']),
+    g('g3', 3, '2026-11-03T19:00:00Z', ['a', 'b']),
+    g('g4', 4, '2026-11-04T20:00:00Z', ['a', 'b', 'c', 'd']),
+    g('g5', 5, null, ['a', 'b', 'c']),
+    g('g6', 6, '2026-11-06T18:00:00Z', ['a', 'b']),
+  ];
+  const tu = (gameId, memberId, turns, totalSec, longestSec) => ({ gameId, memberId, turns, totalSec, longestSec });
+  return {
+    groupId: 'G', members, decks: [], sessions: [],
+    games: spec.map((s) => s.game), players: spec.flatMap((s) => s.players),
+    ratings: [], deckSalt: [], potg: [],
+    turns: [
+      tu('g1', 'a', 10, 1200, 300), tu('g1', 'b', 10, 900, 200), tu('g1', 'c', 9, 1800, 600), tu('g1', 'd', 9, 540, 90),
+      tu('g2', 'a', 8, 800, 250), tu('g2', 'b', 8, 1600, 600), tu('g2', 'c', 7, 700, 150),
+      tu('g4', 'a', 12, 1440, 400), tu('g4', 'b', 12, 1200, 300), tu('g4', 'c', 12, 2400, 500), tu('g4', 'd', 11, 660, 120),
+    ],
+  };
+}
+const P1_EPS = 1e-6;
+const dur = (x, avgMin, games, msg) => {
+  assert.equal(x.games, games, `${msg} Anzahl`);
+  if (avgMin == null) assert.equal(x.avgMin, null, `${msg} Ø`);
+  else assert.ok(Math.abs(x.avgMin - avgMin) < P1_EPS, `${msg} Ø ${x.avgMin} ≠ ${avgMin}`);
+};
+
+test('P1 T1 memberTimes.compare: Reihenfolge, Ø Zug, Anteil', async () => {
+  const { memberTimes } = await S();
+  const c = memberTimes(fZeit(), 'a').compare;
+  assert.deepEqual(c.map((r) => r.memberId), ['c', 'b', 'a', 'd']);
+  [175, 3700 / 30, 3440 / 30, 60].forEach((v, i) => assert.ok(Math.abs(c[i].avgTurnSec - v) < P1_EPS, `avg[${i}] ${c[i].avgTurnSec}`));
+  [1, 0.704762, 0.655238, 0.342857].forEach((v, i) => assert.ok(Math.abs(c[i].share - v) < P1_EPS, `share[${i}] ${c[i].share}`));
+});
+
+test('P1 T2 eine Quelle: compare ohne share = memberProfile().tempo.rows (F-Zeit und Gruppen-Fixture)', async () => {
+  const { memberTimes, memberProfile } = await S();
+  const strip = (rows) => rows.map((r) => ({ memberId: r.memberId, avgTurnSec: r.avgTurnSec }));
+  for (const id of ['a', 'b', 'c', 'd', 'x']) {
+    assert.deepEqual(strip(memberTimes(fZeit(), id).compare), memberProfile(fZeit(), id).tempo.rows, `F-Zeit ${id}`);
+  }
+  const fx = fixtureGroupData();
+  for (const m of fx.members) {
+    assert.deepEqual(strip(memberTimes(fixtureGroupData(), m.id).compare), memberProfile(fixtureGroupData(), m.id).tempo.rows, `Fixture ${m.id}`);
+  }
+});
+
+test('P1 T3 Gruppenrekord: größtes longestSec, Gleichstand ⇒ früheres Spiel', async () => {
+  const { memberTimes } = await S();
+  for (const id of ['a', 'x']) {
+    assert.deepEqual(memberTimes(fZeit(), id).longest.group, { memberId: 'c', seconds: 600, gameId: 'g1', startedAt: '2026-11-01T18:00:00Z' });
+  }
+});
+
+test('P1 T4 eigener Rekord und ownIsGroup', async () => {
+  const { memberTimes } = await S();
+  const want = { a: ['a', 400, 'g4', false], b: ['b', 600, 'g2', false], c: ['c', 600, 'g1', true], d: ['d', 120, 'g4', false] };
+  for (const [id, [mid, sec, gid, isG]] of Object.entries(want)) {
+    const l = memberTimes(fZeit(), id).longest;
+    assert.equal(l.own.memberId, mid, `${id} memberId`);
+    assert.equal(l.own.seconds, sec, `${id} seconds`);
+    assert.equal(l.own.gameId, gid, `${id} gameId`);
+    assert.equal(l.ownIsGroup, isG, `${id} ownIsGroup`);
+  }
+  const lx = memberTimes(fZeit(), 'x').longest;
+  assert.equal(lx.own, null);
+  assert.equal(lx.ownIsGroup, false);
+});
+
+test('P1 T5 Ø Spieldauer Gruppe: ungerundet, g5/g6 entfallen, nach Spielerzahl', async () => {
+  const { memberTimes } = await S();
+  const d = memberTimes(fZeit(), 'b').duration;
+  dur(d.all.group, 78.75, 4, 'all.group');
+  assert.deepEqual(d.byPlayers.map((r) => r.players), [2, 3, 4]);
+  dur(d.byPlayers[0].group, 60, 1, '2.group');
+  dur(d.byPlayers[1].group, 45, 1, '3.group');
+  dur(d.byPlayers[2].group, 105, 2, '4.group');
+});
+
+test('P1 T6 Ø Spieldauer Mitglied', async () => {
+  const { memberTimes } = await S();
+  const want = {
+    a: [[78.75, 4], [60, 1], [45, 1], [105, 2]],
+    c: [[85, 3], [null, 0], [45, 1], [105, 2]],
+    d: [[105, 2], [null, 0], [null, 0], [105, 2]],
+    x: [[null, 0], [null, 0], [null, 0], [null, 0]],
+  };
+  for (const [id, rows] of Object.entries(want)) {
+    const d = memberTimes(fZeit(), id).duration;
+    dur(d.all.member, rows[0][0], rows[0][1], `${id} all`);
+    assert.equal(d.byPlayers.length, 3, `${id} Zeilen`);
+    d.byPlayers.forEach((r, i) => dur(r.member, rows[i + 1][0], rows[i + 1][1], `${id} ${r.players} Spieler`));
+  }
+});
+
+test('P1 T7 leere Gruppe', async () => {
+  const { memberTimes } = await S();
+  const { emptyGroupData } = await H();
+  const r = memberTimes(emptyGroupData('G'), 'a');
+  assert.deepEqual(r.compare, []);
+  assert.deepEqual(r.longest, { group: null, own: null, ownIsGroup: false });
+  assert.deepEqual(r.duration.all, { member: { avgMin: null, games: 0 }, group: { avgMin: null, games: 0 } });
+  assert.deepEqual(r.duration.byPlayers, []);
+});
+
+test('P1 T8 nur Nullen: kein Rekord, share 0, kein NaN', async () => {
+  const { memberTimes } = await S();
+  const f = fZeit();
+  f.turns = f.turns.map((x) => ({ ...x, totalSec: 0, longestSec: 0 }));
+  const r = memberTimes(f, 'a');
+  assert.equal(r.longest.group, null);
+  assert.equal(r.longest.own, null);
+  assert.ok(r.compare.length > 0);
+  for (const c of r.compare) { assert.equal(c.share, 0); assert.ok(!Number.isNaN(c.share)); }
+});
+
+test('P1 T9 Gleichstand eigener Rekord ⇒ früheres Spiel', async () => {
+  const { memberTimes } = await S();
+  const f = fZeit();
+  for (const x of f.turns) if (x.memberId === 'a' && (x.gameId === 'g1' || x.gameId === 'g4')) x.longestSec = 300;
+  assert.equal(memberTimes(f, 'a').longest.own.gameId, 'g1');
+});
+
+test('P1 T10 Eingabe bleibt unberührt (tief eingefroren)', async () => {
+  const { memberTimes } = await S();
+  const f = fZeit();
+  const before = JSON.stringify(f);
+  const freeze = (o) => { if (o && typeof o === 'object') { Object.freeze(o); Object.values(o).forEach(freeze); } return o; };
+  freeze(f);
+  assert.doesNotThrow(() => { for (const id of ['a', 'c', 'x']) memberTimes(f, id); });
+  assert.equal(JSON.stringify(f), before);
+});

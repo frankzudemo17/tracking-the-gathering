@@ -23,4 +23,16 @@ export default {
   rating: 'Bewertung', ownRating: 'Eigene Deck-Bewertung', fun: 'Spaß am Tisch', salt: 'Salz bei Gegnern',
   saltLine1: 'Ø {v} aus 1 Bewertung', saltLineN: 'Ø {v} aus {n} Bewertungen', noSalt: 'Noch keine Salz-Bewertung',
   recent: 'Letzte Spiele', win: 'Sieg', place: 'Platz {n}', rounds: '{n} Runden',
+  // Profil „Erweitert“: Zugzeiten und Spieldauer (Spec P1 Zug-Uhr)
+  more: {
+    title: 'Erweitert', hint: 'Zugzeiten und Spieldauer',
+    compare: 'Ø Zugdauer im Vergleich', compareHint: 'Alle Spieler der Gruppe, langsamster zuerst',
+    compareFew: 'Für einen Vergleich braucht es Zugzeiten von mindestens zwei Spielern.',
+    compareNone: 'Von {name} gibt es noch keine Zugzeiten.',
+    longest: 'Längster Zug', longestGroup: 'Längster Zug der Gruppe', longestMe: 'Dein längster Zug', longestOther: 'Längster Zug von {name}',
+    noTurns: 'Noch keine Zugzeiten erfasst.',
+    duration: 'Ø Spieldauer', durationAll: 'Alle Partien', durationPlayers: '{n} Spieler',
+    colMe: 'Du', colGroup: 'Gruppe',
+    durationNone: 'Noch keine Spieldauer erfasst.',
+  },
 };
