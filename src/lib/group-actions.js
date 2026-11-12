@@ -26,7 +26,7 @@ export async function redeemCode(raw) {
     }
   }
   const c = must(await sb.rpc('claim_member', { p_code: code }));
-  if (c?.id) { await loadMe(); setGroup(c.playgroup_id); groupData.invalidate(c.playgroup_id); /* P12 Nachtrag 2 (B5): Übernehmen führt zusammen ⇒ Gruppen-Stand verworfen */ return { ok: true, message: t('groups.claimed') }; }
+  if (c?.id) { groupData.invalidate(c.playgroup_id); /* P12 Nachtrag 2 (B5): Übernehmen führt zusammen ⇒ Gruppen-Stand verworfen */ await loadMe(); setGroup(c.playgroup_id); return { ok: true, message: t('groups.claimed') }; }
   return { ok: false, message: t('groups.codeWrong') };
 }
 
