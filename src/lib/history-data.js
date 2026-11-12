@@ -8,7 +8,7 @@
 /** @typedef {{ id: string, name: string, profileId: string|null, avatarPath: string|null, isPlaceholder: boolean, removed: boolean, formerProfileId: string|null }} MemberRow */
 /** @typedef {{ id: string, shortName: string, commanderName: string, partnerName: string|null, imageUrl: string|null, colors: string[], bracket: number|null, ownerProfileId: string|null, ownerMemberId: string|null, archived: boolean }} DeckRow */
 /** @typedef {{ id: string, playedOn: string, location: string|null }} SessionRow */
-/** @typedef {{ id: string, sessionId: string|null, status: 'finished'|'live'|'aborted', startedAt: string, endedAt: string|null, round: number, wincon: string|null, note: string|null, photoPath: string|null, startingLife: number }} GameRow */
+/** @typedef {{ id: string, sessionId: string|null, status: 'finished'|'live'|'aborted', startedAt: string, endedAt: string|null, round: number, wincon: string|null, note: string|null, photoPath: string|null, startingLife: number, layout: string|null }} GameRow */
 /** @typedef {{ gameId: string, memberId: string, deckId: string|null, seat: number, place: number|null, eliminatedRound: number|null, eliminatedBy: string|null, finalLife: number|null }} PlayerRow */
 /** @typedef {{ gameId: string, memberId: string, salt: number|null, fun: number|null, deckRating: number|null }} RatingRow */
 /** @typedef {{ gameId: string, raterId: string, deckId: string, salt: number }} DeckSaltRow */
@@ -23,7 +23,7 @@ const CHUNK = 200;
 
 // Spalten (explizit: games.live_state ist ein großes jsonb und wird hier nicht gebraucht)
 const MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path)'; // Muster src/views/groups.js:12
-const GAME_COLS = 'id, playgroup_id, session_id, status, started_at, ended_at, round, wincon, note, photo_path, starting_life';
+const GAME_COLS = 'id, playgroup_id, session_id, status, started_at, ended_at, round, wincon, note, photo_path, starting_life, layout'; // P2 Revanche: layout (first_seat bewusst nicht)
 const PLAYER_COLS = 'game_id, member_id, deck_id, seat, place, eliminated_round, eliminated_by, final_life';
 const RATING_COLS = 'game_id, member_id, salt, fun, deck_rating';
 const DECK_SALT_COLS = 'game_id, rater_id, deck_id, salt';
@@ -88,6 +88,7 @@ const toSession = (r) => ({ id: r.id, playedOn: r.played_on, location: r.locatio
 const toGame = (r) => ({
   id: r.id, sessionId: r.session_id ?? null, status: r.status, startedAt: r.started_at, endedAt: r.ended_at ?? null,
   round: r.round, wincon: r.wincon ?? null, note: r.note ?? null, photoPath: r.photo_path ?? null, startingLife: r.starting_life,
+  layout: r.layout ?? null, // P2 Revanche (Setup-Vorbelegung); fehlt die Spalte ⇒ null ⇒ Gerätestandard
 });
 /** @returns {PlayerRow} */
 const toPlayer = (r) => ({
