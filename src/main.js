@@ -119,7 +119,8 @@ function tabRule(r) {
   const tab = TABS.has(bare(r.path));
   const keep = lastTab && tab && lastPath !== bare(r.path);
   lastPath = bare(r.path); lastTab = tab;
-  if (!keep) pageCache.drop((p) => p.name.startsWith('page:'));
+  // P6 Entscheid 8: nur Arbeitsspeicher — im Gerätespeicher erfüllt die Schreibmarke diesen Zweck genauer
+  if (!keep) pageCache.drop((p) => p.name.startsWith('page:'), { keepStored: true });
 }
 
 // Ein View-Modul ließ sich nicht laden (Netz kurz weg oder neue Version mitten im Betrieb):

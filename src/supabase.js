@@ -1,7 +1,32 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.118.0';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import { deviceStore, isOwnWrite } from './lib/device-store.js';
 
 export const configured = !SUPABASE_URL.startsWith('__');
+
+// ---------------- P6 Schreibmarke (spec-p6-kaltstart.md Entscheid 9) ----------------
+// Jede Anfrage des Clients läuft über trackedFetch. Ein eigener Schreibvorgang (isOwnWrite) zählt die Marke des
+// Gerätespeichers beim Absenden und beim Eintreffen der Antwort (auch bei Fehler) hoch; beim Absenden fallen die
+// gespeicherten Gruppen-/Seiten-Stände des Kontos. Abonnenten (src/lib/refill.js) erfahren beides.
+/** @type {Set<(phase: 'send'|'done') => void>} */
+const writeSubs = new Set();
+/** @param {(phase: 'send'|'done') => void} cb @returns {() => void} abbestellen */
+export function onWrite(cb) { writeSubs.add(cb); return () => { writeSubs.delete(cb); }; }
+/** @param {'send'|'done'} phase */
+function noteWrite(phase) {
+  deviceStore.noteWrite();
+  for (const cb of [...writeSubs]) { try { cb(phase); } catch (e) { console.error(e); } }
+}
+/** @param {any} input @param {any} [init] */
+export function trackedFetch(input, init) {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input?.url;
+  const method = init?.method || (input && typeof input === 'object' && 'method' in input ? input.method : 'GET');
+  const own = isOwnWrite(method, url);
+  if (own) noteWrite('send');
+  const p = globalThis.fetch(input, init);
+  if (own) p.then(() => noteWrite('done'), () => noteWrite('done'));
+  return p;
+}
 
 export const sb = configured
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -13,6 +38,7 @@ export const sb = configured
         flowType: 'pkce',
         storageKey: 'ttg-auth',
       },
+      global: { fetch: trackedFetch },
     })
   : null;
 

@@ -314,6 +314,25 @@ export function createDeviceStore({ backend, now = Date.now }) {
       });
     },
 
+    /** Alle Gruppen-/Seiten-Datensätze einer Gruppe (jedes Konto) löschen — Gruppenwechsel-Setter (Entscheid 11). @param {string} group */
+    dropGroup(group) {
+      if (!group) return;
+      enqueue(async () => {
+        const all = await backend.all('daten');
+        const keys = all.filter((r) => r && r.name !== ME && (r.group === group || keyParts(String(r.key))?.group === group)).map((r) => r.key);
+        if (keys.length) await backend.del('daten', keys);
+      });
+    },
+
+    /** Alle Gruppen-/Seiten-Datensätze (jedes Konto) löschen; `me` und Bilder bleiben — Spiegel von pageCache.clear(). */
+    dropEntries() {
+      enqueue(async () => {
+        const all = await backend.all('daten');
+        const keys = all.filter((r) => r && r.name !== ME).map((r) => r.key);
+        if (keys.length) await backend.del('daten', keys);
+      });
+    },
+
     /** @param {string[]} keys */
     dropData(keys) {
       const ks = (keys || []).filter((k) => typeof k === 'string');
