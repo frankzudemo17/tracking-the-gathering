@@ -76,12 +76,7 @@ export default async function lifeE2e({ browser, base: BASE }) {
     await P.mouse.move(bx.x + bx.width / 2, bx.y + bx.height / 2); await P.mouse.down(); await P.waitForTimeout(ms); await P.mouse.up();
     await P.waitForTimeout(150);
   };
-  await hold(A, 1, 700);
-  ok('Halten + 700 ms ⇒ A +5 (15 → 20), kein +1 beim Loslassen', (await lifeOf(A)) === 20, String(await lifeOf(A)));
-  await hold(A, -1, 1150);
-  ok('Halten − 1150 ms ⇒ A −10 (20 → 10), Wiederholen alle 400 ms', (await lifeOf(A)) === 10, String(await lifeOf(A)));
-  await tap(A, 1, 5);
-  ok('A per Tippen zurück auf 15', (await lifeOf(A)) === 15);
+  // (Halten wird in Spiel 2 geprüft — Spiel 1 zählt seine Ereignisse genau ab)
   await P.click(`${field(B)} [data-act="counters"]`);
   await P.waitForSelector('[data-sheet="counters"]');
   for (let i = 0; i < 3; i++) await P.click('[data-sheet="counters"] .lc-ctr[data-key="poison"] [data-v="1"]');
@@ -275,6 +270,11 @@ export default async function lifeE2e({ browser, base: BASE }) {
   await P.goto(BASE + '#/spiel/' + g2);
   await P.waitForSelector('.lc-field');
   await tap(B, 1, 1);
+  const b0 = await lifeOf(B);
+  await hold(B, 1, 700);
+  ok(`Halten + 700 ms ⇒ B +5 (${b0} → ${b0 + 5}), kein +1 beim Loslassen`, (await lifeOf(B)) === b0 + 5, String(await lifeOf(B)));
+  await hold(B, -1, 1150);
+  ok(`Halten − 1150 ms ⇒ B −10 (${b0 + 5} → ${b0 - 5}), Wiederholen alle 400 ms`, (await lifeOf(B)) === b0 - 5, String(await lifeOf(B)));
   await P.shot('p8-11-rundum');
   await menu();
   await P.click('[data-sheet="menu"] [data-m="end"]');
