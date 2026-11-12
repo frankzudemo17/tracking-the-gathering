@@ -3,6 +3,8 @@
 // Daten nur über groupData.loadGame, Zahlen nur aus stats.js (gameSummary), Anzeige über format.js.
 // Schreiben: Bewertung nur über RPC rate_game (D4), Siegbedingung/Notiz/Foto direkt auf games.
 // Spielerfarben nur in den Schadenszeilen (Diagramm-Ausnahme, WELLE UI-Regel 2).
+// P2 Revanche (Welle ttg-features): „Revanche“ öffnet das Setup mit derselben Aufstellung (Entwurf über
+// src/lib/setup-draft.js); ein geändertes Formular wird vorher gespeichert („Speichern und Revanche“), nie ein Spiel gestartet.
 import { sb, photoUrls, forgetPhoto } from '../supabase.js';
 import { state, currentMembership } from '../state.js';
 import { groupData } from '../lib/data.js';
@@ -18,8 +20,9 @@ import { t } from '../i18n/index.js';
 import { byId, deckArt, colorDeck, num } from './history-ui.js';
 import {
   WINCONS, POTG_MAX, NOTE_MAX, PHOTO_EDGE, PHOTO_QUALITY, initialForm, toggleScore, setDeckSalt, pickSaltiest, pickPotg,
-  pickWincon, formCheck, saltDecks, rateArgs, gamePatch, fitSize, photoPath, saveErrorKey, damageTop,
+  pickWincon, formCheck, saltDecks, rateArgs, gamePatch, fitSize, photoPath, saveErrorKey, damageTop, formDirty,
 } from './result-ui.js';
+import { rematchDraft, writeDraft } from '../lib/setup-draft.js';
 
 const SCORES = [1, 2, 3, 4, 5];
 
@@ -75,6 +78,7 @@ export default async function result(el, { params, isStale }) {
   const wDeck = deckOf(winner?.deckId);
 
   let form = initialForm(data, meId);
+  const initial = initialForm(data, meId); // P2: Vergleichsstand für „geändert“ (Revanche speichert dann vorher)
   let saving = false;
   /** Foto: vorhandenes (Server) oder neu gewähltes (verkleinert, noch nicht hochgeladen). */
   const photo = {
@@ -221,11 +225,15 @@ export default async function result(el, { params, isStale }) {
     ${notes}
     <div class="rs-actions">
       <button type="button" class="btn block" data-act="save">${icon('check', 20)}${t('result.save')}</button>
+      <button type="button" class="btn soft block" data-act="rematch">${icon('arrowCounterClockwise', 20)}<span data-rematch-label>${t('result.rematch')}</span></button>
       <a class="btn soft block" href="#/start">${t('result.later')}</a>
     </div>
   </div>`);
 
   const saveBtn = /** @type {HTMLButtonElement} */ ($('[data-act="save"]', el));
+  const rematchBtn = /** @type {HTMLButtonElement} */ ($('[data-act="rematch"]', el));
+  /** P2: geändert = Formular weicht vom Stand beim Öffnen ab oder ein Foto wurde gewählt/entfernt. */
+  const dirty = () => formDirty(initial, form) || !!photo.blob || photo.removed;
 
   // ---------- Zustand ⇒ Anzeige (ohne neu zu zeichnen: Texteingaben behalten Fokus)
   const word = (key, v) => (v ? t(`result.${key === 'salt' ? 'saltWords' : key === 'fun' ? 'funWords' : 'deckWords'}.${v}`) : t('result.noScore'));
@@ -255,6 +263,10 @@ export default async function result(el, { params, isStale }) {
     paintCount('potgText', POTG_MAX, chk.potgTooLong);
     paintCount('note', NOTE_MAX, chk.noteTooLong);
     saveBtn.disabled = saving || !chk.ok;
+    const changed = dirty();
+    const label = $('[data-rematch-label]', rematchBtn);
+    if (label) label.textContent = changed ? t('result.rematchSave') : t('result.rematch');
+    rematchBtn.disabled = saving || (changed && !chk.ok);
   }
   function paintCount(key, max, bad) {
     const c = $(`[data-count="${key}"]`, el);
@@ -313,6 +325,7 @@ export default async function result(el, { params, isStale }) {
       toast(t('result.photoBad'));
     }
     paintPhoto();
+    paint(); // P2: Beschriftung der Revanche folgt dem Foto
   });
   on(el, 'click', '[data-act="photo-remove"]', () => {
     if (photo.preview) URL.revokeObjectURL(photo.preview);
@@ -320,11 +333,24 @@ export default async function result(el, { params, isStale }) {
     photo.preview = null;
     photo.removed = true;
     paintPhoto();
+    paint();
   });
   on(el, 'click', '[data-act="save"]', () => { save(); });
+  // P2 Revanche: unverändert ⇒ nichts an den Server, Entwurf schreiben, ins Setup; geändert ⇒ derselbe save()-Weg, danach Setup
+  on(el, 'click', '[data-act="rematch"]', () => {
+    if (saving) return;
+    if (dirty()) { save({ rematch: true }); return; }
+    toSetup();
+  });
+  function toSetup() {
+    const d = rematchDraft(data);
+    if (d) writeDraft(data.groupId, d);
+    go('/spiel-neu');
+  }
 
   // ---------- Speichern: Bewertung (RPC) ⇒ Foto ⇒ games (Siegbedingung, Notiz, Fotopfad)
-  async function save() {
+  /** @param {{ rematch?: boolean }} [opts] rematch: nach Erfolg ins Setup (Revanche) statt ins Partie-Detail */
+  async function save({ rematch = false } = {}) {
     if (saving || !formCheck(form).ok) return;
     saving = true;
     saveBtn.setAttribute('aria-busy', 'true');
@@ -359,7 +385,8 @@ export default async function result(el, { params, isStale }) {
       groupData.invalidate(state.groupId);
       if (photo.preview) URL.revokeObjectURL(photo.preview);
       toast(photoFailed ? t('result.photoFailed') : t('result.saved'));
-      go(`/partie/${encodeURIComponent(game.id)}`);
+      if (rematch) toSetup(); // Entwurf erst nach erfolgreichem Speichern
+      else go(`/partie/${encodeURIComponent(game.id)}`);
     } catch (ex) {
       const key = saveErrorKey(ex, navigator.onLine);
       toast(key ? t(`result.err.${key}`) : errText(ex));
