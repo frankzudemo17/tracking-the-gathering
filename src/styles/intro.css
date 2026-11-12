@@ -76,8 +76,10 @@
 .intro-ring { position: absolute; left: 50%; top: 50%; width: 150%; aspect-ratio: 1; border-radius: 50%; pointer-events: none;
   background: radial-gradient(closest-side, rgba(255, 255, 255, 0) 58%, rgba(255, 255, 255, .5) 72%, rgba(255, 255, 255, .16) 84%, rgba(255, 255, 255, 0) 100%);
   opacity: 0; transform: translate(-50%, -50%) scale(.7); }
-.intro-spark { position: absolute; left: 50%; top: 50%; width: 14px; height: 3px; margin-top: -1.5px; border-radius: 2px; pointer-events: none;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .95)); transform-origin: 0 50%; opacity: 0; }
+/* Funken: ein Behälter in der Kartenmitte (nur er wird animiert), darin je Funke eine feste Lage (Winkel aus dem Index) */
+.intro-sparks { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; opacity: 0; }
+.intro-spark { position: absolute; left: 0; top: 0; width: 14px; height: 3px; margin-top: -1.5px; border-radius: 2px; pointer-events: none;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .95)); transform-origin: 0 50%; }
 
 /* ---------- Info-Tafel (neutraler Schleier, Kontrast siehe Spec P8 Krit. 25) */
 .intro-panel {
@@ -113,6 +115,14 @@
   .intro-card { row-gap: 10px; padding-top: 10px; }
   .intro-panel { gap: 4px; padding: 10px 14px 10px; }
 }
+
+/* Tafel-Zeilen: ab dem Aufprall (560 ms) um 40 ms gestaffelt nachrücken, alle bis 900 ms fertig; Klasse .go nur während
+   des Anflugs (intro.js), bei „liegt“ entfernt */
+.intro-card.go .intro-panel > * { animation: intro-line 340ms cubic-bezier(.2, .7, .2, 1) 560ms backwards; }
+.intro-card.go .intro-panel > :nth-child(2) { animation-duration: 300ms; animation-delay: 600ms; }
+.intro-card.go .intro-panel > :nth-child(3) { animation-duration: 260ms; animation-delay: 640ms; }
+.intro-card.go .intro-panel > :nth-child(n + 4) { animation-duration: 220ms; animation-delay: 680ms; }
+@keyframes intro-line { from { transform: translate3d(0, 10px, 0); } to { transform: translate3d(0, 0, 0); } }
 
 @keyframes intro-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 

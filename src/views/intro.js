@@ -150,7 +150,7 @@ function cardView(p, i, got, L, lang, still) {
     </div>`);
   return html`<div class="intro-card" data-intro-card="${i}" data-pid="${p.id}" data-img="${kind}" data-phase="${still ? 'lie' : 'fly'}">
     <div class="intro-slot ${items.length > 1 ? 'pair' : ''}" aria-hidden="true">
-      ${fx ? html`<i class="intro-ring"></i>${Array.from({ length: SPARKS }, (_, k) => html`<i class="intro-spark" data-k="${k}"></i>`)}` : ''}
+      ${fx ? html`<i class="intro-ring"></i><i class="intro-sparks">${Array.from({ length: SPARKS }, (_, k) => html`<i class="intro-spark" data-k="${k}"></i>`)}</i>` : ''}
       ${pieces}
     </div>
     ${panelView(p, i, deck, row, got, L, lang)}
@@ -197,6 +197,9 @@ export function showIntro(host, { groupId, players, onDone }) {
   let idx = -1; // -1 = Bühne wartet auf Daten und Bild 1
   let timer = null;
   let lieTimer = null;
+  let goTimer = null;
+  /** vorab gebaute Karten-Ansichten (Index ⇒ { sig, view }), gebaut in Ruhezeiten statt im Start-Takt der Karte */
+  const views = new Map();
   /** @type {Animation[]} */
   let anims = [];
   /** @type {{ flyMs: number, lieMs: number, cardMs: number } | null} */
@@ -239,7 +242,25 @@ export function showIntro(host, { groupId, players, onDone }) {
   const clear = () => {
     if (timer) { clearTimeout(timer); timer = null; }
     if (lieTimer) { clearTimeout(lieTimer); lieTimer = null; }
+    if (goTimer) { clearTimeout(goTimer); goTimer = null; }
     stopAnims();
+  };
+  /** Was die Ansicht einer Karte bestimmt: geladene Quellen + Bildstand (ändert sich das, wird neu gebaut). */
+  const sigOf = (p) => {
+    const urls = urlsOf(p, got) || [];
+    return [got.rows ? got.rows.size : -1, got.cards.size, got.data ? 1 : 0,
+      ...urls, ...urls.map(imageState), ...artsOf(deckOf(p, got).deck).map(imageState)].join('|');
+  };
+  /** Ansicht von Karte k vorab bauen (P8 K21: Daten/Statistik nicht im Start-Takt der Karte). */
+  const prep = (k) => {
+    if (done || k < 0 || k >= n) return;
+    const sig = sigOf(list[k]);
+    if (views.get(k)?.sig !== sig) views.set(k, { sig, view: cardView(list[k], k, got, L, lang, still) });
+  };
+  const viewOf = (k) => {
+    const sig = sigOf(list[k]);
+    const c = views.get(k);
+    return c && c.sig === sig ? c.view : cardView(list[k], k, got, L, lang, still);
   };
   const teardown = () => {
     clear();
@@ -315,25 +336,24 @@ export function showIntro(host, { groupId, players, onDone }) {
     const r0 = Math.min(cw * (pair ? 2 : 1), ch) / 2;
     card.querySelectorAll('.intro-spark').forEach((sp, k) => {
       const ang = Math.round((k * 360) / SPARKS + (k % 2 ? 9 : -9)); // Winkel aus dem Index (kein Zufall, Lint L1)
-      const far = 40 + ((k * 37) % 51); // 40–90 px nach außen
-      run(sp, [
-        { opacity: 0.95, transform: `rotate(${ang}deg) translateX(${Math.round(r0)}px) scaleX(1)` },
-        { opacity: 0, transform: `rotate(${ang}deg) translateX(${Math.round(r0 + far)}px) scaleX(.4)` },
-      ], { duration: fxDur, delay: IMPACT, easing: 'cubic-bezier(.15, .8, .3, 1)' });
+      const off = (k * 37) % 21; // 0–20 px Versatz je Funke ⇒ ungleichmäßiger Kranz
+      /** @type {HTMLElement} */ (sp).style.transform = `rotate(${ang}deg) translateX(${Math.round(r0 + off)}px)`;
     });
+    // ein Behälter für alle Funken: skaliert ⇒ jeder Funke wandert ≈ 40–90 px nach außen und verblasst
+    const grow = (r0 + 75) / Math.max(1, r0);
+    run(card.querySelector('.intro-sparks'), [
+      { opacity: 0.95, transform: 'scale(1)' },
+      { opacity: 0, transform: `scale(${grow.toFixed(3)})` },
+    ], { duration: fxDur, delay: IMPACT, easing: 'cubic-bezier(.15, .8, .3, 1)' });
     // Filz wackelt kurz mit (≤ 3 px)
     run(felt, [
       { transform: 'translate3d(0, 0, 0)' }, { transform: 'translate3d(0, 3px, 0)', offset: 0.25 },
       { transform: 'translate3d(0, -1px, 0)', offset: 0.6 }, { transform: 'translate3d(0, 0, 0)' },
     ], { duration: fxDur, delay: IMPACT, easing: 'ease-out' });
-    // Info-Tafel: ab dem Aufprall einblenden, Zeilen gestaffelt (40 ms), alles bis 900 ms fertig
-    const panel = card.querySelector('.intro-panel');
-    run(panel, [{ opacity: 0 }, { opacity: 1 }], { duration: fly - IMPACT - 40, delay: IMPACT, easing: 'ease-out', fill: 'backwards' });
-    [...(panel?.children || [])].forEach((ln, k) => {
-      const d = IMPACT + Math.min(k, 4) * 40;
-      run(ln, [{ transform: 'translate3d(0, 10px, 0)' }, { transform: 'translate3d(0, 0, 0)' }],
-        { duration: fly - d, delay: d, easing: 'cubic-bezier(.2, .7, .2, 1)', fill: 'backwards' });
-    });
+    // Info-Tafel: ab dem Aufprall einblenden (eine Animation); Zeilen gestaffelt 40 ms über CSS (.intro-card.go), alles bis 900 ms
+    run(card.querySelector('.intro-panel'), [{ opacity: 0, transform: 'translate3d(0, 10px, 0)' }, { opacity: 1, transform: 'translate3d(0, 0, 0)' }],
+      { duration: fly - IMPACT - 40, delay: IMPACT, easing: 'ease-out', fill: 'backwards' });
+    card.classList.add('go');
   }
 
   /** Karte liegt (900 ms): Animationen beenden, Ring/Funken weg, will-change zurück. */
@@ -341,8 +361,11 @@ export function showIntro(host, { groupId, players, onDone }) {
     lieTimer = null;
     stopAnims();
     card.dataset.phase = 'lie';
-    card.querySelectorAll('.intro-ring, .intro-spark').forEach((e) => e.remove());
+    card.classList.remove('go');
+    card.querySelectorAll('.intro-ring, .intro-sparks').forEach((e) => e.remove());
     card.querySelectorAll('.intro-fly').forEach((e) => { /** @type {HTMLElement} */ (e).style.willChange = 'auto'; });
+    const next = idx + 1;
+    setTimeout(() => prep(next), 0); // Ruhezeit: nächste Karte schon bauen
   }
 
   function show(k) {
@@ -355,19 +378,28 @@ export function showIntro(host, { groupId, players, onDone }) {
     }
     idx = k;
     const p = list[k];
-    mount(stage, cardView(p, k, got, L, lang, still));
+    mount(stage, viewOf(k));
     const card = /** @type {HTMLElement} */ (stage.querySelector('.intro-card'));
+    const next = () => { timer = null; show(k + 1); };
+    if (!still) card.style.visibility = 'hidden'; // bis der Anflug angelegt ist (nächster Takt), sonst blitzt die Ruhelage auf
     const size = layout(card, felt);
     paintProgress();
     live.textContent = p.deck ? fill(L.live, { i: k + 1, n, name: p.name, deck: cmdLine(p.deck) }) : fill(L.liveNoDeck, { i: k + 1, n, name: p.name });
     if (still) {
       // Weniger Bewegung: liegt sofort, Wechsel als Einblenden (nur opacity, WAAPI ⇒ unberührt von den .001-ms-Regeln)
       run(card, [{ opacity: 0 }, { opacity: 1 }], { duration: INTRO_FADE_MS, easing: 'ease-out' });
-    } else {
-      animateIn(card, p, size);
-      lieTimer = setTimeout(() => lie(card), timing.flyMs);
+      timer = setTimeout(next, timing.cardMs);
+      return;
     }
-    timer = setTimeout(() => { timer = null; show(k + 1); }, timing.cardMs);
+    // Anflug in einem eigenen Takt (P8 K21): Einhängen + Maße und das Anlegen der Animationen getrennt, je kurz
+    goTimer = setTimeout(() => {
+      goTimer = null;
+      if (done || idx !== k) return;
+      animateIn(card, p, size);
+      card.style.visibility = '';
+      lieTimer = setTimeout(() => lie(card), timing.flyMs);
+      timer = setTimeout(next, timing.cardMs);
+    }, 0);
   }
 
   function onKey(e) {
@@ -400,7 +432,9 @@ export function showIntro(host, { groupId, players, onDone }) {
     if (done || idx >= 0) return;
     const u = urlsOf(list[0], got);
     if (u) await whenReady(u, Math.max(0, INTRO_WAIT_MS - (performance.now() - opened)));
-    if (!done && idx < 0) show(0);
+    if (done || idx >= 0) return;
+    prep(0); // Karte 1 bauen (Statistik, Kartenzeilen), Start im nächsten Takt
+    setTimeout(() => { if (!done && idx < 0) show(0); }, 0);
   });
 
   return finish;
