@@ -12,6 +12,12 @@ const shownUrls = new Set();
 const preloads = new Map();
 const cssUrl = (/** @type {string} */ u) => `url('${u.replace(/'/g, '%27')}')`;
 const instant = (/** @type {string} */ u) => /^(blob|data):/.test(u) || shownUrls.has(u);
+// Laufendes Einblenden je Adresse (Beginn, performance.now): zeichnet die Seite währenddessen neu, setzt der neue
+// Kreis das Einblenden an derselben Stelle fort, statt hart einzuspringen. Dauer wie components.css `.av-in`.
+const FADE_MS = 180;
+/** @type {Map<string, number>} */
+const fadeAt = new Map();
+const fadeLeft = (/** @type {string} */ u) => { const t0 = fadeAt.get(u); if (t0 == null) return -1; const e = performance.now() - t0; if (e >= FADE_MS) { fadeAt.delete(u); return -1; } return e; };
 /** @param {string} u @returns {Promise<boolean>} */
 function preload(u) {
   let p = preloads.get(u);
@@ -36,7 +42,7 @@ function wireAvatar(el) {
   preload(u).then((ok) => {
     const s = /** @type {HTMLElement} */ (el);
     s.classList.remove('av-wait');
-    if (ok) { s.style.backgroundImage = cssUrl(u); s.classList.add('av-in'); } else s.textContent = ini;
+    if (ok) { s.style.backgroundImage = cssUrl(u); s.classList.add('av-in'); fadeAt.set(u, performance.now()); } else s.textContent = ini;
   });
 }
 /** @param {Node} n */
@@ -65,8 +71,9 @@ export function avatar({ name, url, size = 44, ring = false, color = '', pending
   const now = !!u && instant(u);
   const wait = (!!u && !now) || (!u && pending);
   if (u && !now) watchAvatars();
-  const style = `--av:${size}px;${color ? `--c:${color};` : ''}${now ? `background-image:${cssUrl(u)};` : ''}`;
-  return html`<span class="avatar ${ring ? 'ring' : ''} ${wait ? 'av-wait' : ''}" style="${style}" aria-hidden="true" ${u && !now ? html`data-av-src="${u}" data-av-ini="${initials(name)}"` : ''}>${u || pending ? '' : initials(name)}</span>`;
+  const fading = now ? fadeLeft(u) : -1;
+  const style = `--av:${size}px;${color ? `--c:${color};` : ''}${now ? `background-image:${cssUrl(u)};` : ''}${fading >= 0 ? `--av-fade-delay:-${Math.round(fading)}ms;` : ''}`;
+  return html`<span class="avatar ${ring ? 'ring' : ''} ${wait ? 'av-wait' : ''} ${fading >= 0 ? 'av-in' : ''}" style="${style}" aria-hidden="true" ${u && !now ? html`data-av-src="${u}" data-av-ini="${initials(name)}"` : ''}>${u || pending ? '' : initials(name)}</span>`;
 }
 
 /**

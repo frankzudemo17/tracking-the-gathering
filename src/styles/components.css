@@ -359,3 +359,5 @@ button.cam::after { content: ''; position: absolute; inset: -10px; border-radius
 @keyframes av-in { from { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .avatar.av-in::after { animation: none; } }
 html[data-motion="reduce"] .avatar.av-in::after { animation: none; }
+/* Neu gezeichnet während des Einblendens: an derselben Stelle fortsetzen (parts.js fadeAt) */
+.avatar.av-in::after { animation-delay: var(--av-fade-delay, 0ms); }
