@@ -80,7 +80,7 @@ export function errText(e) {
   if (!navigator.onLine || /Failed to fetch|NetworkError/i.test(m)) return t('auth.errors.offline');
   const known = t(`auth.errors.${m}`);
   if (known !== `auth.errors.${m}`) return known;
-  if (/rate limit|Zu viele/i.test(m)) return /Zu viele/.test(m) ? m : t('auth.errors.rate');
+  if (/rate limit|Zu viele|security purposes/i.test(m)) return /Zu viele/.test(m) ? m : t('auth.errors.rate');
   if (/Password should be/i.test(m)) return t('auth.errors.weak');
   // Eigene Meldungen aus den RPCs sind schon deutsch und verständlich
   if (/^(Nicht angemeldet|Kein Mitglied|Name muss|Nur Admins|Die Gruppe braucht|Spieler ohne Konto)/.test(m)) return m;

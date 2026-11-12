@@ -242,6 +242,10 @@ export default {
         'Zweck ist allein der Betrieb der App für dich und deine Gruppe (Art. 6 Abs. 1 lit. b DSGVO).'] },
       { h: 'Supabase (Server in Frankfurt, EU)', p: [
         'Anmeldung, Datenbank und Bildspeicher laufen bei Supabase in der Region Frankfurt am Main (EU). Supabase verarbeitet die Daten in unserem Auftrag.'] },
+      { h: 'E-Mail-Versand: Brevo (EU)', p: [
+        'Wenn du ein neues Passwort anforderst, verschickt Supabase die Mail mit dem Link über den Mail-Dienst Brevo (Sendinblue SAS, Paris, Frankreich). Brevo erhält dafür deine E-Mail-Adresse und den Inhalt dieser Mail und verarbeitet sie in unserem Auftrag. Andere Mails, etwa Werbung, verschickt die App nicht.'] },
+      { h: 'Commander Spellbook (Bracket-Prüfung)', p: [
+        'Wenn du für ein Deck die Bracket-Prüfung startest, schickt unser Server bei Supabase die Kartenliste des Decks an Commander Spellbook (commanderspellbook.com), um Kombos und Game Changer zu finden. Dabei gehen nur Kartennamen hinaus, keine Konto-, Gruppen- oder Gerätedaten und nicht deine IP-Adresse.'] },
       { h: 'Scryfall (USA)', p: [
         'Kartenbilder und die Commander-Suche kommen direkt von Scryfall (scryfall.com). Dabei überträgt dein Gerät deine IP-Adresse und den Suchbegriff an Scryfall in den USA. Konto- oder Gruppendaten gehen nicht an Scryfall.'] },
       { h: 'GitHub Pages und esm.sh (Auslieferung der App)', p: [
