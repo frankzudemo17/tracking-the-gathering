@@ -153,7 +153,11 @@ function effect(s, ev) {
       t.out = true; t.outBy = ev.source ?? null; t.outRound = s.round; t.place = pl.place;
       const rest = s.players.filter((p) => !p.out);
       if (rest.length === 1) { rest[0].place = 1; s.finished = true; }
-      else if (wasTurn) advance(s);
+      else if (wasTurn) {
+        advance(s);
+        // Folgezug beginnt beim K.O. (payload.at, Gerätezeit); nie vor dem bisherigen Zugbeginn. Alte Ereignisse ohne at: wie bisher.
+        if (typeof pl.at === 'number' && Number.isFinite(pl.at)) s.turnStartedAt = Math.max(s.turnStartedAt, pl.at);
+      }
       break;
     }
     case 'roll':
@@ -329,7 +333,9 @@ function plan(s, action) {
       const p = need(s, action.target);
       if (p.out) return [];
       const alive = s.players.filter((x) => !x.out).length;
-      return [draft('eliminate', { source: action.by ?? null, target: p.id, payload: { place: alive } })];
+      const payload = { place: alive };
+      if (typeof action.at === 'number' && Number.isFinite(action.at)) payload.at = action.at; // optional: Zeitpunkt des K.O. (ms seit Epoch)
+      return [draft('eliminate', { source: action.by ?? null, target: p.id, payload })];
     }
     case 'roll': {
       if (!ROLL_KINDS.includes(action.kind)) throw new Error(`Unbekannte Wurfart '${action.kind}'`);
