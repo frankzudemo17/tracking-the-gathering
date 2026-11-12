@@ -892,7 +892,7 @@ export default async function life(el, { params, isStale }) {
     closeIntro = showIntro(el, {
       groupId: g.game.playgroup_id,
       players: order,
-      onDone: () => { closeIntro = null; if (!stopped && startHoldTip()) renderBoard(); },
+      onDone: () => { closeIntro = null; if (!stopped) doAct({ type: 'global', key: 'turnStartedAt', value: Date.now() }); if (!stopped && startHoldTip()) renderBoard(); },
     });
   }
 }
