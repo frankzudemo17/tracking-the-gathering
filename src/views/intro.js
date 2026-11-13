@@ -198,6 +198,7 @@ export function showIntro(host, { groupId, players, onDone }) {
   let timer = null;
   let lieTimer = null;
   let goTimer = null;
+  let fadeTimer = null; // Weniger Bewegung: alte Karte nach dem Überblenden entfernen
   /** vorab gebaute Karten-Ansichten (Index ⇒ { sig, view }), gebaut in Ruhezeiten statt im Start-Takt der Karte */
   const views = new Map();
   /** @type {Animation[]} */
@@ -243,6 +244,7 @@ export function showIntro(host, { groupId, players, onDone }) {
     if (timer) { clearTimeout(timer); timer = null; }
     if (lieTimer) { clearTimeout(lieTimer); lieTimer = null; }
     if (goTimer) { clearTimeout(goTimer); goTimer = null; }
+    if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
     stopAnims();
   };
   /** Was die Ansicht einer Karte bestimmt: geladene Quellen + Bildstand (ändert sich das, wird neu gebaut). */
@@ -378,6 +380,7 @@ export function showIntro(host, { groupId, players, onDone }) {
     }
     idx = k;
     const p = list[k];
+    const prev = still ? /** @type {HTMLElement | null} */ (stage.querySelector('[data-intro-card]')) : null;
     mount(stage, viewOf(k));
     const card = /** @type {HTMLElement} */ (stage.querySelector('.intro-card'));
     const next = () => { timer = null; show(k + 1); };
@@ -386,8 +389,16 @@ export function showIntro(host, { groupId, players, onDone }) {
     paintProgress();
     live.textContent = p.deck ? fill(L.live, { i: k + 1, n, name: p.name, deck: cmdLine(p.deck) }) : fill(L.liveNoDeck, { i: k + 1, n, name: p.name });
     if (still) {
-      // Weniger Bewegung: liegt sofort, Wechsel als Einblenden (nur opacity, WAAPI ⇒ unberührt von den .001-ms-Regeln)
+      // Weniger Bewegung: liegt sofort, Wechsel als Überblenden (Entscheid 15; nur opacity, WAAPI ⇒ unberührt von den
+      // .001-ms-Regeln): die alte Karte bleibt unter der neuen liegen und blendet in derselben Zeit aus
       run(card, [{ opacity: 0 }, { opacity: 1 }], { duration: INTRO_FADE_MS, easing: 'ease-out' });
+      if (prev) {
+        prev.removeAttribute('data-intro-card');
+        prev.setAttribute('aria-hidden', 'true');
+        stage.prepend(prev);
+        run(prev, [{ opacity: 1 }, { opacity: 0 }], { duration: INTRO_FADE_MS, easing: 'ease-in', fill: 'forwards' });
+        fadeTimer = setTimeout(() => { fadeTimer = null; prev.remove(); }, INTRO_FADE_MS);
+      }
       timer = setTimeout(next, timing.cardMs);
       return;
     }
