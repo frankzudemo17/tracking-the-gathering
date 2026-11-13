@@ -75,6 +75,11 @@ export async function signIn(k) {
   sessions[k] = { token: a.access_token, uid: a.user.id, until: Date.now() + (a.expires_in - 120) * 1000 };
   return sessions[k];
 }
+/** P6: alle Objekte eines Ordners im Bucket avatars (Pfade), z. B. `profiles/<id>`. */
+async function avatarObjects(token, folder) {
+  const objs = await api('POST', `${TARGET.url}/storage/v1/object/list/avatars`, { token, body: { prefix: folder, limit: 1000 } });
+  return (objs || []).filter((o) => o.id).map((o) => `${folder}/${o.name}`);
+}
 export const rpc = async (k, fn, args = {}) => api('POST', rest(`rpc/${fn}`), { token: (await signIn(k)).token, body: args });
 export const get = async (k, p) => api('GET', rest(p), { token: (await signIn(k)).token });
 
@@ -147,7 +152,9 @@ export async function baseState({ log = () => {} } = {}) {
   const ph = members.filter((m) => !m.profile_id);
   if (ph.length) {
     try {
-      const rm = await api('DELETE', `${TARGET.url}/storage/v1/object/avatars`, { token: tokA, body: { prefixes: ph.map((m) => `members/${m.id}/avatar.jpg`) } });
+      // P6: versionierte Namen (avatar-<…>.jpg) ⇒ Ordner auflisten, alle Objekte darin löschen
+      const names = (await Promise.all(ph.map((m) => avatarObjects(tokA, `members/${m.id}`)))).flat();
+      const rm = names.length ? await api('DELETE', `${TARGET.url}/storage/v1/object/avatars`, { token: tokA, body: { prefixes: names } }) : [];
       n.avatars += Array.isArray(rm) ? rm.length : 0;
     } catch (e) { n.leftovers.push(`Platzhalter-Bilder: ${e.message}`); }
     n.placeholders = (await api('DELETE', rest(`members?id=${inList(ph.map((m) => m.id))}`), { token: tokA, prefer: 'return=representation' })).length;
@@ -158,7 +165,8 @@ export async function baseState({ log = () => {} } = {}) {
     const s = await signIn(k);
     n.decks += (await api('DELETE', rest(`decks?owner_profile_id=eq.${s.uid}`), { token: s.token, prefer: 'return=representation' })).length;
     try {
-      const rm = await api('DELETE', `${TARGET.url}/storage/v1/object/avatars`, { token: s.token, body: { prefixes: [`profiles/${s.uid}/avatar.jpg`] } });
+      const names = await avatarObjects(s.token, `profiles/${s.uid}`); // P6: alle Objekte im eigenen Ordner
+      const rm = names.length ? await api('DELETE', `${TARGET.url}/storage/v1/object/avatars`, { token: s.token, body: { prefixes: names } }) : [];
       n.avatars += Array.isArray(rm) ? rm.length : 0;
     } catch (e) { n.leftovers.push(`Profilbild ${LABEL[k]}: ${e.message}`); }
     await api('PATCH', rest(`profiles?id=eq.${s.uid}`), { token: s.token, body: { display_name: NAMES[k], locale: 'de', theme: 'nacht', avatar_path: null } });

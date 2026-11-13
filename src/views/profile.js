@@ -1,9 +1,9 @@
 // Profil (eigenes oder fremdes Mitglied der aktuellen Playgroup)
-import { sb, must, avatarUrls, appUrl } from '../supabase.js';
+import { sb, must, avatarUrls, avatarUrlsNow, appUrl } from '../supabase.js';
 import { state, currentMembership, currentGroup, isAdmin, isSuperadmin, updateProfile, loadMe } from '../state.js';
 import { html, on, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
-import { avatar, backHead, empty, memberName, memberAvatarPath, roleChip, manaPips, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
+import { avatar, pathAvatar, backHead, empty, memberName, memberAvatarPath, roleChip, manaPips, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
 import { pageCache, cacheKey, GROUP_MAX_AGE_MS } from '../lib/cache.js';
 import { decksOf, sortColors, bracketName } from '../lib/decks.js';
 import { sheet, toast, errText, copyText, openPhoto } from '../lib/ui.js';
@@ -95,7 +95,7 @@ export default async function profile(el, { params, isStale, fail }) {
 
     avUrl = urls[avPath] || '';
     const decksOpen = decksOpenPref(); // beim Neuzeichnen gilt der zuletzt gewählte Zustand
-    const av = avatar({ name, url: avUrl, size: 72 });
+    const av = pathAvatar({ name, path: avPath, urls, size: 72 });
     const avView = html`<button type="button" class="avatar-view" data-act="avatar-zoom" aria-label="${t('avatar.view', { name })}">${av}</button>`;
     paint(html`
     ${showBack || isMe ? html`<div class="prof-top">
@@ -188,8 +188,12 @@ export default async function profile(el, { params, isStale, fail }) {
     m = p.cached?.value.m || currentMembership();
     decks = p.cached?.value.decks ?? null;
     if (g.cached) { data = g.cached.value; statsState = 'ok'; }
-    urls = (await settled(signed(m))) || {};
+    const u = signed(m);
+    const now = await settled(u);
     if (!sc.ok()) return;
+    // P6: noch offen ⇒ was ohne Netz bekannt ist (lokales Bild, gültige Signatur), sonst leerer Kreis
+    urls = now || avatarUrlsNow([avPathOf(m)]);
+    if (!now) u.then((x) => { if (sc.ok()) { urls = { ...x, ...urls }; draw(); } });
     await draw();
     stale.from(p.cached?.failed ? p.cached : g.cached?.failed ? { at: p.cached?.at ?? g.cached.at, failed: true } : undefined);
     p.promise?.then(async (v) => {
@@ -212,7 +216,7 @@ export default async function profile(el, { params, isStale, fail }) {
   const rerender = () => go(location.hash.slice(1));
 
   on(el, 'click', '[data-act="avatar-zoom"]', () => { if (avUrl) openPhoto(avUrl, t('avatar.alt', { name }), { round: true }); });
-  on(el, 'click', '[data-act="photo"]', () => openAvatarSheet({ name, url: urls[avPath], has: !!avPath, target, isMe, onDone: () => { groupData.invalidate(m.playgroup_id || state.groupId); rerender(); } })); // P12 Nachtrag 1 (B2)
+  on(el, 'click', '[data-act="photo"]', () => openAvatarSheet({ name, url: urls[avPath], has: !!avPath, path: avPath, target, isMe, onDone: () => { groupData.invalidate(m.playgroup_id || state.groupId); rerender(); } })); // P12 Nachtrag 1 (B2)
   on(el, 'click', '[data-act="rename"]', () => openRename({ name, isMe, member: m, onDone: rerender }));
   on(el, 'click', '[data-act="claim-link"]', () => copyText(appUrl(`#/code/${m.claim_code}`)));
   on(el, 'click', '[data-act="toggle-decks"]', (e, b) => {
@@ -376,7 +380,7 @@ async function profileStats({ pr, data, isMe, name, lang, memberId, moreOpen }) 
   return html`${tiles}${mood}${salt}${line}${tempo}${highlights}${more}`;
 }
 
-function openAvatarSheet({ name, url, has, target, isMe, onDone }) {
+function openAvatarSheet({ name, url, has, path = null, target, isMe, onDone }) {
   sheet(t('avatar.title'), html`
     <div class="prof-head">
       ${avatar({ name, url, size: 64 })}
@@ -396,9 +400,9 @@ function openAvatarSheet({ name, url, has, target, isMe, onDone }) {
     };
     on(sh, 'change', 'input[type=file]', (e, input) => {
       const f = input.files?.[0];
-      if (f) done(() => setAvatar(target, f), t('avatar.saved'));
+      if (f) done(() => setAvatar(target, f, path), t('avatar.saved'));
     });
-    on(sh, 'click', '[data-act="remove"]', () => done(() => removeAvatar(target), t('avatar.removed')));
+    on(sh, 'click', '[data-act="remove"]', () => done(() => removeAvatar(target, path), t('avatar.removed')));
   });
 }
 

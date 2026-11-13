@@ -3,11 +3,11 @@
 // P12: zuletzt geladener Stand (page:start) sofort, sonst Gerüst; Auffrischen bei jedem Besuch im Hintergrund.
 // Mitglieder ∥ laufende Spiele ∥ Gruppen-Daten; davon abhängig Decks ∥ Bild-Adressen. Das erste Zeichnen ohne
 // gemerkten Stand wartet nicht auf die Gruppen-Daten (Abschnitt „Rangliste“ zeigt solange Platzhalter).
-import { sb, must, avatarUrls } from '../supabase.js';
+import { sb, must, avatarUrls, avatarUrlsNow } from '../supabase.js';
 import { state, currentGroup } from '../state.js';
 import { html, on } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
-import { avatar, empty, memberName, memberAvatarPath, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
+import { avatar, pathAvatar, empty, memberName, memberAvatarPath, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
 import { sheet, toast } from '../lib/ui.js';
 import { go } from '../router.js';
 import { t, getLang } from '../i18n/index.js';
@@ -19,7 +19,8 @@ import { groupData } from '../lib/data.js';
 import { playerTable } from '../lib/stats.js';
 import { deckArt } from './history-ui.js';
 import { recentGames, fmtShortDate } from './result-ui.js';
-import { pageCache, GROUP_MAX_AGE_MS } from '../lib/cache.js';
+import { pageCache, cacheKey, GROUP_MAX_AGE_MS } from '../lib/cache.js';
+import { registerRefill } from '../lib/refill.js';
 
 // Zuletzt gezeigtes Commander-Bild der Startseite (öffentliche Scryfall-Adresse), je Konto + Gruppe, nur fürs Gerüst.
 // Geleert in clearCaches (Abmelden/Kontowechsel).
@@ -33,6 +34,28 @@ function rememberArt(/** @type {string} */ k, /** @type {string|null} */ url) {
     else if (rememberedArt(k)) localStorage.removeItem(HERO_ART_KEY);
   } catch { /* privat */ }
 }
+
+/**
+ * page:start einer Gruppe laden (Daten, nie HTML): Mitglieder ∥ laufende Spiele, dann neuestes Deck je Mitglied.
+ * P6: Modul-Funktion, damit das Nachfüllen (src/lib/refill.js) sie ohne offene Startseite nutzen kann.
+ * `prevLive`: zuletzt gemerkte Liste laufender Spiele — mit ihr zählt ein Ausfall der Anzeigetafel als gescheitertes
+ * Auffrischen (nie eine alte Liste mit neuem Zeitstempel). `withMembers` läuft parallel zu den Decks (Bild-Adressen).
+ * @param {string} gid
+ * @param {{ prevLive?: any[]|null, withMembers?: ((members: any[]) => Promise<any>)|null }} [o]
+ */
+export async function loadStartPage(gid, { prevLive = null, withMembers = null } = {}) {
+  // Anzeigetafel: ein Fehler hier lässt die Startseite unverändert (bisherige Liste, sonst keine)
+  const liveP = createStore(sb).liveGames(gid).catch((e) => { console.warn('Laufende Spiele', e); if (prevLive) throw e; return []; });
+  liveP.catch(() => {}); // scheitern die Mitglieder zuerst, wartet niemand mehr auf liveP
+  const members = await sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', gid).order('created_at').then(must);
+  const [latest, live] = await Promise.all([latestDeckByMember(members), liveP, withMembers ? withMembers(members) : null]);
+  return { members, latest, live };
+}
+// P6 Entscheid 10: Nachfüllen nach eigenen Schreibvorgängen (auch ohne offene Startseite, sobald das Modul geladen ist)
+registerRefill('page:start', (gid) => {
+  const key = cacheKey(state.session?.user?.id, gid, 'page:start');
+  return pageCache.load(key, () => loadStartPage(gid, { prevLive: pageCache.peek(key)?.value?.live || null }), { force: true });
+});
 
 export default async function start(el, { isStale, fail }) {
   const sc = viewScope(state, isStale);
@@ -53,16 +76,10 @@ export default async function start(el, { isStale, fail }) {
   const signed = (/** @type {any[]} */ members) => avatarUrls(paths(members)).catch(() => ({}));
 
   const loadPage = async () => {
-    const gid = sc.gid;
-    const prevLive = pageCache.peek(pageKey)?.value?.live;
-    // Anzeigetafel: ein Fehler hier lässt die Startseite unverändert (bisherige Liste, sonst keine)
-    // Mit gemerktem Stand zählt ein Ausfall als gescheitertes Auffrischen (nie eine alte Liste mit neuem Zeitstempel).
-    const liveP = createStore(sb).liveGames(gid).catch((e) => { console.warn('Laufende Spiele', e); if (prevLive) throw e; return []; });
-    liveP.catch(() => {}); // scheitern die Mitglieder zuerst, wartet niemand mehr auf liveP
     const ownUrl = signed([]);
-    const members = await sb.from('members').select(MEMBER_SELECT).eq('playgroup_id', gid).order('created_at').then(must);
-    const [latest, live] = await Promise.all([latestDeckByMember(members), liveP, signed(members), ownUrl]);
-    return { members, latest, live };
+    const v = await loadStartPage(sc.gid, { prevLive: pageCache.peek(pageKey)?.value?.live || null, withMembers: signed });
+    await ownUrl;
+    return v;
   };
 
   const view = () => {
@@ -90,7 +107,7 @@ export default async function start(el, { isStale, fail }) {
 
     // Gerüst (Entscheid 8): Kopfzeile, Karte „Neue Runde“, ruhige Platzhalter
     if (!page) {
-      return html`${top0(avatar({ name: me?.display_name, url: urls[me?.avatar_path], size: 42 }))}
+      return html`${top0(pathAvatar({ name: me?.display_name, path: me?.avatar_path, urls, size: 42 }))}
     ${hero(null, true)}
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('home.players')}</h3><a href="#/gruppen">${t('home.all')}</a></div>
@@ -106,11 +123,9 @@ export default async function start(el, { isStale, fail }) {
     const mine = members.find((m) => m.profile_id === me?.id);
     const myDeck = mine ? latest[mine.id] : null;
     rememberArt(heroKey(), myDeck?.image_url || null);
-    // Spielerbild: Foto, sonst Commander-Art des neuesten Decks, sonst Initialen
-    const personAv = (m, size) => {
-      const d = latest[m.id];
-      return avatar({ name: memberName(m), url: urls[memberAvatarPath(m)] || d?.image_url || null, size });
-    };
+    // Spielerbild: Foto, sonst Commander-Art des neuesten Decks, sonst Initialen.
+    // P6 Entscheid 14: Mitglied mit Pfad zeigt nie die Commander-Art als Zwischenbild (offen ⇒ leerer Kreis).
+    const personAv = (m, size) => pathAvatar({ name: memberName(m), path: memberAvatarPath(m), urls, art: latest[m.id]?.image_url || null, size });
     const nameOf = new Map(members.map((m) => [m.id, memberName(m)]));
     // Anzeigetafel je laufendem Spiel (HANDOFF 4 Startseite): Kacheln aus games.live_state
     const boardCard = (gm) => {
@@ -162,7 +177,7 @@ export default async function start(el, { isStale, fail }) {
           : html`<div class="card">${empty('trophy', t('home.noGames'), t('home.noGamesSub'))}</div>`;
 
     return html`
-    ${top0(mine ? personAv(mine, 42) : avatar({ name: me?.display_name, url: urls[me?.avatar_path], size: 42 }))}
+    ${top0(mine ? personAv(mine, 42) : pathAvatar({ name: me?.display_name, path: me?.avatar_path, urls, size: 42 }))}
 
     ${hero(myDeck)}
 
@@ -220,11 +235,16 @@ export default async function start(el, { isStale, fail }) {
   if (p.cached) {
     page = p.cached.value;
     const u = signed(page.members);
-    urls = (await settled(u)) || {};
+    const now = await settled(u);
     if (!sc.ok()) return;
+    // P6: noch offen ⇒ was ohne Netz bekannt ist (lokale Bilder, gültige Signaturen), Rest als leerer Kreis
+    urls = now || avatarUrlsNow(paths(page.members));
+    if (!now) u.then((x) => { if (sc.ok()) { urls = { ...urls, ...x }; draw(); } });
   } else {
-    urls = (await settled(signed([]))) || {};
+    const u = signed([]);
+    const now = await settled(u);
     if (!sc.ok()) return;
+    urls = now || avatarUrlsNow(paths([]));
   }
   draw();
   stale.from(p.cached?.failed ? p.cached : g.cached?.failed ? { at: p.cached?.at ?? g.cached.at, failed: true } : undefined);

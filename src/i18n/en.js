@@ -258,7 +258,7 @@ export default {
         'The sign-in library (supabase-js) is loaded from esm.sh at startup; this also transmits your IP address.',
         'Fonts are part of the app itself; there are no requests to Google Fonts.'] },
       { h: 'No trackers', p: [
-        'No analytics, no ads, no third-party cookies. In your browser the app only stores what it needs to work: your sign-in, language, look, selected playgroup, game events not yet sent and the app files for offline use.'] },
+        'No analytics, no ads, no third-party cookies. In your browser the app only stores what it needs to work: your sign-in, language, look, selected playgroup, game events not yet sent and the app files for offline use. For a fast start it also keeps the most recently loaded group data, profile pictures and computed statistics (e.g. badges) of your account on this device; signing out deletes them.'] },
       { h: 'Retention and deletion', p: [
         'Data is kept as long as your account exists. Under Settings → Account you can delete your account yourself at any time. Your account, profile, picture and unplayed decks are then gone. Shared games remain for the group; you appear there as “Ehemaliges Mitglied” (former member) without name or picture, and played decks stay there archived. Playgroups where nobody else has an account are deleted together with their games and photos.'] },
       { h: 'Your rights', p: [
@@ -267,7 +267,8 @@ export default {
   },
 
   common: { back: 'Back', close: 'Close', cancel: 'Cancel', loading: 'Loading …', error: 'Something went wrong.', reload: 'Reload',
-    stale: 'Not updated – as of {time}' }, // P12
+    stale: 'Not updated – as of {time}', // P12
+    staleDate: 'Not updated – as of {date}, {time}' }, // P6: not from today
 
   setup, life, dice, attack, ko, intro, // intro: P3 Spielstart-Intro
   decklist, live, table, // seam P3 (wave ttg-live-feinschliff-decks)

@@ -153,7 +153,7 @@ export async function openPage({ root: rootIn = DEFAULT_ROOT, look = 'nacht', ro
       try { paths = JSON.parse(req.postData() || '{}').paths || []; } catch { /* leer */ }
       return json(paths.map((p) => ({ path: p, signedURL: `/object/sign/vorschau/${encodeURIComponent(p)}?token=vorschau`, error: null })));
     }
-    if (u.pathname.startsWith('/storage/')) return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: PLACEHOLDER });
+    if (u.pathname.startsWith('/storage/')) return r.fulfill({ status: 200, contentType: 'image/svg+xml', headers: { 'access-control-allow-origin': '*' }, body: PLACEHOLDER });
     if (u.pathname.startsWith('/auth/')) return json({ id: fx.ME_PROFILE, aud: 'authenticated', email: 'vorschau@example.com', user_metadata: {} });
     if (u.pathname.startsWith('/rest/v1/rpc/')) return json({});
     if (u.pathname.startsWith('/rest/v1/')) {

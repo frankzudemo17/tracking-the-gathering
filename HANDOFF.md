@@ -100,7 +100,7 @@ Laufendes Spiel als **kompakte Anzeigetafel** (eine Reihe Sitzfelder mit Command
 - **Profilbild:** Im eigenen Profil auf das runde Bild tippen (kleines Kamera-Symbol unten rechts). Bottom-Sheet mit „Foto aufnehmen“ (`<input type="file" accept="image/*" capture="user">`), „Aus Galerie wählen“ und „Bild entfernen“. Im Client quadratisch mittig zuschneiden und auf 256×256 JPEG (Qualität ~0,85) verkleinern, dann hochladen. Ohne Bild stehen die Initialen da.
   - Setzen darf man das eigene Bild und das von **Spielern ohne Konto** in der eigenen Gruppe. Fremde Profile mit Konto: nur ansehen.
   - Angezeigt wird es oben rechts auf der Startseite, im Profil und in der Mitgliederliste der Playgroup (später gern auch in Rangliste und Historie).
-  - Speicherort: Bucket `avatars`, Pfad `profiles/<profile_id>/avatar.jpg` bzw. `members/<member_id>/avatar.jpg`, Spalte `avatar_path` in `profiles` bzw. `members`. Übernimmt jemand einen Platzhalter per Code, wird dessen Bild übernommen, falls er noch keins hat.
+  - Speicherort: Bucket `avatars`, Pfad `profiles/<profile_id>/avatar-<zeit36><4 hex>.jpg` bzw. `members/<member_id>/avatar-<…>.jpg` (seit P6 je Hochladen ein neuer Name, das alte Objekt im selben Ordner wird danach entfernt; ältere Bilder heißen noch `avatar.jpg`), Spalte `avatar_path` in `profiles` bzw. `members`. Übernimmt jemand einen Platzhalter per Code, wird dessen Bild übernommen, falls er noch keins hat. Die App legt zuletzt geladene Gruppendaten und Profilbilder je Konto im Gerätespeicher (IndexedDB `ttg-geraet`, `src/lib/device-store.js`) ab und zeigt sie beim Kaltstart sofort; Abmelden leert ihn.
 
 ### 5.2 Decks
 - Profil → Decks → „+ Commander hinzufügen“. Geht für das eigene Profil und für Spieler ohne Konto.

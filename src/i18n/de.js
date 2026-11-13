@@ -258,7 +258,7 @@ export default {
         'Die Programmbibliothek für die Anmeldung (supabase-js) lädt die App beim Start von esm.sh; auch dabei wird deine IP-Adresse übertragen.',
         'Schriften liegen in der App selbst, es gibt keine Anfrage an Google Fonts.'] },
       { h: 'Keine Tracker', p: [
-        'Keine Analyse, keine Werbung, keine Cookies von Dritten. Im Browser speichert die App nur, was sie zum Funktionieren braucht: deine Anmeldung, Sprache, Look, die gewählte Playgroup, noch nicht gesendete Spielereignisse und die App-Dateien für den Offline-Betrieb.'] },
+        'Keine Analyse, keine Werbung, keine Cookies von Dritten. Im Browser speichert die App nur, was sie zum Funktionieren braucht: deine Anmeldung, Sprache, Look, die gewählte Playgroup, noch nicht gesendete Spielereignisse und die App-Dateien für den Offline-Betrieb. Für den schnellen Start merkt sie sich außerdem die zuletzt geladenen Gruppendaten, Profilbilder und berechneten Statistiken (z. B. Abzeichen) deines Kontos auf diesem Gerät; beim Abmelden wird das gelöscht.'] },
       { h: 'Speicherdauer und Löschen', p: [
         'Daten bleiben, solange dein Konto besteht. Unter Einstellungen → Konto kannst du dein Konto jederzeit selbst löschen. Dann sind Konto, Profil, Profilbild und ungespielte Decks weg. Gemeinsame Spiele bleiben für die Gruppe erhalten, du erscheinst dort als „Ehemaliges Mitglied“ ohne Namen und Bild; gespielte Decks bleiben dort archiviert. Playgroups, in denen sonst niemand ein Konto hat, werden samt Spielen und Fotos gelöscht.'] },
       { h: 'Deine Rechte', p: [
@@ -267,7 +267,8 @@ export default {
   },
 
   common: { back: 'Zurück', close: 'Schließen', cancel: 'Abbrechen', loading: 'Lädt …', error: 'Da ist etwas schiefgelaufen.', reload: 'Neu laden',
-    stale: 'Nicht aktualisiert – Stand von {time} Uhr' }, // P12
+    stale: 'Nicht aktualisiert – Stand von {time} Uhr', // P12
+    staleDate: 'Nicht aktualisiert – Stand vom {date}, {time} Uhr' }, // P6: Stand nicht von heute
 
   setup, life, dice, attack, ko, intro, // intro: P3 Spielstart-Intro
   decklist, live, table, // Naht P3 (Welle ttg-live-feinschliff-decks)
