@@ -43,13 +43,20 @@ async function visit(P, hash) {
   }, de.legal.operator);
 }
 
-/** Sucht `needle` (nur in der Seite bekannt) in localStorage, sessionStorage, allen IndexedDB-Stores und CacheStorage. */
+/**
+ * Sucht den Wert (nur in der Seite bekannt) in localStorage, sessionStorage, allen IndexedDB-Stores und CacheStorage —
+ * zeilenweise (jede Zeile ≥ 5 Zeichen, ein Treffer genügt): ein mehrzeiliger Wert stünde in JSON mit \n maskiert.
+ * Dieselbe Suchlogik prüft die Probe mit Positivkontrolle (belege-p10-impressum, K13).
+ */
 const stored = (P, needleExpr) => P.evaluate(async (expr) => {
   // eslint-disable-next-line no-new-func
   const n = new Function(`return (${expr})`)();
-  const out = { local: false, session: false, idb: false, caches: false, cacheApi: typeof caches !== 'undefined', restInCache: false };
-  if (!n) return out;
-  const has = (x) => { try { return JSON.stringify(x).includes(n) || String(x).includes(n); } catch { return String(x).includes(n); } };
+  const out = { local: false, session: false, idb: false, caches: false, cacheApi: typeof caches !== 'undefined', restInCache: false, cacheCount: 0, cacheEntries: 0, needles: 0 };
+  const needles = String(n || '').split('\n').map((x) => x.trim()).filter((x) => x.length >= 5);
+  out.needles = needles.length;
+  if (needles.length === 0) return out;
+  const inStr = (str) => needles.some((x) => str.includes(x));
+  const has = (x) => { let j = ''; try { j = JSON.stringify(x) ?? ''; } catch { /* nicht serialisierbar */ } return inStr(j) || inStr(String(x)); };
   for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (has(k) || has(localStorage.getItem(k))) out.local = true; }
   for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); if (has(k) || has(sessionStorage.getItem(k))) out.session = true; }
   for (const { name } of (indexedDB.databases ? await indexedDB.databases() : [])) {
@@ -62,11 +69,13 @@ const stored = (P, needleExpr) => P.evaluate(async (expr) => {
   }
   if (out.cacheApi) {
     for (const k of await caches.keys()) {
+      out.cacheCount++;
       const c = await caches.open(k);
       for (const req of await c.keys()) {
+        out.cacheEntries++;
         if (/\/rest\/v1\//.test(req.url)) out.restInCache = true;
         const res = await c.match(req);
-        if (res && (await res.clone().text()).includes(n)) out.caches = true;
+        if (res && inStr(await res.clone().text())) out.caches = true;
       }
     }
   }
@@ -125,18 +134,25 @@ export default async function impressumE2e({ browser, base: BASE }) {
       await A.evaluate(() => { /** @type {any} */ (window).__imp = document.querySelector('#view [data-imprint-value]')?.textContent?.trim() || ''; });
       await A.waitForTimeout(1500);
       const s = await stored(A, 'window.__imp');
-      ok('Wert nicht in localStorage/sessionStorage/IndexedDB/CacheStorage', !s.local && !s.session && !s.idb && !s.caches, JSON.stringify(s));
+      ok(`Wert nicht in localStorage/sessionStorage/IndexedDB/CacheStorage (${s.needles} Suchzeilen, ${s.cacheApi ? `${s.cacheCount} Caches, ${s.cacheEntries} Einträge` : 'CacheStorage nicht verfügbar'})`,
+        s.needles > 0 && !s.local && !s.session && !s.idb && !s.caches, JSON.stringify(s));
       await A.evaluate(() => { location.hash = '#/einstellungen'; });
       await waitHash(A, '#/einstellungen');
       await A.click('[data-act="logout"]');
       await waitHash(A, '#/login');
       const after = await visit(A, '#/datenschutz');
-      const gone = await A.evaluate(() => { const w = /** @type {any} */ (window); const n = w.__imp; delete w.__imp; return !!n && !document.body.innerText.includes(n) && !document.body.innerHTML.includes(n); });
+      const gone = await A.evaluate(() => {
+        const w = /** @type {any} */ (window);
+        const lines = String(w.__imp || '').split('\n').map((x) => x.trim()).filter((x) => x.length >= 5);
+        delete w.__imp;
+        const dom = document.body.innerText + '\n' + document.body.innerHTML;
+        return lines.length > 0 && !lines.some((x) => dom.includes(x));
+      });
       ok('nach Abmelden: #/datenschutz neutral + Hinweis, Wert nicht im DOM', after.operator && after.hint && !after.value && gone);
     }
     // Service Worker: keine Supabase-REST-Antwort im CacheStorage (unabhängig vom Prod-Stand)
     const c = await stored(A, "'/rest/v1/'");
-    ok('CacheStorage enthält keine /rest/v1/-Antwort', c.cacheApi ? !c.restInCache : true, c.cacheApi ? '' : 'CacheStorage nicht verfügbar');
+    ok(`CacheStorage enthält keine /rest/v1/-Antwort (${c.cacheApi ? `${c.cacheCount} Caches, ${c.cacheEntries} Einträge` : 'CacheStorage nicht verfügbar'})`, c.cacheApi ? !c.restInCache : true);
     ok('angemeldet: keine JS-Fehler, keine HTTP-Fehler', A.errs.length === 0 && A.bad.length === 0, [...A.errs, ...A.bad].join(' | '));
   } finally {
     env.appInfoMissing = false;
