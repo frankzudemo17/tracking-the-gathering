@@ -97,7 +97,8 @@ export async function launch() {
   }
 }
 
-export const env = { rateLimited: false, scryfallDown: false };
+// appInfoMissing: nur von impressum.e2e.mjs gesetzt, wenn dessen Probe „Tabelle app_info fehlt in Prod“ erkannt hat (P10)
+export const env = { rateLimited: false, scryfallDown: false, appInfoMissing: false };
 /** Alle in diesem Lauf geöffneten Seiten [name, page] (für Fehler-Screenshots). */
 export const opened = [];
 
@@ -124,6 +125,7 @@ export async function ctx(browser, name) {
   p.on('response', (r) => {
     const u = r.url();
     if (r.status() === 404 && u.startsWith(TARGET.url + '/rest/v1/') && /\/rest\/v1\/(rpc\/check_invite|rpc\/list_all_playgroups|playgroup_invites)(\?|$)/.test(u)) { p.transit.push(u.split('?')[0]); return; }
+    if (env.appInfoMissing && r.status() === 404 && u.split('?')[0] === TARGET.url + '/rest/v1/app_info') { p.transit.push(u.split('?')[0]); return; }
     if (r.status() === 429 && u.startsWith(TARGET.url + '/auth/')) env.rateLimited = true;
     if (/api\.scryfall\.com/.test(u) && (r.status() === 429 || r.status() >= 500)) env.scryfallDown = true;
     if (r.status() >= 400) p.bad.push(r.status() + ' ' + u.split('?')[0] + (u.includes('grant_type=password') ? '?grant_type=password' : ''));
