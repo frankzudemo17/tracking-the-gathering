@@ -784,3 +784,95 @@ test('P1 Z11 K.O. am Zug beim Rundenwechsel', async () => {
   assert.equal(te.actor, 'A');
   assert.equal(te.payload.seconds, 1);
 });
+
+// ---------------------------------------------------------------------------
+// P8 Nachtrag 1 (spec-p8-intro2.md): Zugbeginn des ersten Zugs = Intro-Ende.
+// global-Schlüssel turnStartedAt (ms seit Epoch); nur Runde 1, Startspieler am Zug, vorher nur Würfe;
+// nicht rückgängig machbar, nicht im Verlauf. Ohne das Ereignis rechnet der erste Zug ab startedAt (Bestand).
+
+const TS = (value) => ({ type: 'global', key: 'turnStartedAt', value });
+const firstTurnEnd = (t) => t.all.find((e) => e.type === 'turn_end');
+
+test('P8 N1 Zugbeginn nach dem Intro: erster turn_end zählt ab Intro-Ende', async () => {
+  const E = await load(); const t = table(E, { startedAt: 1000000 });
+  t.do({ type: 'roll', kind: 'start', values: [2], winnerSeat: 0 });
+  const ev = t.do(TS(1021000));
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].type, 'global');
+  assert.deepEqual({ key: ev[0].payload.key, value: ev[0].payload.value }, { key: 'turnStartedAt', value: 1021000 });
+  assert.equal(t.s.turnStartedAt, 1021000);
+  t.do({ type: 'endTurn', at: 1051000 });
+  assert.equal(firstTurnEnd(t).payload.seconds, 30, 'ab Intro-Ende, nicht ab Spielstart (51)');
+  // Replay (anderes Gerät, Neuladen) kommt zum selben Ergebnis
+  const r = E.replay(t.init, t.all);
+  assert.equal(r.turnStartedAt, t.s.turnStartedAt);
+  assert.equal(r.round, t.s.round);
+});
+
+test('P8 N1 Gegenstück ohne Ereignis: erster turn_end enthält die Intro-Dauer (Bestand)', async () => {
+  const E = await load(); const t = table(E, { startedAt: 1000000 });
+  t.do({ type: 'roll', kind: 'start', values: [2], winnerSeat: 0 });
+  t.do({ type: 'endTurn', at: 1051000 });
+  assert.equal(firstTurnEnd(t).payload.seconds, 51);
+});
+
+test('P8 N1 nur am Anfang: nach Lebensänderung, nach Zugende, zweites Mal, nach Spielende ⇒ kein Ereignis', async () => {
+  const E = await load();
+  let t = table(E);
+  t.do({ type: 'life', target: 'B', d: -1 });
+  assert.deepEqual(t.do(TS(5000)), [], 'nach life');
+  assert.equal(t.s.turnStartedAt, 0);
+  t = table(E);
+  t.do({ type: 'endTurn', at: 1000 });
+  assert.deepEqual(t.do(TS(5000)), [], 'Runde 1, aber nicht mehr der Startspieler');
+  t = table(E);
+  for (let i = 0; i < 4; i++) t.do({ type: 'endTurn', at: (i + 1) * 1000 });
+  assert.equal(t.s.turn, 0); assert.equal(t.s.round, 2);
+  assert.deepEqual(t.do(TS(9000)), [], 'Runde 2, Startspieler wieder am Zug');
+  t = table(E);
+  assert.equal(t.do(TS(5000)).length, 1, 'ohne Startwurf erlaubt');
+  assert.deepEqual(t.do(TS(6000)), [], 'zweites Mal');
+  assert.equal(t.s.turnStartedAt, 5000);
+  t = table(E);
+  t.do({ type: 'global', key: 'storm', value: 2 });
+  assert.deepEqual(t.do(TS(5000)), [], 'nach anderem global-Ereignis');
+  t = table(E);
+  for (const id of ['B', 'C', 'D']) t.do({ type: 'eliminate', target: id });
+  assert.equal(t.s.finished, true);
+  assert.deepEqual(t.do(TS(5000)), [], 'nach Spielende');
+});
+
+test('P8 N1 Wert: nur endliche Zahl, sonst Fehler', async () => {
+  const E = await load(); const t = table(E);
+  for (const bad of [null, undefined, '5000', NaN, Infinity]) assert.throws(() => t.do(TS(bad)), /turnStartedAt/, String(bad));
+  assert.equal(t.all.length, 0);
+});
+
+test('P8 N1 nicht rückgängig machbar: canUndo false, undo danach trifft die nächste Aktion, nicht den Zugbeginn', async () => {
+  const E = await load(); const t = table(E, { startedAt: 1000 });
+  t.do({ type: 'roll', kind: 'start', values: [1], winnerSeat: 0 });
+  t.do(TS(20000));
+  assert.equal(E.canUndo(t.s), false, 'nur Wurf + Zugbeginn ⇒ nichts rückgängig zu machen');
+  assert.deepEqual(t.do({ type: 'undo' }), []);
+  assert.equal(t.s.turnStartedAt, 20000);
+  t.do({ type: 'life', target: 'B', d: -3 });
+  const u = t.do({ type: 'undo' });
+  assert.equal(u.length, 1);
+  assert.equal(t.p('B').life, 40);
+  assert.equal(t.s.turnStartedAt, 20000, 'Zugbeginn bleibt');
+  assert.equal(E.canUndo(t.s), false);
+});
+
+test('P8 N1 Verlauf: der Zugbeginn erscheint nicht (keine Zeile „Sturm“), andere global-Einträge schon', async () => {
+  const E = await load(); const t = table(E);
+  t.do({ type: 'roll', kind: 'start', values: [3], winnerSeat: 0 });
+  t.do(TS(4000));
+  t.do({ type: 'global', key: 'daynight', value: 'tag' });
+  const h = E.history(t.s);
+  assert.deepEqual(h.map((e) => [e.type, e.key]), [['roll', 'start'], ['global', 'daynight']]);
+});
+
+test('P8 N1 alte Spiele: unbekannte global-Schlüssel bleiben verboten', async () => {
+  const E = await load(); const t = table(E);
+  assert.throws(() => t.do({ type: 'global', key: 'round', value: 5 }), /Unbekannter globaler Schlüssel/);
+});

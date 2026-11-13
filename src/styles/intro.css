@@ -1,108 +1,152 @@
-/* intro.css · Spielstart-Intro (Spec P3, Welle ttg-features). Besitzer: P3.
+/* intro.css · Spielstart-Intro (Spec P3 + P8 „Intro 2.0“, Welle ttg-features). Besitzer: P3/P8.
    Bühne wie die K.O.-Screens (fixed, inset 0, overflow hidden), z-index 26: über Tisch und .atk-layer (25),
-   unter Sheets (30), Schild (31), Toast (40). Farben nur aus Tokens: Bühne --hero, Text --hero-ink/--hero-mu,
-   „Beginnt“ --turn (einziges farbiges Element), Verlauf über dem Bild aus --scrim (Schreibweise wie
-   components.css: rgba(var(--scrim), a), da --scrim als „r, g, b“ hinterlegt ist). Bilder ungetönt.
-   Animiert werden nur transform und opacity; gesteuert wird über Zeitgeber in intro.js, nie über animationend. */
+   unter Sheets (30), Schild (31), Toast (40). P8: Spieltisch mit Filz wie der Würfeltisch; Tisch und Filz als
+   lokale Größen --in-* (dokumentierte Ausnahme vom Token-Gebot wie in dice.css; wertgleich zu dice.css:10–14 /
+   Mockup F5a, in allen Looks gleich). Text nur aus Tokens (--hero-ink, --hero-mu, „Beginnt“ --turn als einziges
+   farbiges Element) auf der Info-Tafel (neutraler Schleier rgba(0, 0, 0, .5)). Ring/Funken neutral weiß, Schatten
+   neutral schwarz. Kartenbilder ungetönt, unbeschnitten (object-fit: contain), nichts liegt über der Karte.
+   Animiert werden nur transform und opacity (element.animate in intro.js, hier nur intro-fill); gesteuert wird über
+   Zeitgeber in intro.js, nie über animationend. */
 
 .intro {
+  /* Tisch + Filz: Werte aus dice.css:11–12 (--dt-bg, --dt-rim, --dt-felt-1/2/3) */
+  --in-bg: #0E1319; --in-rim: #0B1015;
+  --in-felt-1: #2E6B52; --in-felt-2: #235442; --in-felt-3: #183B2F;
+  --in-top: calc(60px + var(--safe-t)); --in-side: 8px; --in-bot: calc(8px + var(--safe-b));
   position: fixed; inset: 0; z-index: 26; overflow: hidden; overscroll-behavior: none;
-  background: var(--hero); color: var(--hero-ink); font-family: var(--f-body);
+  background: var(--in-bg); color: var(--hero-ink); font-family: var(--f-body);
   -webkit-tap-highlight-color: transparent; user-select: none; cursor: pointer;
 }
 .intro-shield { position: fixed; inset: 0; z-index: 31; background: transparent; }
 
-/* ---------- Kopf: Fortschritt + Überspringen */
+/* ---------- Kopf (außerhalb des Filzes): Fortschritt + Überspringen */
 .intro-top {
   position: absolute; left: 0; right: 0; top: 0; z-index: 2;
   display: flex; align-items: center; gap: 12px;
-  padding: calc(10px + var(--safe-t)) 8px 0 16px;
+  padding: calc(8px + var(--safe-t)) 8px 0 16px;
 }
 .intro-prog { flex: 1; display: flex; gap: 4px; min-width: 0; }
-.intro-prog i { flex: 1; height: 3px; border-radius: 2px; overflow: hidden; background: rgba(var(--scrim), .55);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hero-ink) 22%, transparent); }
+.intro-prog i { flex: 1; height: 3px; border-radius: 2px; overflow: hidden; background: rgba(255, 255, 255, .14); }
 .intro-prog b { display: block; height: 100%; background: var(--hero-ink); transform-origin: 0 50%; transform: scaleX(0); }
 .intro-prog i.done b { transform: scaleX(1); }
-.intro-prog i.cur b { animation: intro-fill 2500ms linear forwards; }
+.intro-prog i.cur b { animation: intro-fill var(--intro-card-ms, 4900ms) linear forwards; }
 .intro-skip {
   flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-width: 44px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 22px;
-  background: rgba(var(--scrim), .55); color: var(--hero-ink);
+  background: rgba(255, 255, 255, .08); color: var(--hero-ink);
   font: 600 14px/1 var(--f-body); letter-spacing: .01em; cursor: pointer;
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
 }
 .intro-skip svg { opacity: .8; }
 .intro-skip:focus-visible { outline: 2px solid color-mix(in srgb, var(--hero-ink) 60%, transparent); outline-offset: 2px; }
 
-/* ---------- Karte */
-.intro-stage { position: absolute; inset: 0; }
-.intro-card { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; }
-/* Bild oben (Scryfall art_crop ist quer ⇒ nicht vollflächig hochziehen), unten weich in die Bühne auslaufend;
-   die Maske wirkt nur über die Deckkraft (Farbwert der Verläufe ohne Bedeutung) */
-.intro-art { position: absolute; left: 0; right: 0; top: 0; height: 76%; display: flex; gap: 2px; background: var(--hero);
-  -webkit-mask-image: linear-gradient(180deg, rgba(var(--scrim), 1) 50%, rgba(var(--scrim), 0) 100%);
-  mask-image: linear-gradient(180deg, rgba(var(--scrim), 1) 50%, rgba(var(--scrim), 0) 100%); }
-.intro-img { flex: 1; min-width: 0; background-size: cover; background-position: center 30%; background-repeat: no-repeat; }
-.intro-art.none { align-items: center; justify-content: center; -webkit-mask-image: none; mask-image: none; background: transparent; }
+/* ---------- Tisch: Filz mit Rand, Innenschatten und Struktur (wie .dt-felt) */
+.intro-felt, .intro-stage { position: absolute; left: var(--in-side); right: var(--in-side); top: var(--in-top); bottom: var(--in-bot); }
+.intro-felt {
+  border-radius: 28px; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 34%, var(--in-felt-1) 0%, var(--in-felt-2) 52%, var(--in-felt-3) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), inset 0 0 0 7px var(--in-rim), inset 0 10px 40px rgba(0, 0, 0, .45);
+}
+.intro-felt::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: repeating-radial-gradient(circle at 30% 20%, rgba(255, 255, 255, .03) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, .035) 0 2px, transparent 2px 5px); }
+
+/* ---------- Karte: oben mittig der Bildplatz, darunter die Info-Tafel */
+.intro-card {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  row-gap: 14px; padding: 18px 12px 12px; min-height: 0;
+}
+.intro-slot { position: relative; flex: none; display: flex; gap: 10px; justify-content: center; }
+.intro-place { position: relative; flex: none; perspective: 900px; }
+.intro-fly { position: absolute; inset: 0; transform-origin: 50% 50%; }
+.intro-cardimg { display: block; width: 100%; height: 100%; object-fit: contain; -webkit-user-drag: none; }
+/* Rückfall: art_crop-Kachel 4 : 3 (wie die Bilder in der App) bzw. Initialen-Kreis aus P3 */
+.intro-tile { display: block; width: 100%; height: 100%; border-radius: 16px; background-size: cover; background-position: center 30%;
+  background-repeat: no-repeat; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); }
 .intro-ini {
-  display: grid; place-items: center; width: 128px; height: 128px; border-radius: 50%;
-  font: 700 48px/1 var(--f-display); letter-spacing: -.02em; color: var(--hero-ink);
-  background: color-mix(in srgb, var(--hero-ink) 8%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hero-ink) 18%, transparent);
+  display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%;
+  font: 700 clamp(36px, 12vw, 48px)/1 var(--f-display); letter-spacing: -.02em; color: var(--hero-ink);
+  background: rgba(0, 0, 0, .28); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
 }
-/* nur ein neutraler dunkler Verlauf unten (Lesbarkeit), kein Farbschleier über dem Bild */
-.intro-scrim {
-  position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(180deg, rgba(var(--scrim), .45) 0%, rgba(var(--scrim), 0) 16%, rgba(var(--scrim), 0) 34%,
-    rgba(var(--scrim), .55) 54%, rgba(var(--scrim), .7) 70%, rgba(var(--scrim), .7) 100%);
-}
-.intro-text {
-  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
-  padding: 0 20px calc(28px + var(--safe-b)); max-width: 560px; width: 100%; margin: 0 auto; min-width: 0;
+/* Schatten (vorab weich als Verlauf, kein filter), Ruhelage eng und dunkel; ohne Bild (Initialen) kein Schatten */
+.intro-shadow { position: absolute; left: -7%; right: -7%; top: -4%; bottom: -9%; pointer-events: none; border-radius: 18px;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, .55), rgba(0, 0, 0, .3) 62%, rgba(0, 0, 0, 0));
+  opacity: .85; transform: translate3d(0, 9px, 0) scale(1.03); }
+.intro-card[data-img="none"] .intro-shadow { display: none; }
+/* Lichtring (ein Element, vorgerenderter Verlauf) und Funken: hinter der Karte, in Ruhe unsichtbar */
+.intro-ring { position: absolute; left: 50%; top: 50%; width: 150%; aspect-ratio: 1; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0) 58%, rgba(255, 255, 255, .5) 72%, rgba(255, 255, 255, .16) 84%, rgba(255, 255, 255, 0) 100%);
+  opacity: 0; transform: translate(-50%, -50%) scale(.7); }
+/* Funken: ein Behälter in der Kartenmitte (nur er wird animiert), darin je Funke eine feste Lage (Winkel aus dem Index) */
+.intro-sparks { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; opacity: 0; }
+.intro-spark { position: absolute; left: 0; top: 0; width: 14px; height: 3px; margin-top: -1.5px; border-radius: 2px; pointer-events: none;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .95)); transform-origin: 0 50%; }
+
+/* ---------- Info-Tafel (neutraler Schleier, Kontrast siehe Spec P8 Krit. 25) */
+.intro-panel {
+  position: relative; flex: none; width: min(100%, 520px); min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+  padding: 12px 16px 14px; border-radius: 18px; background: rgba(0, 0, 0, .5);
 }
 .intro-first {
-  display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px; border-radius: 13px;
-  font: 700 12px/1 var(--f-body); letter-spacing: .08em; text-transform: uppercase;
-  color: var(--turn); box-shadow: inset 0 0 0 1.5px var(--turn); background: rgba(var(--scrim), .5);
+  display: inline-flex; align-items: center; gap: 7px; height: 24px; padding: 0 10px; border-radius: 12px;
+  font: 700 11px/1 var(--f-body); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--turn); box-shadow: inset 0 0 0 1.5px var(--turn);
 }
 .intro-first i { width: 7px; height: 7px; border-radius: 50%; background: var(--turn); }
 .intro-name {
-  max-width: 100%; margin: 2px 0 0; font: 800 clamp(34px, 10vw, 48px)/1.02 var(--f-display); letter-spacing: -.03em;
+  max-width: 100%; margin: 0; font: 800 clamp(24px, 7.4vw, 34px)/1.08 var(--f-display); letter-spacing: -.03em;
   color: var(--hero-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.intro-deck { display: flex; align-items: center; gap: 8px; max-width: 100%; min-width: 0;
-  font: 600 16px/1.3 var(--f-body); color: var(--hero-ink); }
+.intro-deck { display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 100%; min-width: 0;
+  font: 600 15px/1.3 var(--f-body); color: var(--hero-ink); }
 .intro-deck .pips { flex: none; display: inline-flex; gap: 3px; }
 .intro-deck > span:last-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.intro-facts { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--hero-mu); font: 500 14px/1.3 var(--f-body);
+.intro-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; color: var(--hero-mu); font: 500 13px/1.3 var(--f-body);
   font-variant-numeric: tabular-nums; }
 .intro-fact { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .intro-fact svg { flex: none; opacity: .9; }
-.intro-line { margin: 4px 0 0; max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
-.intro-line.motto { -webkit-line-clamp: 3; line-clamp: 3; font: 600 italic 19px/1.32 var(--f-display); letter-spacing: -.01em; color: var(--hero-ink);
-  padding-inline-end: .3em; } /* Kursiv ragt rechts über die Box hinaus: ohne Rand schnitt overflow:hidden das schließende „“ ab (Review P3) */
-.intro-line.auto { -webkit-line-clamp: 2; line-clamp: 2; font: 500 14px/1.4 var(--f-body); color: var(--hero-mu); }
+.intro-line { margin: 2px 0 0; max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.intro-line.motto { -webkit-line-clamp: 3; line-clamp: 3; font: 600 italic 17px/1.3 var(--f-display); letter-spacing: -.01em; color: var(--hero-ink);
+  padding-inline: .3em; } /* Kursiv ragt über die Box hinaus: ohne Rand schnitt overflow:hidden das schließende „“ ab (Review P3) */
+.intro-line.auto { -webkit-line-clamp: 2; line-clamp: 2; font: 500 13px/1.4 var(--f-body); color: var(--hero-mu); }
 
-/* ---------- Bewegung (wenn erlaubt): Bild 1.04 → 1 + Einblenden, Text gleitet ≤ 12 px; ≤ 450 ms */
-.intro-card .intro-art { animation: intro-art 450ms cubic-bezier(.2, .7, .2, 1) both; }
-.intro-card .intro-text { animation: intro-rise 380ms cubic-bezier(.2, .7, .2, 1) 60ms both; }
-@keyframes intro-art { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
-@keyframes intro-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+/* Niedrige Bildschirme (320 × 568): engere Abstände, damit die Karte trotz dreizeiligem Motto ≥ 170 px breit bleibt */
+@media (max-height: 640px) {
+  .intro-card { row-gap: 10px; padding-top: 10px; }
+  .intro-panel { gap: 4px; padding: 10px 14px 10px; }
+}
+
+/* Tafel-Zeilen: ab dem Aufprall (560 ms) um 40 ms gestaffelt nachrücken, alle bis 900 ms fertig; Klasse .go nur während
+   des Anflugs (intro.js), bei „liegt“ entfernt */
+.intro-card.go .intro-panel > * { animation: intro-line 340ms cubic-bezier(.2, .7, .2, 1) 560ms backwards; }
+.intro-card.go .intro-panel > :nth-child(2) { animation-duration: 300ms; animation-delay: 600ms; }
+.intro-card.go .intro-panel > :nth-child(3) { animation-duration: 260ms; animation-delay: 640ms; }
+.intro-card.go .intro-panel > :nth-child(n + 4) { animation-duration: 220ms; animation-delay: 680ms; }
+@keyframes intro-line { from { transform: translate3d(0, 10px, 0); } to { transform: translate3d(0, 0, 0); } }
+
 @keyframes intro-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
-/* ---------- Weniger Bewegung: statische Karten, Fortschritt ohne Füllbewegung (aktuelles Segment voll) */
-.intro-still .intro-card .intro-art, .intro-still .intro-card .intro-text, .intro-still .intro-prog i.cur b { animation: none; }
-.intro-still .intro-prog i.cur b { transform: scaleX(1); }
+/* ---------- Weniger Bewegung: Fortschritt ohne Füllbewegung (aktuelles Segment voll); Karte liegt sofort (intro.js) */
+.intro-still .intro-prog i.cur b { animation: none; transform: scaleX(1); }
 @media (prefers-reduced-motion: reduce) {
-  .intro .intro-card .intro-art, .intro .intro-card .intro-text, .intro .intro-prog i.cur b { animation: none; }
-  .intro .intro-prog i.cur b { transform: scaleX(1); }
+  .intro .intro-prog i.cur b { animation: none; transform: scaleX(1); }
 }
-html[data-motion="reduce"] .intro .intro-card .intro-art, html[data-motion="reduce"] .intro .intro-card .intro-text,
-html[data-motion="reduce"] .intro .intro-prog i.cur b { animation: none; }
-html[data-motion="reduce"] .intro .intro-prog i.cur b { transform: scaleX(1); }
+html[data-motion="reduce"] .intro .intro-prog i.cur b { animation: none; transform: scaleX(1); }
 
 /* ---------- Deckprofil: Motto (deck.js) */
 .deck-motto { margin: 0; color: var(--mu); font: 500 italic 16px/1.4 var(--f-display); overflow-wrap: anywhere; }
 .motto-hint { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .motto-count { flex: none; font-variant-numeric: tabular-nums; color: var(--mu); }
 .motto-count.over { color: var(--danger); }
+
+/* ---------- Gruppe: Intro-Dauer (groups.js, P8 Entscheid 5) — Stepper „− 4 s +“, Knöpfe 44 × 44 px */
+.intro-set-title { display: flex; align-items: center; gap: 8px; }
+.intro-set-title svg { flex: none; color: var(--acc2); }
+.intro-set-row { display: flex; align-items: center; gap: 12px; font-weight: 600; }
+.intro-stepper { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.intro-stepper .intro-step { min-width: 44px; min-height: 44px; width: 44px; height: 44px; padding: 0; border-radius: var(--r-sm);
+  background: var(--sf2); font: 700 22px/1 var(--f-body); }
+.intro-stepper .intro-step:disabled { opacity: .4; }
+.intro-stepper output { min-width: 4.2ch; text-align: center; font: 700 18px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.intro-setting [data-act="intro-save"] { align-self: flex-start; }
+.intro-setting [data-act="intro-save"]:disabled { opacity: .5; }

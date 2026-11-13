@@ -12,6 +12,9 @@ const EXCLUSIVE = ['monarch', 'init'];
 const DAYNIGHT = [null, 'tag', 'nacht'];
 const ROLL_KINDS = ['w6', 'w6x2', 'w20', 'coin', 'player', 'start'];
 const ATTACK_KINDS = ['damage', 'cmd', 'cmd2', 'poison'];
+const TURN_START = 'turnStartedAt'; // global-Schlüssel (P8 Nachtrag 1), nicht rückgängig machbar, nicht im Verlauf
+/** Ereignisse, die Rückgängig nie trifft: Würfe und der Zugbeginn nach dem Intro. */
+const fixedEvent = (e) => e.type === 'roll' || (e.type === 'global' && e.payload?.key === TURN_START);
 
 // ---------------------------------------------------------------------------
 // Aufbau
@@ -216,12 +219,12 @@ export function replay(init, events) {
 // ---------------------------------------------------------------------------
 // Rückgängig
 
-/** Höchstes noch wirksames act (kein roll/undo, nicht rückgängig) oder null. */
+/** Höchstes noch wirksames act (kein roll/undo/Zugbeginn, nicht rückgängig) oder null. */
 function lastUndoableAct(s) {
   const undone = undoneSeqs(s.events);
   let best = null;
   for (const e of s.events) {
-    if (e.type === 'undo' || e.type === 'roll' || undone.has(e.seq)) continue;
+    if (e.type === 'undo' || fixedEvent(e) || undone.has(e.seq)) continue;
     const a = e.payload?.act;
     if (Number.isInteger(a) && (best === null || a > best)) best = a;
   }
@@ -316,6 +319,14 @@ function plan(s, action) {
         if (!Number.isInteger(v) || v < 0) throw new Error(`Ungültiger Wert für storm: '${v}'`);
         return v === s.storm ? [] : [draft('global', { payload: { key: 'storm', value: v } })];
       }
+      if (action.key === TURN_START) {
+        // P8 Nachtrag 1: Zugbeginn des ersten Zugs = Intro-Ende (ms seit Epoch). Nur ganz am Anfang:
+        // Runde 1, Startspieler am Zug, bisher nur Würfe (Startwurf); sonst still nichts.
+        const v = action.value;
+        if (typeof v !== 'number' || !Number.isFinite(v)) throw new Error(`Ungültiger Wert für ${TURN_START}: '${v}'`);
+        const fresh0 = s.round === 1 && s.turn === s.first && s.events.every((e) => e.type === 'roll');
+        return fresh0 ? [draft('global', { payload: { key: TURN_START, value: v } })] : [];
+      }
       throw new Error(`Unbekannter globaler Schlüssel '${action.key}'`);
     }
     case 'storm': {
@@ -348,7 +359,7 @@ function plan(s, action) {
       if (target === null) return [];
       const undone = undoneSeqs(s.events);
       return s.events
-        .filter((e) => e.payload?.act === target && e.type !== 'undo' && e.type !== 'roll' && !undone.has(e.seq))
+        .filter((e) => e.payload?.act === target && e.type !== 'undo' && !fixedEvent(e) && !undone.has(e.seq))
         .map((e) => draft('undo', { payload: { seq: e.seq } }));
     }
     default:
@@ -441,7 +452,8 @@ export function killerCandidates(state, targetId) {
  */
 export function history(state) {
   const undone = undoneSeqs(state.events);
-  const live = state.events.filter((e) => e.type !== 'undo' && !undone.has(e.seq));
+  const live = state.events.filter((e) => e.type !== 'undo' && !undone.has(e.seq)
+    && !(e.type === 'global' && e.payload?.key === TURN_START)); // Zugbeginn ist keine Spielhandlung
   const entries = [];
   for (const e of live) {
     const pl = e.payload || {};

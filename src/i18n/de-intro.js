@@ -26,4 +26,18 @@ export default {
     few: 'kaum Kreaturen',
     curve: { low: 'niedrige Manakurve', mid: 'mittlere Manakurve', high: 'hohe Manakurve' },
   },
+  // P8: Gruppen-Einstellung „Zeit je Spieler“ (src/views/groups.js, nur Admins/Superadmin)
+  setting: {
+    title: 'Spielstart-Intro',
+    row: 'Zeit je Spieler',
+    value: '{n} s',
+    aria: '{n} Sekunden',
+    shorter: 'Kürzer',
+    longer: 'Länger',
+    hint: 'So lange bleibt jede Commander-Karte liegen, nachdem sie gelandet ist. Der Anflug dauert knapp eine Sekunde zusätzlich. Gilt für alle Geräte der Gruppe; an- und ausschalten lässt sich das Intro je Gerät unter Einstellungen › Am Tisch.',
+    save: 'Speichern',
+    saved: 'Gespeichert',
+    notAdmin: 'Nur Admins der Gruppe können das ändern.',
+    range: 'Erlaubt sind 2 bis 10 Sekunden.',
+  },
 };
