@@ -40,15 +40,17 @@ function fakeSb({ result = { data: null, error: null }, throws = null } = {}) {
   const chain = {
     select: (c) => { calls.push(['select', c]); return chain; },
     eq: (k, v) => { calls.push(['eq', k, v]); return chain; },
-    maybeSingle: async () => { calls.push(['maybeSingle']); if (throws) throw throws; return result; },
+    maybeSingle: () => { calls.push(['maybeSingle']); return chain; },
+    retry: (on) => { calls.push(['retry', on]); return chain; },
+    then: (res, rej) => { calls.push(['await']); return (throws ? Promise.reject(throws) : Promise.resolve(result)).then(res, rej); },
   };
   return { calls, sb: { from: (tbl) => { calls.push(['from', tbl]); return chain; } } };
 }
 
-test('loadImprint: genau eine Anfrage app_info.select(value).eq(key, impressum).maybeSingle()', async () => {
+test('loadImprint: genau eine Anfrage app_info.select(value).eq(key, impressum).maybeSingle(), ohne Wiederholung', async () => {
   const f = fakeSb({ result: { data: { value: WERT }, error: null } });
   assert.deepEqual(await loadImprint(f.sb), { row: { value: WERT }, error: null });
-  assert.deepEqual(f.calls, [['from', 'app_info'], ['select', 'value'], ['eq', 'key', 'impressum'], ['maybeSingle']]);
+  assert.deepEqual(f.calls, [['from', 'app_info'], ['select', 'value'], ['eq', 'key', 'impressum'], ['maybeSingle'], ['retry', false], ['await']]);
 });
 
 test('loadImprint: Fehlerantwort und geworfener Fehler kommen als error zurück, nie als Ausnahme', async () => {

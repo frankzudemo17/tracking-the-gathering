@@ -32,12 +32,14 @@ export function pickImprint(session, row, error) {
 /**
  * Genau eine Leseanfrage an app_info (Schlüssel „impressum“). Wirft nie: Netz-/Schnittstellenfehler (auch 404 vor dem
  * db push, 401) kommen als `error` zurück — die Seite bleibt dann still neutral (keine Konsole, kein Abmelden).
+ * retry(false): postgrest-js wiederholt GET sonst bei Netzfehler bis zu dreimal mit Wartezeit (Probe: 4 Versuche,
+ * Platzhalter 7 s) — hier genau ein Versuch, danach sofort der neutrale Satz.
  * @param {any} sb  Supabase-Client
  * @returns {Promise<{ row: any, error: unknown }>}
  */
 export async function loadImprint(sb) {
   try {
-    const { data, error } = await sb.from('app_info').select('value').eq('key', 'impressum').maybeSingle();
+    const { data, error } = await sb.from('app_info').select('value').eq('key', 'impressum').maybeSingle().retry(false);
     return { row: data ?? null, error: error ?? null };
   } catch (e) {
     return { row: null, error: e };
