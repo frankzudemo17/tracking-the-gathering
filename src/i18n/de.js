@@ -85,6 +85,7 @@ export default {
     board: { title: 'Rangliste kommt bald', sub: 'Punkte, Decks und Salt-Rangliste kommen in Etappe 5.' },
   },
   result, history, board, recap, stats, // Etappe 4/5 (Naht P13)
+  badges, // P4 Abzeichen (Welle ttg-features)
 
   groups: {
     title: 'Playgroups', newGroup: 'Neue Playgroup', groupName: 'Name der Playgroup', groupNamePh: 'z. B. Küchentisch',
@@ -280,3 +281,4 @@ import history from './de-history.js';
 import board from './de-board.js';
 import recap from './de-recap.js';
 import stats from './de-stats.js';
+import badges from './de-badges.js';

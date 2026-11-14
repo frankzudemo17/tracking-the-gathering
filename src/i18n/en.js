@@ -85,6 +85,7 @@ export default {
     board: { title: 'Rankings coming soon', sub: 'Points, decks and salt rankings arrive in stage 5.' },
   },
   result, history, board, recap, stats, // Etappe 4/5 (Naht P13)
+  badges, // P4 Abzeichen (Welle ttg-features)
 
   groups: {
     title: 'Playgroups', newGroup: 'New playgroup', groupName: 'Playgroup name', groupNamePh: 'e.g. Kitchen table',
@@ -280,3 +281,4 @@ import history from './en-history.js';
 import board from './en-board.js';
 import recap from './en-recap.js';
 import stats from './en-stats.js';
+import badges from './en-badges.js';
