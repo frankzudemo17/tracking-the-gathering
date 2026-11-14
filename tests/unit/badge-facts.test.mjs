@@ -267,6 +267,26 @@ test('S13 onPlan (Zusatz Anzeige): nach dem Lesen vor dem Laden; zweiter Lauf lo
   assert.deepEqual(plans, [{ have: 1, missing: 3, total: 4, loading: 3, calls: 0 }, { have: 4, missing: 0, total: 4, loading: 0, calls: 1 }]);
 });
 
+test('S14 Wettlauf: Ladung A endet, während B noch liest ⇒ B lädt dieselben Spiele nicht erneut', async () => {
+  const { store } = await setup('k1');
+  const { ensureFacts } = await BF();
+  const ga = gate(); const gb = gate();
+  const spy = eventsSpy({ delay: ga.p });
+  const data = groupWith(3);
+  // B liest einen Stand von vor A's Schreiben, bekommt ihn aber erst nach A's Ende
+  const slow = { ...store, generation: () => store.generation(), putFacts: (...a) => store.putFacts(...a), dropFacts: (k) => store.dropFacts(k),
+    factsOf: async (a, g) => { const r = await store.factsOf(a, g); await gb.p; return r; } };
+  const pa = ensureFacts({ data, account: 'k1', storage: store, loadEvents: spy.fn });
+  await new Promise((r) => setTimeout(r, 5)); // A wartet in loadEvents
+  const pb = ensureFacts({ data, account: 'k1', storage: slow, loadEvents: spy.fn });
+  await new Promise((r) => setTimeout(r, 5)); // B wartet in factsOf (alter Stand)
+  ga.open(); const a = await pa; // A fertig: Fakten im Arbeitsspeicher, nicht mehr in Ladung
+  gb.open(); const b = await pb;
+  assert.equal(a.facts.size, 3); assert.equal(b.facts.size, 3);
+  assert.equal(spy.calls.flat().length, 3, `loadEvents-Aufrufe ${JSON.stringify(spy.calls)}`);
+  assert.equal(b.loaded, 0);
+});
+
 // ---------------------------------------------------------------------------
 // DS · device-store-Erweiterung (Objektspeicher fakten)
 

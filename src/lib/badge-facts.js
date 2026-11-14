@@ -143,6 +143,8 @@ export async function ensureFacts({ data, account, storage = deviceStore, loadEv
     .slice().sort((a, b) => ts(b.startedAt) - ts(a.startedAt) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
   const facts = await readFacts(store, account, group, games.map((g) => g.id));
   if (store) await pruneFacts(store, account, group, (data?.games || []).map((g) => g.id));
+  // Eine andere Ladung kann während des Lesens fertig geworden sein ⇒ Arbeitsspeicher-Kopie erneut ansehen
+  if (epoch === e0) for (const g of games) { if (!facts.has(g.id)) { const f = memory.get(memKey(account, group, g.id)); if (f) facts.set(g.id, f); } }
   const missing = games.filter((g) => !facts.has(g.id));
   const take = missing.slice(0, Math.max(0, limit));
   // Zusatz für die Anzeige: nach dem Lesen, vor dem Laden — wie viele Spiele fehlen und gleich geladen werden

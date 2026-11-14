@@ -50,8 +50,15 @@ async function showNewBadges(el, gameId, isStale) {
     const names = new Map((data.members || []).map((x) => [x.id, x.name]));
     const hero = el.querySelector('.rs-hero');
     const below = !!hero && window.scrollY > hero.getBoundingClientRect().bottom + window.scrollY;
+    // Bezug: das Element unter dem Abschnitt. Verschiebt es sich (kein Scroll-Anchoring, z. B. Safari), um genau
+    // diesen Betrag nachscrollen; hat der Browser schon ausgeglichen, ist der Betrag 0.
+    const ref = /** @type {HTMLElement|null} */ (box.nextElementSibling);
+    const before = ref ? ref.getBoundingClientRect().top : 0;
     mount(box, newBadges({ items, who: (id) => names.get(id) || '–' }));
-    if (below) window.scrollBy(0, box.getBoundingClientRect().height);
+    if (below && ref) {
+      const delta = ref.getBoundingClientRect().top - before;
+      if (Math.abs(delta) > 0.5) window.scrollBy(0, delta);
+    }
   } catch (ex) {
     console.warn('Abzeichen', ex);
   }

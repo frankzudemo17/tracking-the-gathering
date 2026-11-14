@@ -68,7 +68,8 @@ html[data-motion="reduce"] .shd-glint::after { content: none; animation: none; }
 .bdg-tiers { list-style: none; margin: 6px 0 0; padding: 0; width: 100%; display: grid; gap: 4px; }
 .bdg-tier { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--ln); border-radius: 10px; text-align: left; }
 .bdg-tier.is-on { border-color: var(--hi); }
-.bdg-when a { color: var(--acc2); font-weight: 600; }
+/* Text-Links in --ink (--acc2 als Textfarbe bleibt in Arktis/Lachs unter 4,5 : 1, kontrast.txt) */
+.bdg-when a { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 
 /* Ergebnisseite / Rückblick */
 .bdg-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -77,5 +78,5 @@ html[data-motion="reduce"] .shd-glint::after { content: none; animation: none; }
 .bdg-txt { display: grid; min-width: 0; }
 .bdg-txt b, .bdg-txt small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bdg-txt small { font-size: 13px; }
-.bdg-more { justify-self: start; min-height: 44px; padding: 0 2px; border: 0; background: transparent; color: var(--acc2); font: inherit; font-weight: 600; cursor: pointer; }
+.bdg-more { justify-self: start; min-height: 44px; padding: 0 2px; border: 0; background: transparent; color: var(--ink); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .bdg-more:focus-visible, .bdg-row:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; border-radius: 8px; }
