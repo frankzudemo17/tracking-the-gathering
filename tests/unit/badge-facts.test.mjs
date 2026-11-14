@@ -257,6 +257,16 @@ test('S12 ohne loadEvents (Vorschau) ⇒ nichts geladen, rest = fehlende; isStal
   assert.equal(r3.loaded, 15);
 });
 
+test('S13 onPlan (Zusatz Anzeige): nach dem Lesen vor dem Laden; zweiter Lauf loading 0', async () => {
+  const { store } = await setup('k1');
+  const { ensureFacts, writeFacts } = await BF();
+  writeFacts(store, 'k1', 'G1', 'x01', OK());
+  const plans = []; const spy = eventsSpy();
+  await ensureFacts({ data: groupWith(4), account: 'k1', storage: store, loadEvents: spy.fn, onPlan: (p) => plans.push({ ...p, calls: spy.calls.length }) });
+  await ensureFacts({ data: groupWith(4), account: 'k1', storage: store, loadEvents: spy.fn, onPlan: (p) => plans.push({ ...p, calls: spy.calls.length }) });
+  assert.deepEqual(plans, [{ have: 1, missing: 3, total: 4, loading: 3, calls: 0 }, { have: 4, missing: 0, total: 4, loading: 0, calls: 1 }]);
+});
+
 // ---------------------------------------------------------------------------
 // DS · device-store-Erweiterung (Objektspeicher fakten)
 

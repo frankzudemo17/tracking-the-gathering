@@ -1,7 +1,7 @@
 // Profil (eigenes oder fremdes Mitglied der aktuellen Playgroup)
 import { sb, must, avatarUrls, avatarUrlsNow, appUrl } from '../supabase.js';
 import { state, currentMembership, currentGroup, isAdmin, isSuperadmin, updateProfile, loadMe } from '../state.js';
-import { html, on, busy } from '../lib/dom.js';
+import { html, on, busy, mount } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { avatar, pathAvatar, backHead, empty, memberName, memberAvatarPath, roleChip, manaPips, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
 import { pageCache, cacheKey, GROUP_MAX_AGE_MS } from '../lib/cache.js';
@@ -15,6 +15,9 @@ import { memberProfile, deckProfile, memberTimes } from '../lib/stats.js';
 import { fmtAvg, fmtPct, fmtMmss } from '../lib/format.js';
 import { runMemberRemoval, canRemoveMember } from './member-remove.js';
 import { kpis, section, moodRows, saltBars, pointsLine, highlight, deckThumb, iconDisc, moreStats } from './stats-ui.js';
+import { BADGES, memberBadges } from '../lib/badges.js';
+import { ensureFacts } from '../lib/badge-facts.js';
+import { badgeGrid, badgeSheet, badgeName } from './badges-ui.js';
 
 // Decks auf- oder zugeklappt: pro Gerät gemerkt (reine Ansichtssache)
 const DECKS_KEY = 'ttg.decksOpen';
@@ -24,6 +27,10 @@ const setDecksOpenPref = (v) => { try { localStorage.setItem(DECKS_KEY, v ? '1' 
 const MORE_KEY = 'ttg.statsMore';
 const moreOpenPref = () => { try { return localStorage.getItem(MORE_KEY) === '1'; } catch { return false; } };
 const setMoreOpenPref = (v) => { try { localStorage.setItem(MORE_KEY, v ? '1' : '0'); } catch { /* egal */ } };
+// Abzeichen (P4): Standard offen, pro Gerät gemerkt (Muster ttg.decksOpen)
+const BADGES_KEY = 'ttg.badgesOpen';
+const badgesOpenPref = () => { try { return localStorage.getItem(BADGES_KEY) !== '0'; } catch { return true; } };
+const setBadgesOpenPref = (v) => { try { localStorage.setItem(BADGES_KEY, v ? '1' : '0'); } catch { /* egal */ } };
 // Wie MEMBER_SELECT (groups.js) + is_superadmin des Zielprofils: kein Entfernen-Knopf beim Superadmin (P10 B1)
 const PROFILE_MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path, is_superadmin)';
 
@@ -73,6 +80,42 @@ export default async function profile(el, { params, isStale, fail }) {
     if (!data) return '';
     const dp = deckProfile(data, id);
     return dp.games ? t('stats.deckLine', { games: gamesText(dp.games), rate: fmtPct(dp.winRate, lang) }) : t('decks.noGames');
+  };
+
+  // P4 Abzeichen: Fakten der Gruppe (bleiben über Neuzeichnen erhalten), Ladezeile, Teil-Hinweis
+  /** @type {Map<string, any>} */
+  let facts = new Map();
+  /** @type {{ n: number, of: number }|null} */
+  let bdgLoading = null;
+  let bdgPartial = false;
+  /** @type {any} Gruppen-Daten, für die zuletzt Fakten angefordert wurden */
+  let factsFor = null;
+  const badgesHtml = () => (statsState !== 'ok' || !data || !m ? '' : badgeGrid({
+    states: memberBadges(data, facts, m.id, { now: Date.now() }), name, isMe: !!isMe, open: badgesOpenPref(), loading: bdgLoading, partial: bdgPartial, lang,
+  }));
+  /** Nur den Abzeichen-Container neu zeichnen; Fokus bleibt auf demselben data-badge-Knopf. */
+  const redrawBadges = () => {
+    const box = el.querySelector('#prof-bdg-wrap');
+    if (!box || !sc.ok()) return;
+    const focused = /** @type {HTMLElement|null} */ (document.activeElement?.closest?.('#prof-bdg-wrap [data-badge], #prof-bdg-wrap [data-act]') || null);
+    const sel = focused?.dataset.badge ? `[data-badge="${focused.dataset.badge}"]` : focused?.dataset.act ? `[data-act="${focused.dataset.act}"]` : null;
+    mount(box, badgesHtml());
+    if (sel) /** @type {HTMLElement|null} */ (box.querySelector(sel))?.focus();
+  };
+  const kickFacts = () => {
+    if (statsState !== 'ok' || !data || data === factsFor) return;
+    const d = factsFor = data;
+    ensureFacts({
+      data: d, account: state.session?.user?.id || null, loadEvents: typeof groupData.loadEvents === 'function' ? groupData.loadEvents : null,
+      isStale: () => !sc.ok() || data !== d,
+      onPlan: (p, f) => { if (p.loading > 0) { facts = new Map(f); bdgLoading = { n: p.have, of: p.total }; redrawBadges(); } },
+      onProgress: (f) => { facts = new Map(f); if (bdgLoading) bdgLoading = { n: f.size, of: bdgLoading.of }; redrawBadges(); },
+    }).then((r) => {
+      if (!sc.ok() || data !== d) return;
+      facts = r.facts; bdgLoading = null;
+      bdgPartial = r.failed > 0 || (typeof groupData.loadEvents !== 'function' && r.rest > 0);
+      redrawBadges();
+    }, (ex) => { console.warn('Abzeichen laden', ex); });
   };
 
   let drawSeq = 0;
@@ -127,6 +170,8 @@ export default async function profile(el, { params, isStale, fail }) {
 
     ${statsHtml}
 
+    <div id="prof-bdg-wrap">${badgesHtml()}</div>
+
     ${decks == null ? html`<div class="section">
       <div class="section-head"><h3 class="section-title">${t('profile.decks')}</h3></div>
       ${skel.rows(2)}
@@ -152,6 +197,7 @@ export default async function profile(el, { params, isStale, fail }) {
     <button type="button" class="btn danger" data-act="remove-member">${icon('trash', 18)}${t('memberRemove.button')}</button>` : ''}
 
 `, { busy: decks == null });
+    kickFacts();
   };
 
   const groupOf = (/** @type {string} */ gid) => fromCache(cacheKey(sc.uid, gid, 'group'), (o) => groupData.loadGroup(gid, o), { maxAge: GROUP_MAX_AGE_MS, fits: ownNameFits(state) });
@@ -224,6 +270,17 @@ export default async function profile(el, { params, isStale, fail }) {
     b.setAttribute('aria-expanded', String(open));
     el.querySelector('#prof-decks').hidden = !open;
     setDecksOpenPref(open);
+  });
+  on(el, 'click', '[data-act="toggle-badges"]', (e, b) => {
+    const open = b.getAttribute('aria-expanded') !== 'true';
+    b.setAttribute('aria-expanded', String(open));
+    el.querySelector('#prof-badges').hidden = !open;
+    setBadgesOpenPref(open);
+  });
+  on(el, 'click', '[data-badge]', (e, b) => {
+    const def = BADGES.find((x) => x.id === b.dataset.badge);
+    const st = def && data && m ? memberBadges(data, facts, m.id, { now: Date.now() }).find((x) => x.id === def.id) : null;
+    if (def && st) sheet(badgeName(def, st), badgeSheet({ def, state: st, lang }));
   });
   on(el, 'click', '[data-act="toggle-more"]', (e, b) => {
     const open = b.getAttribute('aria-expanded') !== 'true';

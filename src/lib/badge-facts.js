@@ -130,10 +130,10 @@ const ts = (/** @type {any} */ iso) => { const t = typeof iso === 'string' ? Dat
  * Fakten aller beendeten Spiele der Gruppe sicherstellen: gespeicherte lesen, fehlende laden (neueste zuerst,
  * Pakete à `batch`, höchstens `limit`), rechnen, speichern. Lade-Fehler ⇒ diese Spiele bleiben ohne Fakten.
  * @param {{ data: GroupData, account: string|null, storage?: FactsStore|null, loadEvents?: ((ids: string[]) => Promise<EventRow[]>)|null,
- *   onProgress?: ((facts: Map<string, GameFacts>) => void)|null, isStale?: (() => boolean)|null, limit?: number, batch?: number, persist?: boolean }} opts
+ *   onProgress?: ((facts: Map<string, GameFacts>) => void)|null, onPlan?: ((plan: { have: number, missing: number, total: number, loading: number }, facts: Map<string, GameFacts>) => void)|null, isStale?: (() => boolean)|null, limit?: number, batch?: number, persist?: boolean }} opts
  * @returns {Promise<{ facts: Map<string, GameFacts>, loaded: number, failed: number, rest: number }>}
  */
-export async function ensureFacts({ data, account, storage = deviceStore, loadEvents = null, onProgress = null, isStale = null, limit = FACTS_LIMIT, batch = FACTS_BATCH, persist = PERSIST }) {
+export async function ensureFacts({ data, account, storage = deviceStore, loadEvents = null, onProgress = null, onPlan = null, isStale = null, limit = FACTS_LIMIT, batch = FACTS_BATCH, persist = PERSIST }) {
   claim(account);
   const e0 = epoch;
   const store = persist ? storage : null;
@@ -145,6 +145,10 @@ export async function ensureFacts({ data, account, storage = deviceStore, loadEv
   if (store) await pruneFacts(store, account, group, (data?.games || []).map((g) => g.id));
   const missing = games.filter((g) => !facts.has(g.id));
   const take = missing.slice(0, Math.max(0, limit));
+  // Zusatz für die Anzeige: nach dem Lesen, vor dem Laden — wie viele Spiele fehlen und gleich geladen werden
+  if (onPlan && epoch === e0) {
+    try { onPlan({ have: facts.size, missing: missing.length, total: games.length, loading: typeof loadEvents === 'function' ? take.length : 0 }, facts); } catch { /* Anzeige */ }
+  }
   let loaded = 0; let failed = 0;
   const done = () => ({ facts, loaded, failed, rest: missing.length - loaded - failed });
   if (typeof loadEvents !== 'function' || !take.length) return done();
