@@ -46,10 +46,15 @@ export async function loadImprint(sb) {
   }
 }
 
-/** Inhalt des Abschnitts: Wert als vorformatierter Text (escaped über html``) oder neutraler Satz (+ Hinweis). */
-function imprintBody({ value, hint }) {
-  if (value !== null) return html`<p class="pre" data-imprint-value>${value}</p>`;
-  return html`<p data-operator>${t('legal.operator')}</p>${hint ? html`<p class="muted" data-members-only>${t('legal.membersOnly')}</p>` : ''}`;
+/**
+ * Inhalt des Abschnitts: Wert als vorformatierter Text (escaped über html``) oder neutraler Satz (+ Hinweis).
+ * held: nach dem Platzhalter (angemeldet) hält der erste Absatz dieselben 4 Zeilen frei wie der Platzhalter
+ * (Nachtrag 1 B2) — Wert mit bis zu 4 Zeilen und neutraler Rückfall ersetzen ihn ohne Sprung.
+ */
+function imprintBody({ value, hint }, held = false) {
+  const cls = held ? ' imprint-held' : '';
+  if (value !== null) return html`<p class="pre${cls}" data-imprint-value>${value}</p>`;
+  return html`<p class="${cls.trim()}" data-operator>${t('legal.operator')}</p>${hint ? html`<p class="muted" data-members-only>${t('legal.membersOnly')}</p>` : ''}`;
 }
 
 /** Abschnitt „Impressum“/„Verantwortlich“: mit Sitzung zuerst der Platzhalter (kein Blitz des neutralen Satzes). */
@@ -134,7 +139,7 @@ async function fillImprint(el, { sb, state, isStale }) {
   const slot = sec?.querySelector('[data-imprint-slot]');
   if (isStale() || !slot || !slot.isConnected) return;
   const same = state.session && state.session.user?.id === uid;
-  mount(slot, imprintBody(same ? pickImprint(state.session, row, error) : pickImprint(null, null, null)));
+  mount(slot, imprintBody(same ? pickImprint(state.session, row, error) : pickImprint(null, null, null), true));
   sec.removeAttribute('aria-busy');
 }
 

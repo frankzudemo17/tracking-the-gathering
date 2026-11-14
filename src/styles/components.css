@@ -310,7 +310,8 @@ button.cam::after { content: ''; position: absolute; inset: -10px; border-radius
 /* P10 Impressum: Platzhalter während der Leseanfrage — hält die Höhe von drei Textzeilen (Name, Straße, Ort) frei,
    zeigt eine gedämpfte Zeile in Texthöhe; kein Spinner, keine Bewegung. Der Rahmen um den Inhalt bleibt flach. */
 .imprint-slot { display: contents; }
-.legal .imprint-wait { min-height: calc(3 * 1.6em); }
+/* P10 Nachtrag 1: Platzhalter und befüllter Abschnitt (angemeldet) halten 4 Zeilen frei (Eintrag hat 4 Zeilen) */
+.legal .imprint-wait, .legal .imprint-held { min-height: calc(4 * 1.6em); }
 .imprint-wait span { display: block; width: 62%; height: 1em; margin-top: .3em; border-radius: 6px; background: var(--sf2); }
 
 /* Zugang (P9b) — Einladungs-Karte, QR-Sheet, Einladungsseite, Verwaltung. Nur Tokens; der QR-Code ist in jedem
