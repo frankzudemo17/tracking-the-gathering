@@ -5,7 +5,8 @@
 -- „Verantwortlich“). Die Migration legt keine Zeile an; die Zeile trägt der Betreiber nach dem db push selbst ein.
 --
 -- Regel: Lesen nur für angemeldete, nicht anonyme Konten (Policy app_info_select, to authenticated,
--- not public.is_anon_user()). Rolle anon hat kein Recht auf die Tabelle. Schreiben (insert/update/delete) nur
+-- auth.uid() is not null and not public.is_anon_user() — dieselbe Kopplung wie die Wächter in
+-- 20261109000000_sicherheit.sql; ein authenticated-Aufruf ohne sub liest nichts). Rolle anon hat kein Recht auf die Tabelle. Schreiben (insert/update/delete) nur
 -- als Datenbank-Eigentümer: keine Schreib-Policy und kein Schreib-Grant für anon/authenticated, daher nie aus der App.
 --
 -- Übergang: additiv (neue Tabelle, nichts an Bestandstabellen). Die App liest app_info mit maybeSingle();
@@ -25,7 +26,7 @@ grant select on public.app_info to authenticated;
 
 create policy app_info_select on public.app_info
   for select to authenticated
-  using (not public.is_anon_user());
+  using (auth.uid() is not null and not public.is_anon_user());
 
 -- ============================================================================
 -- Rückwärts (zum Zurücknehmen; Zeilen ohne „-- “ ausführen).

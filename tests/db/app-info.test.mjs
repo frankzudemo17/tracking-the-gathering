@@ -5,9 +5,11 @@
 // Aufbau Rechte: A (Admin der Gruppe G, für „Schreiben“ zusätzlich Superadmin), B (Mitglied in G), Gast G (anonymes
 // Konto), Rolle anon (ohne Anmeldung).
 //
-// Gegenproben (Spec Krit. 7):
+// Gegenproben (Spec Krit. 7, Nachtrag 1 B1):
 //   GEGENPROBE=1       ⇒ alle Migrationen AUSSER dieser ⇒ die Datei muss rot sein
-//   GEGENPROBE=policy  ⇒ Policy app_info_select im Test durch „using (true)“ ersetzt ⇒ „Lesen“ (Gast) rot
+//   GEGENPROBE=policy  ⇒ Policy ohne uid-Hälfte („using (not is_anon_user())“, Stand vor Nachtrag 1)
+//                        ⇒ „Lesen in der Tiefe“ rot (Fälle c/d: authenticated ohne sub liest)
+//   GEGENPROBE=offen   ⇒ Policy „using (true)“ ⇒ „Lesen“ (Gast) und „Lesen in der Tiefe“ (a) rot
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,7 +19,7 @@ import { freshDb, tools, U, MIGRATIONS } from './harness.mjs';
 
 const FILE = '20261120000000_app_info.sql';
 const GEGEN = process.env.GEGENPROBE || '';
-const EXPECTED = 6;
+const EXPECTED = 7;
 const WERT = 'Erika Muster\nTeststraße 1\n00000 Prüfstadt';
 let ran = 0;
 let gegenDir = null;
@@ -103,9 +105,10 @@ before(async () => {
   db = await freshDb({ migrations: migrations() });
   ({ as, su, q } = tools(db));
   await su();
-  if (GEGEN === 'policy') {
+  const gegenUsing = { policy: 'not public.is_anon_user()', offen: 'true' }[GEGEN];
+  if (gegenUsing) {
     await db.exec(`drop policy if exists app_info_select on public.app_info;
-      create policy app_info_select on public.app_info for select to authenticated using (true);`);
+      create policy app_info_select on public.app_info for select to authenticated using (${gegenUsing});`);
   }
   await seed(db);
   await su();
@@ -141,6 +144,11 @@ check('Policies/Grants: genau app_info_select (SELECT, authenticated); anon ohne
   await su();
   const pol = await q(`select policyname, cmd, roles::text r, permissive from pg_policies where schemaname = 'public' and tablename = 'app_info' order by policyname`);
   assert.deepEqual(pol, [{ policyname: 'app_info_select', cmd: 'SELECT', r: '{authenticated}', permissive: 'PERMISSIVE' }]);
+  if (!GEGEN) {
+    // Nachtrag 1 B1: Bedingung koppelt uid und Anonym-Merkmal (wie 20261109000000_sicherheit.sql)
+    const qual = (await q(`select qual from pg_policies where schemaname = 'public' and tablename = 'app_info'`))[0].qual;
+    ok(qual.includes('auth.uid() IS NOT NULL') && qual.replace(/public\./g, '').includes('NOT is_anon_user()'), `Bedingung: ${qual}`);
+  }
   const priv = async (role, p) => (await q(`select has_table_privilege($1, 'public.app_info', $2) x`, [role, p]))[0].x;
   assert.equal(await priv('anon', 'SELECT'), false, 'anon SELECT');
   assert.equal(await priv('authenticated', 'SELECT'), true, 'authenticated SELECT');
@@ -179,6 +187,36 @@ check('Lesen: A und B lesen die Zeile, Gast (anonym) 0 Zeilen, Rolle anon kein W
   console.log(`  Ist-Wert Rolle anon: ${n.code ? `Fehler ${n.code}` : `${n.rows.length} Zeile(n)`}`);
   ok(n.code === '42501' || (Array.isArray(n.rows) && n.rows.length === 0), `anon: ${J(n)}`);
   ok(!J(n).includes('Teststraße'), 'anon sieht keinen Wert');
+});
+
+/** Als Rolle authenticated mit genau diesen Claims lesen (sub '' ⇒ auth.uid() null; claims '' ⇒ auth.jwt() '{}'). */
+async function readRaw(sub, claims) {
+  await su();
+  await db.query(`select set_config('request.jwt.claim.sub', $1, false), set_config('request.jwt.claims', $2, false)`, [sub, claims]);
+  await db.exec('set role authenticated;');
+  try { return { rows: (await db.query(`select value from public.app_info where key = 'impressum'`)).rows }; }
+  catch (e) { return { code: e.code ?? null, message: String(e.message) }; }
+  finally { await su(); }
+}
+
+// Nachtrag 1 B1: Policy koppelt auth.uid() is not null and not is_anon_user() (wie die Wächter in 20261109000000_sicherheit.sql)
+check('Lesen in der Tiefe: Gast mit is_anonymous 0, authenticated ohne sub 0 (mit/ohne Claims), A 1; Fall b hingenommen', async () => {
+  const rows = (r) => (Array.isArray(r.rows) ? r.rows.length : `Fehler ${r.code}`);
+  const ist = {
+    'a) Gast-sub + is_anonymous:true': rows(await readRaw(U.G, J({ sub: U.G, role: 'authenticated', is_anonymous: true }))),
+    'c) authenticated ohne sub, Claims {role}': rows(await readRaw('', J({ role: 'authenticated' }))),
+    'd) authenticated ohne sub, ohne Claims': rows(await readRaw('', '')),
+    'e) Konto A': rows(await readRaw(U.A, J({ sub: U.A, role: 'authenticated', is_anonymous: false }))),
+  };
+  // alle Fälle zuerst messen, dann gemeinsam vergleichen: die Gegenprobe zeigt jeden roten Fall, nicht nur den ersten
+  assert.deepEqual(ist, { 'a) Gast-sub + is_anonymous:true': 0, 'c) authenticated ohne sub, Claims {role}': 0, 'd) authenticated ohne sub, ohne Claims': 0, 'e) Konto A': 1 });
+  const e = await readRaw(U.A, J({ sub: U.A, role: 'authenticated', is_anonymous: false }));
+  assert.deepEqual(e.rows, [{ value: WERT }], 'e) Konto A liest den Wert');
+  // b) Gast-sub, Claims ohne is_anonymous: hingenommen, Nachtrag 1 — nur mit selbst signiertem Token (Server-Secret)
+  // erreichbar, nicht aus dem Client; kein security-definer-Abgleich mit auth.users. Der Test hält den Ist-Wert fest.
+  const b = rows(await readRaw(U.G, J({ sub: U.G, role: 'authenticated' })));
+  console.log(`  Ist-Wert b) Gast-sub ohne is_anonymous (hingenommen, Nachtrag 1): ${b} Zeile(n)`);
+  assert.equal(b, 1, 'b) dokumentierter Ist-Wert 1 Zeile (hingenommen, Nachtrag 1)');
 });
 
 check('Schreiben: insert/update/delete als A (auch als Superadmin), B, Gast und anon abgewiesen; Inhalt unverändert', async () => {
