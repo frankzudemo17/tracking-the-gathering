@@ -78,5 +78,5 @@ html[data-motion="reduce"] .shd-glint::after { content: none; animation: none; }
 .bdg-txt { display: grid; min-width: 0; }
 .bdg-txt b, .bdg-txt small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bdg-txt small { font-size: 13px; }
-.bdg-more { justify-self: start; min-height: 44px; padding: 0 2px; border: 0; background: transparent; color: var(--ink); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.bdg-more { align-self: flex-start; justify-self: start; min-height: 44px; padding: 0 2px; border: 0; background: transparent; color: var(--ink); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .bdg-more:focus-visible, .bdg-row:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; border-radius: 8px; }
