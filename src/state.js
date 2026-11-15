@@ -3,6 +3,7 @@ import { sb, must, clearSignedUrls, seedAvatars, clearLocalAvatars } from './sup
 import { pageCache } from './lib/cache.js';
 import { deviceStore, HYDRATE_MAX_MS, DECODE_MAX_MS } from './lib/device-store.js';
 import { setLang } from './i18n/index.js';
+import { clearBadgeFacts } from './lib/badge-facts.js';
 
 const GROUP_KEY = 'ttg.group';
 const PENDING_KEY = 'ttg.pendingCode';
@@ -90,6 +91,7 @@ export function clearCaches() {
   clearLocalAvatars();
   resetFresh();
   pageCache.clear(); clearSignedUrls(); store('ttg.heroArt', null);
+  clearBadgeFacts();
 }
 
 /**

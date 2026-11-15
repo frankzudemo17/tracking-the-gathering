@@ -369,3 +369,83 @@ test('P2 HL3 select der games-Abfrage: mit layout, ohne first_seat, live_state u
     assert.ok(!cols.includes('first_seat') && !/live_state|\*/.test(c.select), `zu viel: ${c.select}`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// P4 Abzeichen: loadEvents (spec-p4-abzeichen.md HE1–HE5). Eigene Attrappe für game_events (in/not/order/range),
+// damit fakeSb oben unverändert bleibt.
+
+function fakeEvSb(rows, { error = null } = {}) {
+  const calls = [];
+  function from(table) {
+    const q = { table, select: null, in: [], not: [], order: [], range: null };
+    calls.push(q);
+    const b = {
+      select(c) { q.select = c; return b; },
+      in(c, vs) { q.in.push([c, [...vs]]); return b; },
+      not(c, op, v) { q.not.push([c, op, v]); return b; },
+      eq() { throw new Error('eq unerwartet'); },
+      order(c, o) { q.order.push([c, o?.ascending !== false]); return b; },
+      range(a, z) {
+        q.range = [a, z];
+        return Promise.resolve().then(() => {
+          if (error) return { data: null, error: { ...error }, status: 400 };
+          const hit = (table === 'game_events' ? rows : []).filter((r) => q.in.every(([c, vs]) => vs.includes(r[c]))
+            && q.not.every(([c, op, v]) => !(op === 'is' && v === null && r[c] === null)));
+          return { data: hit.slice(a, z + 1).map((r) => ({ ...r })), error: null, status: 200 };
+        });
+      },
+    };
+    return b;
+  }
+  return { from, calls };
+}
+const evRow = (game, seq, extra = {}) => ({ game_id: game, seq, type: 'damage', source: 'm1', target: 'm2', amount: 3, payload: { act: seq }, ...extra });
+
+test('P4 HE1 loadEvents: game_events mit in game_id, not seq is null, Sortierung game_id, seq', async () => {
+  const { createHistoryData } = await load();
+  const sb = fakeEvSb([evRow('g1', 1), evRow('g1', null), evRow('g2', 1)]);
+  const out = await createHistoryData(sb).loadEvents(['g1', 'g2']);
+  assert.equal(sb.calls.length, 1);
+  const c = sb.calls[0];
+  assert.equal(c.table, 'game_events');
+  assert.deepEqual(c.in, [['game_id', ['g1', 'g2']]]);
+  assert.deepEqual(c.not, [['seq', 'is', null]]);
+  assert.deepEqual(c.order, [['game_id', true], ['seq', true]]);
+  assert.deepEqual(String(c.select).split(',').map((s) => s.trim()), ['game_id', 'seq', 'type', 'source', 'target', 'amount', 'payload']);
+  assert.equal(out.length, 2, 'Zeile ohne seq fällt');
+});
+
+test('P4 HE2 loadEvents: 1500 Zeilen ⇒ 2 Seiten, alle Zeilen', async () => {
+  const { createHistoryData } = await load();
+  const rows = Array.from({ length: 1500 }, (_, i) => evRow('g1', i + 1));
+  const sb = fakeEvSb(rows);
+  const out = await createHistoryData(sb).loadEvents(['g1']);
+  assert.equal(sb.calls.length, 2);
+  assert.deepEqual(sb.calls.map((c) => c.range), [[0, 999], [1000, 1999]]);
+  assert.equal(out.length, 1500);
+  assert.deepEqual(out.map((e) => e.seq), rows.map((r) => r.seq));
+});
+
+test('P4 HE3 loadEvents: Fehler ⇒ wirft', async () => {
+  const { createHistoryData } = await load();
+  const sb = fakeEvSb([], { error: { message: 'Ereignisse kaputt', code: '42501' } });
+  await assert.rejects(() => createHistoryData(sb).loadEvents(['g1']), /Ereignisse kaputt/);
+});
+
+test('P4 HE4 loadEvents: leere Liste ⇒ [], keine Anfrage', async () => {
+  const { createHistoryData } = await load();
+  const sb = fakeEvSb([evRow('g1', 1)]);
+  assert.deepEqual(await createHistoryData(sb).loadEvents([]), []);
+  assert.equal(sb.calls.length, 0);
+});
+
+test('P4 HE5 loadEvents: Abbildung { gameId, seq, type, source, target, amount, payload }, auch mit übergebenem Speicher', async () => {
+  const { createHistoryData } = await load();
+  const row = evRow('g1', 4, { type: 'eliminate', source: null, target: 'm2', amount: null, payload: { place: 3 } });
+  const want = [{ gameId: 'g1', seq: 4, type: 'eliminate', source: null, target: 'm2', amount: null, payload: { place: 3 } }];
+  assert.deepEqual(await createHistoryData(fakeEvSb([row])).loadEvents(['g1']), want);
+  const cache = { load: (k, loader) => loader(), drop: () => 0 };
+  const api = createHistoryData(fakeEvSb([row]), { cache, key: (g) => `k|${g}|group` });
+  assert.equal(typeof api.loadEvents, 'function');
+  assert.deepEqual(await api.loadEvents(['g1']), want);
+});

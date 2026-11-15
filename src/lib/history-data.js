@@ -15,6 +15,7 @@
 /** @typedef {{ gameId: string, voterId: string, votedFor: string, text: string|null }} PotgRow */
 /** @typedef {{ gameId: string, memberId: string, turns: number, totalSec: number, longestSec: number }} TurnRow */
 /** @typedef {{ source: string, target: string, damage: number, commanderDamage: number, poison: number }} DamageRow */
+/** @typedef {{ gameId: string, seq: number, type: string, source: string|null, target: string|null, amount: number|null, payload: any }} EventRow */
 /** @typedef {{ groupId: string, members: MemberRow[], decks: DeckRow[], sessions: SessionRow[], games: GameRow[], players: PlayerRow[], ratings: RatingRow[], deckSalt: DeckSaltRow[], potg: PotgRow[], turns: TurnRow[] }} GroupData */
 /** @typedef {GroupData & { game: GameRow, damage: DamageRow[] }} GameData */ // loadGame: genau ein Spiel (jeder Status), Listen nur dieses Spiels
 
@@ -32,6 +33,7 @@ const TURN_COLS = 'game_id, member_id, turns, total_sec, longest_sec';
 const DAMAGE_COLS = 'source, target, damage, commander_damage, poison';
 const DECK_COLS = 'id, short_name, commander_name, partner_name, image_url, color_identity, bracket, owner_profile_id, owner_member_id, archived';
 const SESSION_COLS = 'id, played_on, location';
+const EVENT_COLS = 'game_id, seq, type, source, target, amount, payload'; // P4 Abzeichen: Replay beendeter Spiele
 // Feste Sortierung je Abfrage (sonst kann range Zeilen auslassen oder doppelt liefern)
 const ORDER = {
   members: ['created_at', 'id'],
@@ -44,6 +46,7 @@ const ORDER = {
   v_damage_matrix: ['source', 'target'],
   decks: ['id'],
   sessions: ['id'],
+  game_events: ['game_id', 'seq'],
 };
 /** Fehlt die View v_game_turn_times (P14 noch nicht gepusht): Postgres 42P01 bzw. PostgREST PGRST205. */
 const MISSING = new Set(['42P01', 'PGRST205']);
@@ -105,6 +108,8 @@ const toPotg = (r) => ({ gameId: r.game_id, voterId: r.voter_id, votedFor: r.vot
 const toTurn = (r) => ({ gameId: r.game_id, memberId: r.member_id, turns: r.turns, totalSec: r.total_sec, longestSec: r.longest_sec });
 /** @returns {DamageRow} */
 const toDamage = (r) => ({ source: r.source, target: r.target, damage: r.damage ?? 0, commanderDamage: r.commander_damage ?? 0, poison: r.poison ?? 0 });
+/** @returns {EventRow} */
+const toEvent = (r) => ({ gameId: r.game_id, seq: r.seq, type: r.type, source: r.source ?? null, target: r.target ?? null, amount: r.amount ?? null, payload: r.payload ?? null });
 
 // ---------------------------------------------------------------------------
 // Laden
@@ -127,7 +132,7 @@ const uniq = (xs) => [...new Set(xs.filter((x) => x != null))];
  * @param {any} sb Supabase-Client (oder Attrappe)
  * @param {{ cache?: { load: (key: string|null, loader: () => Promise<any>, opts?: { force?: boolean }) => Promise<any>, drop: (key: string) => number }, key?: (groupId: string) => string|null }} [store]
  *   P12: übergebener Speicher (src/lib/cache.js) + Schlüssel je Gruppe (Konto|Gruppe|group). Ohne ⇒ eigener Speicher wie bisher.
- * @returns {{ loadGroup: (groupId: string, opts?: { force?: boolean }) => Promise<GroupData>, loadGame: (gameId: string) => Promise<GameData|null>, invalidate: (groupId: string) => void }}
+ * @returns {{ loadGroup: (groupId: string, opts?: { force?: boolean }) => Promise<GroupData>, loadGame: (gameId: string) => Promise<GameData|null>, invalidate: (groupId: string) => void, loadEvents: (gameIds: string[]) => Promise<EventRow[]> }}
  */
 export function createHistoryData(sb, { cache: shared, key } = {}) {
 
@@ -235,6 +240,18 @@ export function createHistoryData(sb, { cache: shared, key } = {}) {
     };
   }
 
+  /**
+   * P4 Abzeichen: Ereignisse (nur mit seq, wie game-store.js allEvents) der genannten Spiele, nicht zwischengespeichert.
+   * Stücke ≤ 200 Spiele, jedes seitenweise (Sortierung game_id, seq). Leere Liste ⇒ keine Anfrage. Fehler ⇒ Wurf.
+   * @param {string[]} gameIds @returns {Promise<EventRow[]>}
+   */
+  async function loadEvents(gameIds) {
+    const ids = uniq(gameIds || []);
+    if (!ids.length) return [];
+    const parts = await Promise.all(chunks(ids).map((part) => paged('game_events', EVENT_COLS, (q) => q.in('game_id', part).not('seq', 'is', null))));
+    return parts.flat().map(toEvent);
+  }
+
   if (shared && key) {
     return {
       /** P12: im geteilten Speicher je Konto + Gruppe; ohne Schlüssel (kein Konto/keine Gruppe) wird geladen, nichts gemerkt. */
@@ -242,6 +259,7 @@ export function createHistoryData(sb, { cache: shared, key } = {}) {
         return shared.load(key(groupId), () => fetchGroup(groupId), { force });
       },
       loadGame,
+      loadEvents,
       invalidate(groupId) {
         const k = key(groupId);
         if (k) shared.drop(k);
@@ -263,6 +281,7 @@ export function createHistoryData(sb, { cache: shared, key } = {}) {
       return p;
     },
     loadGame,
+    loadEvents,
     invalidate(groupId) {
       cache.delete(groupId);
     },

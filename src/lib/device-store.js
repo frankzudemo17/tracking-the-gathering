@@ -1,7 +1,10 @@
 // Gerätespeicher (P6 Kaltstart, spec-p6-kaltstart.md, Vertrag): letzter Stand und Profilbilder dauerhaft auf
-// diesem Gerät, damit der Kaltstart sofort zeichnet. IndexedDB `ttg-geraet` (Version 1), Objektspeicher
+// diesem Gerät, damit der Kaltstart sofort zeichnet. IndexedDB `ttg-geraet` (Version 2 seit P4), Objektspeicher
 // `daten` (Datensätze { key, account, group, name, fmt, at, value }) und `bilder`
 // (Datensätze { key, account, path, type, bytes: ArrayBuffer, at, seen, checked, fmt }).
+// P4 Abzeichen (Nachtrag 3, Write-Set-Ausnahme): Objektspeicher `fakten` (Version 2; Datensätze
+// { key: `konto|gruppe|name`, account, group, name, fmt, value }) für die Replay-Fakten beendeter Spiele. Eigene
+// Schreibvorgänge (`noteWrite`) und `hydrate` lassen ihn unberührt; `clearAll` leert ihn mit.
 //
 // Mandantentrennung (Entscheid 4): jeder Schlüssel beginnt mit dem Konto (`konto|gruppe|name`, `konto|*|me`,
 // `konto|avatars/<pfad>`) und jeder Datensatz trägt `account` (+ `group`). Gelesen wird nur, was Präfix UND Feld
@@ -41,6 +44,7 @@ export const READ_RPC = new Set(['check_invite', 'access_overview', 'member_remo
 
 const BUCKET = 'avatars';
 const ME = 'me';
+const FACTS = 'fakten';
 
 /**
  * Eigener Schreibvorgang dieses Geräts? (Entscheid 9; rein)
@@ -78,7 +82,7 @@ export function sameFolder(a, b) {
 /** Hintergrund im Arbeitsspeicher (Tests). @returns {Backend & { maps: Record<string, Map<string, any>> }} */
 export function memoryBackend() {
   /** @type {Record<string, Map<string, any>>} */
-  const maps = { daten: new Map(), bilder: new Map() };
+  const maps = { daten: new Map(), bilder: new Map(), [FACTS]: new Map() };
   const m = (/** @type {string} */ s) => maps[s] || (maps[s] = new Map());
   return {
     maps,
@@ -105,10 +109,10 @@ export function idbBackend(name = 'ttg-geraet') {
       try {
         const idb = /** @type {any} */ (globalThis).indexedDB;
         if (!idb) { resolve(null); return; }
-        const req = idb.open(name, 1);
+        const req = idb.open(name, 2);
         req.onupgradeneeded = () => {
           const db = req.result;
-          for (const s of ['daten', 'bilder']) if (!db.objectStoreNames.contains(s)) db.createObjectStore(s, { keyPath: 'key' });
+          for (const s of ['daten', 'bilder', FACTS]) if (!db.objectStoreNames.contains(s)) db.createObjectStore(s, { keyPath: 'key' });
         };
         req.onsuccess = () => {
           const db = req.result;
@@ -427,12 +431,54 @@ export function createDeviceStore({ backend, now = Date.now }) {
       return all.filter((r) => r && r.account === a && typeof r.key === 'string' && r.key.startsWith(`${a}|`) && r.fmt === STORE_FORMAT);
     },
 
-    /** Beide Objektspeicher ganz leeren; Generation +1 ⇒ eingereihte Schreibvorgänge schreiben nicht mehr. */
+    /**
+     * P4: Fakten eines Spiels ablegen. Riegel beim Ausführen: Generation und Konto (Schlüssel beginnt mit dem Konto).
+     * @param {string} key `konto|gruppe|name` @param {any} value @param {{ gen: any }} riegel
+     */
+    putFacts(key, value, { gen: g } = /** @type {any} */ ({})) {
+      enqueue(async () => {
+        const p = typeof key === 'string' ? keyParts(key) : null;
+        if (g !== gen || !acct || !p || p.account !== acct || !p.group) return;
+        await backend.put(FACTS, { key, account: p.account, group: p.group, name: p.name, fmt: STORE_FORMAT, value });
+      });
+    },
+
+    /**
+     * P4: Fakten-Datensätze eines Kontos und einer Gruppe. Datensätze dieses Kontos mit falschem Format oder
+     * unstimmigem Feld werden gekehrt; fremde Konten bleiben liegen (die räumt clearAll beim Kontowechsel).
+     * @param {string} account @param {string} group
+     * @returns {Promise<Array<{ key: string, name: string, value: any }>>}
+     */
+    async factsOf(account, group) {
+      if (!account || !group) return [];
+      const g0 = gen;
+      const all = await safe(() => backend.all(FACTS), []);
+      if (g0 !== gen) return [];
+      const out = []; const sweep = [];
+      for (const r of all) {
+        const p = r && typeof r.key === 'string' ? keyParts(r.key) : null;
+        if (!p || p.account !== account) continue;
+        const ok = r.account === account && r.fmt === STORE_FORMAT && p.name === r.name && p.group === r.group;
+        if (!ok) { sweep.push(r.key); continue; }
+        if (p.group === group) out.push({ key: r.key, name: r.name, value: r.value });
+      }
+      if (sweep.length) enqueue(() => backend.del(FACTS, sweep));
+      return out;
+    },
+
+    /** P4: Fakten-Datensätze löschen. @param {string[]} keys */
+    dropFacts(keys) {
+      const ks = (keys || []).filter((k) => typeof k === 'string');
+      if (ks.length) enqueue(() => backend.del(FACTS, ks));
+    },
+
+    /** Alle Objektspeicher ganz leeren; Generation +1 ⇒ eingereihte Schreibvorgänge schreiben nicht mehr. */
     clearAll() {
       gen++;
       enqueue(async () => {
         await safe(() => backend.clear('daten'));
         await safe(() => backend.clear('bilder'));
+        await safe(() => backend.clear(FACTS));
       });
     },
 

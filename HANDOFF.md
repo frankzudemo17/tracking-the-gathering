@@ -228,6 +228,7 @@ Nach Spieleabenden gruppiert, mit Filtern (Alle, Meine Siege, Hoher Salt, Mit Fo
   - Play of the Game (meiste Stimmen) mit Spruch
   - Spielanzahl und Stunden am Tisch
   - Teilen als Bild: per Canvas rendern und mit der Web Share API (`navigator.share({ files })`) direkt an WhatsApp schicken; Fallback ist ein Download.
+- **Abzeichen (P4, 12.11.):** 21 Abzeichen als Wappen in vier Gruppen (Erste Schritte, Spielzüge, Ausdauer, Selten; zwei davon geheim). Orte genau drei: Profil-Raster mit Fortschritt (eigenes und fremdes Profil), „Neues Abzeichen!“ auf der Ergebnisseite, „Abzeichen des Abends“ im Rückblick (nicht auf der Teilen-Karte). Regeln und Zeitleiste nur in `src/lib/badges.js`, rückwirkend im Client aus Ergebnissen und dem Spielverlauf (`game_events`, Replay) berechnet — keine Tabelle, keine Migration. Replay-Ergebnisse liegen gerätelokal je Konto + Gruppe im device-store (Objektspeicher `fakten`, `src/lib/badge-facts.js`) und werden beim Abmelden/Kontowechsel geleert.
 
 ### 5.10 Einstellungen
 Sprache DE/EN, Erscheinungsbild (Schiefer, Gletscher, Obsidian), Playgroups verwalten, Abmelden.
@@ -353,4 +354,4 @@ Nach jeder Etappe kurz mit Franco abstimmen und auf GitHub Pages veröffentliche
 - **Punkteschema** bei 3, 5 und 6 Spielern bestätigen.
 - K.O.-Variante D (Friedhof) ist entworfen, wird aber aktuell nicht genutzt.
 - Weitere Ideen aus der Liste, nicht beauftragt: Mulligans erfassen, Bracket-Check vor dem Start, Ø Siegrunde pro Deck, Kingmaker-Wertung, Deck-Matchups, Deck-Versionen, Jahresrückblick, Spieleabend planen, Tisch-Aufteilung bei vielen Spielern.
-- Bewusst nicht: Erfolge/Badges, Import aus playgroup.gg.
+- Bewusst nicht: Import aus playgroup.gg.

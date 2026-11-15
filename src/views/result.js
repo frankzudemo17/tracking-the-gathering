@@ -23,8 +23,46 @@ import {
   pickWincon, formCheck, saltDecks, rateArgs, gamePatch, fitSize, photoPath, saveErrorKey, damageTop, formDirty,
 } from './result-ui.js';
 import { rematchDraft, writeDraft } from '../lib/setup-draft.js';
+import { gameBadges } from '../lib/badges.js';
+import { ensureFacts } from '../lib/badge-facts.js';
+import { newBadges, toggleMore } from './badges-ui.js';
 
 const SCORES = [1, 2, 3, 4, 5];
+
+/**
+ * P4: Gruppen-Daten + Fakten laden, „Neu“ dieser Partie zeigen. Keine Einträge, Fehler oder Seite verlassen ⇒ nichts.
+ * Ist die Seite schon unter den Sieger-Kopf gescrollt, wird um die Höhe des Abschnitts nachgescrollt.
+ * @param {HTMLElement} el @param {string} gameId @param {() => boolean} isStale
+ */
+async function showNewBadges(el, gameId, isStale) {
+  try {
+    const gid = state.groupId;
+    const data = await groupData.loadGroup(gid);
+    if (isStale()) return;
+    const { facts } = await ensureFacts({
+      data, account: state.session?.user?.id || null, isStale,
+      loadEvents: typeof groupData.loadEvents === 'function' ? groupData.loadEvents : null,
+    });
+    if (isStale()) return;
+    const items = gameBadges(data, facts, gameId, { now: Date.now() });
+    const box = /** @type {HTMLElement|null} */ (el.querySelector('[data-bdg-new]'));
+    if (!items.length || !box) return;
+    const names = new Map((data.members || []).map((x) => [x.id, x.name]));
+    const hero = el.querySelector('.rs-hero');
+    const below = !!hero && window.scrollY > hero.getBoundingClientRect().bottom + window.scrollY;
+    // Bezug: das Element unter dem Abschnitt. Verschiebt es sich (kein Scroll-Anchoring, z. B. Safari), um genau
+    // diesen Betrag nachscrollen; hat der Browser schon ausgeglichen, ist der Betrag 0.
+    const ref = /** @type {HTMLElement|null} */ (box.nextElementSibling);
+    const before = ref ? ref.getBoundingClientRect().top : 0;
+    mount(box, newBadges({ items, who: (id) => names.get(id) || '–' }));
+    if (below && ref) {
+      const delta = ref.getBoundingClientRect().top - before;
+      if (Math.abs(delta) > 0.5) window.scrollBy(0, delta);
+    }
+  } catch (ex) {
+    console.warn('Abzeichen', ex);
+  }
+}
 
 export default async function result(el, { params, isStale }) {
   const id = params?.id || '';
@@ -218,6 +256,7 @@ export default async function result(el, { params, isStale }) {
   mount(el, html`<div class="rs">
     ${back}
     ${hero}
+    <div data-bdg-new></div>
     ${placement}
     ${damage}
     ${wincon}
@@ -229,6 +268,10 @@ export default async function result(el, { params, isStale }) {
       <a class="btn soft block" href="#/start">${t('result.later')}</a>
     </div>
   </div>`);
+
+  // P4 Abzeichen: „Neues Abzeichen!“ unter dem Sieger-Kopf — erst nach dem Zeichnen, die Seite wartet nie darauf
+  showNewBadges(el, game.id, isStale);
+  on(el, 'click', '[data-act="badges-more"]', (e, b) => toggleMore(b));
 
   const saveBtn = /** @type {HTMLButtonElement} */ ($('[data-act="save"]', el));
   const rematchBtn = /** @type {HTMLButtonElement} */ ($('[data-act="rematch"]', el));

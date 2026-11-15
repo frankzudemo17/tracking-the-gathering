@@ -14,6 +14,43 @@ import { avatar, backHead, empty } from '../lib/parts.js';
 import { toast } from '../lib/ui.js';
 import { t, getLang } from '../i18n/index.js';
 import { makeCard, cardFileName } from './recap-card.js';
+import { sessionBadges } from '../lib/badges.js';
+import { ensureFacts } from '../lib/badge-facts.js';
+import { eveningBadges, toggleMore } from './badges-ui.js';
+
+/**
+ * P4: „Abzeichen des Abends“ (nicht in `.rc`, nicht in der Teilen-Karte). Laufen noch Ladungen, steht im Abschnitt
+ * die Statuszeile; der Abschnitt erscheint erst mit Einträgen. Fehler oder Seite verlassen ⇒ nichts.
+ * @param {HTMLElement} el @param {any} data @param {string} sessionId @param {(id: string) => string} who @param {() => boolean} isStale
+ */
+async function showEveningBadges(el, data, sessionId, who, isStale) {
+  const box = /** @type {HTMLElement|null} */ (el.querySelector('[data-bdg-eve]'));
+  if (!box) return;
+  /** @type {{ n: number, of: number }|null} */
+  let loading = null;
+  const paint = (/** @type {Map<string, any>} */ facts) => {
+    if (isStale() || !box.isConnected) return;
+    const items = sessionBadges(data, facts, sessionId, { now: Date.now() });
+    if (!items.length) { mount(box, html``); return; }
+    // „weitere“ offen lassen, wenn schon aufgeklappt
+    const wasOpen = box.querySelector('[data-act="badges-more"]')?.getAttribute('aria-expanded') === 'true';
+    mount(box, html`${eveningBadges({ items, who })}${loading ? html`<p class="bdg-status tiny muted" aria-live="polite">${t('badges.loading', { n: loading.n, of: loading.of })}</p>` : ''}`);
+    const more = /** @type {HTMLElement|null} */ (box.querySelector('[data-act="badges-more"]'));
+    if (wasOpen && more) toggleMore(more);
+  };
+  try {
+    const r = await ensureFacts({
+      data, account: state.session?.user?.id || null, isStale,
+      loadEvents: typeof groupData.loadEvents === 'function' ? groupData.loadEvents : null,
+      onPlan: (p, f) => { if (p.loading > 0) { loading = { n: p.have, of: p.total }; paint(f); } },
+      onProgress: (f) => { if (loading) loading = { n: f.size, of: loading.of }; paint(f); },
+    });
+    loading = null;
+    paint(r.facts);
+  } catch (ex) {
+    console.warn('Abzeichen', ex);
+  }
+}
 
 const WUBRG = ['W', 'U', 'B', 'R', 'G'];
 
@@ -166,6 +203,7 @@ export default async function recapView(el, { params, isStale }) {
       <button type="button" class="icon-btn rc-save" data-act="save" aria-label="${t('recap.save')}" title="${t('recap.save')}">${icon('downloadSimple', 22)}</button>
     </div>
     <p class="small muted rc-hint">${t('recap.shareHint')}</p>
+    <div data-bdg-eve></div>
     ${rows.length ? html`<section class="rc-games">
       <h3 class="section-title">${t('recap.gamesTitle')}</h3>
       <div class="list">${rows}</div>
@@ -196,7 +234,11 @@ export default async function recapView(el, { params, isStale }) {
     toast(t('recap.saved'));
   };
 
-  on(el, 'click', '[data-act]', (e, btn) => {
+  // P4 Abzeichen des Abends: nach dem Zeichnen laden, Abschnitt erst mit Einträgen
+  showEveningBadges(el, data, r.sessionId, name, isStale);
+  on(el, 'click', '[data-act="badges-more"]', (e, b) => toggleMore(b));
+
+  on(el, 'click', '[data-act="share"], [data-act="save"]', (e, btn) => {
     const act = btn.getAttribute('data-act');
     busy(/** @type {HTMLButtonElement} */ (btn), async () => {
       const t0 = performance.now();
