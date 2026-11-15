@@ -251,6 +251,7 @@ Ausführlich in der Migration. Wichtigste Idee: **Jede Aktion am Tisch ist ein E
 | `player_ratings` | Salt, Spaß, eigene Deck-Bewertung pro Spieler und Spiel |
 | `deck_salt_ratings` | optionale Salt-Bewertung gegnerischer Decks |
 | `potg_votes` | Play-of-the-Game-Stimmen |
+| `app_info` | App-Angaben, die nicht ins öffentliche Repo gehören; heute genau eine Zeile `impressum` (Anbieterangaben für „Impressum“ und „Verantwortlich“). Lesen nur angemeldet und nicht anonym, Schreiben nur als Datenbank-Eigentümer (`npx supabase db query --remote`), nie aus der App. Ohne Zeile/ohne Sitzung zeigt die App den neutralen Satz (`20261120000000_app_info.sql`, P10) |
 
 RPCs: `create_playgroup`, `join_playgroup`, `create_placeholder`, `claim_member`.
 Views: `v_game_results`, `v_member_stats`, `v_deck_stats`, `v_turn_times`, `v_deck_salt`, `v_damage_matrix`.

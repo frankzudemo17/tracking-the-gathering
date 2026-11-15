@@ -234,6 +234,7 @@ export default {
     fonts: 'Schriften', fontsLic: 'Bricolage Grotesque, Geist, Unbounded · SIL Open Font License 1.1 · selbst gehostet',
     operator: 'Tracking the Gathering ist ein privates, nicht kommerzielles Hobbyprojekt für einen festen Freundeskreis. Kontakt und Anfragen zu deinen Daten über den Admin deiner Gruppe.',
     imprintTitle: 'Impressum', privacyLink: 'Datenschutzerklärung', version: 'App-Version {v}',
+    membersOnly: 'Die vollständigen Anbieterangaben sehen angemeldete Mitglieder.',
   },
 
   privacy: {
