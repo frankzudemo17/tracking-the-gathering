@@ -35,6 +35,7 @@ const SHELL = [
   './src/lib/device-store.js', // P6 Kaltstart (Welle ttg-features)
   './src/lib/refill.js', // P6 Kaltstart (Welle ttg-features)
   './src/lib/card-images.js', // P8 Intro 2.0
+  './src/lib/nav-tab.js', // P13 Reiter fremdes Profil
   './src/lib/badges.js', './src/lib/badge-facts.js', './src/views/badges-ui.js', './src/styles/badges.css', './src/i18n/de-badges.js', './src/i18n/en-badges.js', // P4 Abzeichen (Welle ttg-features)
   './src/game/engine.js', './src/game/layouts.js', './src/game/rng.js', './src/game/ko.js', './src/game/dice.js',
   './assets/icons/logo.png', './assets/icons/favicon.png', './assets/icons/icon-192.png',

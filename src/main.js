@@ -10,6 +10,7 @@ import { applyDevicePrefs, onPrefs, keepAwake } from './lib/prefs.js';
 import { setupSwUpdate } from './lib/sw-update.js';
 import { pageCache } from './lib/cache.js';
 import { startRefill } from './lib/refill.js';
+import { activeTab } from './lib/nav-tab.js';
 
 // ---------- Routen ----------
 const v = (name) => () => import(`./views/${name}.js`);
@@ -87,7 +88,11 @@ function syncNav(nav, active) {
 }
 
 /** P12 Entscheid 7: neuer #view je Seitenwechsel, die Leiste bleibt stehen. */
+// P13: zuletzt heller Reiter (fremdes Profil/Deck behält ihn, statt „Profil“ zu markieren)
+let lastNav = null;
 function frame(r) {
+  const active = activeTab(r, state.memberships.map((m) => m.id), lastNav);
+  lastNav = active;
   const view = document.createElement('main');
   view.id = 'view';
   view.className = `screen ${r.opts.nav ? 'with-nav' : ''}`;
@@ -95,8 +100,8 @@ function frame(r) {
   else mount(view, loading());
   const old = app.querySelector(':scope > #view');
   let nav = r.opts.nav ? app.querySelector(':scope > nav.nav') : null;
-  if (nav) syncNav(nav, r.opts.nav);
-  else if (r.opts.nav) { const tmp = document.createElement('div'); mount(tmp, navHtml(r.opts.nav)); nav = tmp.firstElementChild; }
+  if (nav) syncNav(nav, active);
+  else if (r.opts.nav) { const tmp = document.createElement('div'); mount(tmp, navHtml(active)); nav = tmp.firstElementChild; }
   for (const c of [...app.children]) if (c !== old && c !== nav) c.remove();
   if (old) old.replaceWith(view); else app.prepend(view);
   if (nav && nav.parentNode !== app) app.append(nav);
