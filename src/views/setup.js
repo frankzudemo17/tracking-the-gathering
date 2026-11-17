@@ -12,7 +12,7 @@ import { html, mount, on, $ } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { memberName } from '../lib/parts.js';
 import { errText, sheet, toast } from '../lib/ui.js';
-import { createStore } from '../lib/game-store.js';
+import { sharedStore } from '../lib/game-store.js';
 import {
   PALETTE, PALETTE_KEYS, COLORLESS, commanderColors, fieldColors, fieldMode, modeColors, fieldBg, fieldStyle, styleText, swatchBg, frameColor,
 } from '../lib/field-color.js';
@@ -40,7 +40,7 @@ const artLayers = (d) => html`<div class="su-art">${[d?.image_url, d?.partner_im
 
 export default async function setup(el, { isStale }) {
   const gid = state.groupId;
-  const store = createStore(sb);
+  const store = sharedStore(sb); // P9: dieselbe Instanz wie der Lifecounter (kein doppelter Wurf)
   const [members, decksRaw] = await loadGroup(gid);
   if (isStale()) return;
 
@@ -290,7 +290,7 @@ export default async function setup(el, { isStale }) {
  * store.setFieldColor gespeichert; scheitert das, wird zurückgedreht. `onChange()` nach jeder
  * Änderung (auch beim Zurückdrehen). opts: name/life für Untertitel und Vorschau.
  */
-export function openFieldColor(d, onChange, { name = '', life = 40, store = createStore(sb) } = {}) {
+export function openFieldColor(d, onChange, { name = '', life = 40, store = sharedStore(sb) } = {}) {
   if (!d) return;
   let chain = Promise.resolve();
   const look = document.documentElement.dataset.theme || 'nacht';
