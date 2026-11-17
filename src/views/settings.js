@@ -57,6 +57,11 @@ export default function settings(el) {
     <div class="section">
       <div class="section-head"><h3 class="section-title">${t('settings.about')}</h3></div>
       <div class="list">
+        <a class="row" href="#/einstellungen/anleitung" data-nav="guide">
+          <span class="row-ic">${icon('listBullets', 20)}</span>
+          <span class="grow"><span class="title">${t('guide.title')}</span><span class="sub">${t('guide.rowSub')}</span></span>
+          <span class="chev">${icon('chevRight', 18)}</span>
+        </a>
         <a class="row" href="#/einstellungen/rechtliches" data-nav="legal">
           <span class="row-ic">${icon('shield', 20)}</span>
           <span class="grow"><span class="title">${t('settings.legal')}</span><span class="sub">${t('settings.legalSub')}</span></span>

@@ -33,6 +33,7 @@ route('/profil/:memberId', v('profile'), { nav: 'me', group: true, swap: true })
 route('/gruppen', v('groups'), { swap: true, rights: true });
 route('/einstellungen', v('settings'), { nav: 'me', swap: true });
 route('/einstellungen/konto', v('settings-account'), { nav: 'me' });
+route('/einstellungen/anleitung', v('guide'), { nav: 'me' }); // P7 „So funktioniert’s“
 route('/einstellungen/verwaltung', v('admin'), { nav: 'me', rights: true });
 // Rechtliches und Datenschutz auch ohne Anmeldung lesbar (ohne Navigationsleiste)
 route('/einstellungen/rechtliches', v('legal'), { public: true, swap: true });
