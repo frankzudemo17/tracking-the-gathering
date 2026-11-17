@@ -18,11 +18,11 @@ export default {
   nemesis: 'Nemesis', nemesisMe: '{name} knocked you out {n}×', nemesisOther: '{name} knocked {who} out {n}×',
   favDeck: 'Favourite deck', bestDeck: 'Best deck', favBestDeck: 'Favourite and best deck',
   streak: 'Longest win streak', streak1: '1 win in a row', streakN: '{n} wins in a row',
-  fastestWin: 'Fastest win', inRounds: 'in {n} rounds',
+  fastestWin: 'Fastest win', inRounds: 'in {n} rounds', inRoundsOne: 'in 1 round',
   // Deck
   rating: 'Rating', ownRating: 'Own deck rating', fun: 'Fun at the table', salt: 'Salt from opponents',
   saltLine1: 'Avg {v} from 1 rating', saltLineN: 'Avg {v} from {n} ratings', noSalt: 'No salt rating yet',
-  recent: 'Recent games', win: 'Win', place: 'Place {n}', rounds: '{n} rounds',
+  recent: 'Recent games', win: 'Win', place: 'Place {n}', rounds: '{n} rounds', roundsOne: '1 round',
   // Profile "Advanced": turn times and game length (Spec P1 turn clock)
   more: {
     title: 'Advanced', hint: 'Turn times and game length',

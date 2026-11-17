@@ -16,6 +16,7 @@ export default {
   toGame: 'Zur Partie',
   loading: 'Abzeichen aus dem Spielverlauf werden berechnet … ({n} von {of} Partien)',
   partial: 'Einige Abzeichen fehlen noch, weil der Spielverlauf nicht geladen werden konnte.',
+  partialRest: 'Ältere Partien werden beim nächsten Öffnen ergänzt — einige Abzeichen können noch fehlen.',
   noneYet: 'Noch keine Abzeichen – die erste Partie bringt das erste.',
   newOne: 'Neues Abzeichen!',
   newMany: 'Neue Abzeichen!',

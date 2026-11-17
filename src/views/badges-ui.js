@@ -66,7 +66,7 @@ function progressBar(def, state) {
 
 /**
  * Profil-Abschnitt „Abzeichen“ (Kopf zum Auf-/Zuklappen, vier Gruppen à Raster, Statuszeile).
- * @param {{ states: BadgeState[], name?: string, isMe?: boolean, open?: boolean, loading?: { n: number, of: number }|null, partial?: boolean, lang?: string }} p
+ * @param {{ states: BadgeState[], name?: string, isMe?: boolean, open?: boolean, loading?: { n: number, of: number }|null, partial?: boolean|'rest', lang?: string }} p
  */
 export function badgeGrid({ states, open = true, loading = null, partial = false }) {
   const byId = new Map((states || []).map((s) => [s.id, s]));
@@ -84,7 +84,7 @@ export function badgeGrid({ states, open = true, loading = null, partial = false
     </button>
     <div id="prof-badges" class="bdg-body" ${open ? '' : html`hidden`}>
       <p class="bdg-status tiny muted" aria-live="polite">${loading ? t('badges.loading', { n: loading.n, of: loading.of }) : ''}</p>
-      ${partial ? html`<p class="bdg-note tiny muted">${t('badges.partial')}</p>` : ''}
+      ${partial ? html`<p class="bdg-note tiny muted">${t(partial === 'rest' ? 'badges.partialRest' : 'badges.partial')}</p>` : ''}
       ${noGames ? html`<p class="bdg-note tiny muted">${t('badges.noneYet')}</p>` : ''}
       ${GROUPS.map((g) => html`<h4 class="bdg-h">${t(`badges.group.${g}`)}</h4><div class="bdg-grid">${BADGES.filter((b) => b.group === g).map(cell)}</div>`)}
     </div>

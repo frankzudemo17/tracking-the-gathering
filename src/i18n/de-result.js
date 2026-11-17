@@ -5,7 +5,7 @@ export default {
   label: 'Ergebnis',
   close: 'Zur Startseite',
   winsWith: '{name} gewinnt',
-  meta: '{rounds} Runden · {min} Min',
+  meta: '{rounds} Runden · {min} Min', metaOne: '1 Runde · {min} Min',
   deckArt: 'Commander-Bild: {name}',
   placement: 'Platzierung',
   place: 'Platz {n}',

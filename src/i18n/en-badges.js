@@ -16,6 +16,7 @@ export default {
   toGame: 'To the game',
   loading: 'Calculating badges from game history … ({n} of {of} games)',
   partial: 'Some badges are missing because the game history could not be loaded.',
+  partialRest: 'Older games will be added next time you open this — some badges may still be missing.',
   noneYet: 'No badges yet – the first game brings the first one.',
   newOne: 'New badge!',
   newMany: 'New badges!',

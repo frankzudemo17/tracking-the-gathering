@@ -87,6 +87,7 @@ export default async function profile(el, { params, isStale, fail }) {
   let facts = new Map();
   /** @type {{ n: number, of: number }|null} */
   let bdgLoading = null;
+  /** @type {boolean|'rest'} */
   let bdgPartial = false;
   /** @type {any} Gruppen-Daten, für die zuletzt Fakten angefordert wurden */
   let factsFor = null;
@@ -113,7 +114,8 @@ export default async function profile(el, { params, isStale, fail }) {
     }).then((r) => {
       if (!sc.ok() || data !== d) return;
       facts = r.facts; bdgLoading = null;
-      bdgPartial = r.failed > 0 || (typeof groupData.loadEvents !== 'function' && r.rest > 0);
+      // P11: Fehler/fehlendes loadEvents ⇒ partial; nur Grenze 200 je Besuch erreicht ⇒ Hinweis „beim nächsten Öffnen ergänzt“
+      bdgPartial = r.failed > 0 || (typeof groupData.loadEvents !== 'function' && r.rest > 0) ? true : (r.rest > 0 ? 'rest' : false);
       redrawBadges();
     }, (ex) => { console.warn('Abzeichen laden', ex); });
   };
@@ -427,7 +429,7 @@ async function profileStats({ pr, data, isMe, name, lang, memberId, moreOpen }) 
     label: t('stats.streak'), text: t(pr.longestStreak === 1 ? 'stats.streak1' : 'stats.streakN', { n: pr.longestStreak }), media: iconDisc('fire'),
   }));
   if (pr.fastestWin) hl.push(highlight({
-    label: t('stats.fastestWin'), text: t('stats.inRounds', { n: pr.fastestWin.rounds }), media: iconDisc('lightning'),
+    label: t('stats.fastestWin'), text: t(pr.fastestWin.rounds === 1 ? 'stats.inRoundsOne' : 'stats.inRounds', { n: pr.fastestWin.rounds }), media: iconDisc('lightning'),
     href: `#/partie/${encodeURIComponent(pr.fastestWin.gameId)}`,
   }));
   const highlights = hl.length ? section(t('stats.highlights'), html`<div class="st-hls">${hl}</div>`) : '';

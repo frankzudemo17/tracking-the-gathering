@@ -68,7 +68,7 @@ export default async function history(el, { isStale, fail }) {
             ${s.placements.map((p, i) => av(p.memberId, 28, i === 0 ? { ring: true, color: 'var(--hi)' } : {}))}
           </span>
           <span class="hist-facts">
-            <span>${t('history.rounds', { n: num(s.rounds) })}</span>
+            <span>${t(s.rounds === 1 ? 'history.roundsOne' : 'history.rounds', { n: num(s.rounds) })}</span>
             <span>${t('history.minutes', { n: num(s.minutes) })}</span>
             <span class="hist-salt" title="${t('history.avgSalt')}">${icon('salt', 15)}<span class="num">${fmtAvg(s.avgSalt, lang)}</span><span class="sr-only">${t('history.avgSalt')}</span></span>
           </span>
