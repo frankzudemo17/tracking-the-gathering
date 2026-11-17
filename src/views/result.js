@@ -144,7 +144,7 @@ export default async function result(el, { params, isStale }) {
       <h2>${winner ? t('result.winsWith', { name: name(winner.memberId) }) : t('result.label')}</h2>
       <span class="rs-hero-deck">${wDeck?.commanderName || deckTitle(wDeck)}</span>
       ${winner ? html`<span class="rs-hero-life">${t('result.outcome.win', { life: num(winner.finalLife) })}</span>` : ''}
-      <span class="rs-hero-meta num">${t('result.meta', { rounds: num(s.rounds), min: num(s.minutes) })}</span>
+      <span class="rs-hero-meta num">${t(s.rounds === 1 ? 'result.metaOne' : 'result.meta', { rounds: num(s.rounds), min: num(s.minutes) })}</span>
     </div>
   </section>`;
 

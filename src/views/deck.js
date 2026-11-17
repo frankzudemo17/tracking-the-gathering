@@ -230,7 +230,7 @@ function deckStats(dp, data, deckId, lang) {
     return html`<a class="st-game" href="#/partie/${encodeURIComponent(id)}">
       <span class="st-place ${place === 1 ? 'win' : ''}" aria-hidden="true">${place === 1 ? icon('trophyFill', 18) : place ?? '–'}</span>
       <span class="grow-col"><b>${place === 1 ? t('stats.win') : place != null ? t('stats.place', { n: place }) : '–'}</b>
-        <span class="small muted">${fmtDay(g?.startedAt, lang)}${g?.rounds ? ` · ${t('stats.rounds', { n: g.rounds })}` : ''}</span></span>
+        <span class="small muted">${fmtDay(g?.startedAt, lang)}${g?.rounds ? ` · ${t(g.rounds === 1 ? 'stats.roundsOne' : 'stats.rounds', { n: g.rounds })}` : ''}</span></span>
       <span class="st-hl-go" aria-hidden="true">${icon('chevRight', 18)}</span>
     </a>`;
   });

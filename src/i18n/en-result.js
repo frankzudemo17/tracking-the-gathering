@@ -4,7 +4,7 @@ export default {
   label: 'Result',
   close: 'To home',
   winsWith: '{name} wins',
-  meta: '{rounds} rounds · {min} min',
+  meta: '{rounds} rounds · {min} min', metaOne: '1 round · {min} min',
   deckArt: 'Commander art: {name}',
   placement: 'Placement',
   place: 'Place {n}',

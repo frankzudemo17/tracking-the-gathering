@@ -9,7 +9,7 @@ export default {
   dayWinner: 'Tageskönig {name}',
   toRecap: 'Abend-Rückblick: {date}',
   winsWith: '{name} gewinnt',
-  rounds: '{n} Runden',
+  rounds: '{n} Runden', roundsOne: '1 Runde',
   minutes: '{n} Min',
   avgSalt: 'Ø Salz',
   avgFun: 'Ø Spaß',

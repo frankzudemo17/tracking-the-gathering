@@ -18,11 +18,11 @@ export default {
   nemesis: 'Nemesis', nemesisMe: '{name} hat dich {n}× rausgenommen', nemesisOther: '{name} hat {who} {n}× rausgenommen',
   favDeck: 'Lieblingsdeck', bestDeck: 'Bestes Deck', favBestDeck: 'Lieblings- und bestes Deck',
   streak: 'Längste Siegesserie', streak1: '1 Sieg in Folge', streakN: '{n} Siege in Folge',
-  fastestWin: 'Schnellster Sieg', inRounds: 'in {n} Runden',
+  fastestWin: 'Schnellster Sieg', inRounds: 'in {n} Runden', inRoundsOne: 'in 1 Runde',
   // Deck
   rating: 'Bewertung', ownRating: 'Eigene Deck-Bewertung', fun: 'Spaß am Tisch', salt: 'Salz bei Gegnern',
   saltLine1: 'Ø {v} aus 1 Bewertung', saltLineN: 'Ø {v} aus {n} Bewertungen', noSalt: 'Noch keine Salz-Bewertung',
-  recent: 'Letzte Spiele', win: 'Sieg', place: 'Platz {n}', rounds: '{n} Runden',
+  recent: 'Letzte Spiele', win: 'Sieg', place: 'Platz {n}', rounds: '{n} Runden', roundsOne: '1 Runde',
   // Profil „Erweitert“: Zugzeiten und Spieldauer (Spec P1 Zug-Uhr)
   more: {
     title: 'Erweitert', hint: 'Zugzeiten und Spieldauer',

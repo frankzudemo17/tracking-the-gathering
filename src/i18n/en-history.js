@@ -9,7 +9,7 @@ export default {
   dayWinner: 'King of the night {name}',
   toRecap: 'Game night recap: {date}',
   winsWith: '{name} wins',
-  rounds: '{n} rounds',
+  rounds: '{n} rounds', roundsOne: '1 round',
   minutes: '{n} min',
   avgSalt: 'Avg salt',
   avgFun: 'Avg fun',
