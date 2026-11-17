@@ -7,7 +7,7 @@ import { backHead, empty, manaPips } from '../lib/parts.js';
 import { sheet, toast, errText } from '../lib/ui.js';
 import { BRACKETS, bracketName, sortColors, linkInfo, normalizeLink } from '../lib/decks.js';
 import { t, getLang } from '../i18n/index.js';
-import { go } from '../router.js';
+import { go, backTarget } from '../router.js';
 import { groupData } from '../lib/data.js';
 import { deckProfile, gameSummary } from '../lib/stats.js';
 import { fmtAvg, fmtPct } from '../lib/format.js';
@@ -34,6 +34,9 @@ export default async function deckView(el, { params, isStale }) {
   const ownerName = owner?.display_name || ownerMember?.display_name || '';
   const canEdit = d.owner_profile_id === state.profile?.id || (!!d.owner_member_id && !ownerMember?.profile_id);
   const backTo = ownerMember?.id ? `#/profil/${ownerMember.id}` : '#/profil';
+  // P14: Zurück führt dorthin, woher man kam (Profil, Rangliste, Partie …); nur ohne Vorgänger ins Besitzerprofil
+  const ownerBack = backTo;
+  const backHref = backTarget(ownerBack, (h) => !/^#\/(deck\/|login|registrieren|beitreten|passwort)/.test(h));
   const lang = getLang();
   const dp = data ? deckProfile(data, d.id) : null;
   const link = d.list_url ? linkInfo(d.list_url) : null;
@@ -44,7 +47,7 @@ export default async function deckView(el, { params, isStale }) {
   const motto = typeof d.motto === 'string' ? d.motto.trim() : '';
 
   mount(el, html`
-    ${backHead('', backTo)}
+    ${backHead('', backHref)}
     <div class="deck-hero ${arts.length > 1 ? 'split' : ''}">
       ${arts.map((a) => html`<span class="art" style="background-image:url('${a}')"></span>`)}
       <div class="deck-hero-text">
