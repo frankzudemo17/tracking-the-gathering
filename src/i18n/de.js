@@ -86,6 +86,7 @@ export default {
   },
   result, history, board, recap, stats, // Etappe 4/5 (Naht P13)
   badges, // P4 Abzeichen (Welle ttg-features)
+  guide, // P7 Anleitung (Welle ttg-features)
 
   groups: {
     title: 'Playgroups', newGroup: 'Neue Playgroup', groupName: 'Name der Playgroup', groupNamePh: 'z. B. Küchentisch',
@@ -283,3 +284,4 @@ import board from './de-board.js';
 import recap from './de-recap.js';
 import stats from './de-stats.js';
 import badges from './de-badges.js';
+import guide from './de-guide.js';
