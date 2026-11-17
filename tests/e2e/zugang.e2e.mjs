@@ -41,10 +41,15 @@ async function profileMock(p, uid, ov) {
   await p.route(`${SB}/rest/v1/profiles?*`, async (route) => {
     const req = route.request();
     if (req.method() !== 'GET' || !req.url().includes(`id=eq.${uid}`) || !ov.superadmin) return route.fallback();
-    const res = await route.fetch();
-    const body = await res.json();
-    const patch = (o) => ({ ...o, is_superadmin: true });
-    await route.fulfill({ response: res, body: JSON.stringify(Array.isArray(body) ? body.map(patch) : patch(body)) });
+    // Seite kann während des Abrufs schließen (Abschnittsende): dann nichts mehr tun statt den ganzen Lauf abzubrechen
+    try {
+      const res = await route.fetch();
+      const body = await res.json();
+      const patch = (o) => ({ ...o, is_superadmin: true });
+      await route.fulfill({ response: res, body: JSON.stringify(Array.isArray(body) ? body.map(patch) : patch(body)) });
+    } catch (e) {
+      if (!/closed|disposed/i.test(String(e?.message))) throw e;
+    }
   });
 }
 
@@ -402,7 +407,9 @@ export default async function zugangE2e({ browser, base }) {
     ovB.superadmin = true;
     await B.reload();
     await B.waitForSelector('[data-act="code"]');
-    await B.waitForTimeout(200);
+    // Vorstart zeichnet erst den gespeicherten Stand, das frische Profil (abgefangen, Umweg über Prod) folgt per Netz:
+    // auf den Knopf warten statt fester 200 ms (rot im vollen Lauf 17.11., wenn das Netz langsamer war)
+    await B.locator('[data-act="new"]').waitFor({ timeout: 8000 }).catch(() => {});
     ok('K5 mit abgefangenem is_superadmin ⇒ „Gruppe erstellen“ da', (await B.locator('[data-act="new"]').count()) === 1);
     ovB.superadmin = false;
   });
