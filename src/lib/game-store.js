@@ -107,6 +107,18 @@ export function takeFreshStart(gameId) {
   return typeof at === 'number' ? at : null;
 }
 
+// P9: Spielvorbereitung und Lifecounter teilen EINE Store-Instanz. Zwei Instanzen teilten nur die Warteschlange in
+// localStorage, nicht den laufenden Schreibvorgang: startGame() schrieb das Wurf-Ereignis, der Lifecounter las es aus
+// der Warteschlange und sendete es ein zweites Mal ⇒ 409 (Daten blieben richtig, die Konfliktauflösung bestätigte die
+// eigene cid). Mit einer Instanz gibt es je Spiel genau einen Recorder und genau einen Schreibvorgang.
+/** @type {ReturnType<typeof createStore>|null} */
+let shared = null;
+/** Gemeinsame Store-Instanz der App (erste Anlage mit `sb`/`opts`, danach dieselbe). */
+export function sharedStore(sb, opts) {
+  if (!shared) shared = createStore(sb, opts);
+  return shared;
+}
+
 /**
  * @param {object} sb Supabase-Client (oder Attrappe)
  * @param {{ storage?: Storage, online?: () => boolean, timers?: { setTimeout: Function, clearTimeout: Function }, events?: EventTarget, realtime?: { channel: Function, removeChannel: Function } }} [opts]

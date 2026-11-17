@@ -11,7 +11,7 @@ import { html, mount, on, $, $$, busy } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { empty, memberName } from '../lib/parts.js';
 import { errText, sheet, toast, copyText } from '../lib/ui.js';
-import { createStore, takeFreshStart } from '../lib/game-store.js';
+import { sharedStore, takeFreshStart } from '../lib/game-store.js';
 import { appRand } from '../lib/rand.js';
 import { fieldMode, modeColors, fieldStyle, styleText } from '../lib/field-color.js';
 import { act, isLethal, newlyLethal, canUndo, history, killerCandidates, results, COUNTER_MAX, POISON_MAX } from '../game/engine.js';
@@ -32,8 +32,8 @@ import {
 } from './life-ui.js';
 
 // Ein Store für alle Besuche: die Schreib-Warteschlange je Spiel (Timer, online-Ereignis) lebt
-// über Seitenwechsel weiter und wird nicht doppelt angelegt.
-const store = createStore(sb);
+// über Seitenwechsel weiter und wird nicht doppelt angelegt. P9: dieselbe Instanz wie die Spielvorbereitung.
+const store = sharedStore(sb);
 
 const DELTA_MS = 1800; // Sammelfenster: Änderungen innerhalb dieser Zeit zählen zur selben Plakette / zum selben Treffer
 const DELTA_SHOW_MS = 2800; // so lange bleibt die Plakette nach der letzten Änderung stehen
