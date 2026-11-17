@@ -5,7 +5,7 @@ import { html, on, busy, mount } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { avatar, pathAvatar, backHead, empty, memberName, memberAvatarPath, roleChip, manaPips, viewScope, fromCache, ownNameFits, settled, painter, staleMark, skel } from '../lib/parts.js';
 import { pageCache, cacheKey, GROUP_MAX_AGE_MS } from '../lib/cache.js';
-import { decksOf, sortColors, bracketName } from '../lib/decks.js';
+import { decksOf, sortColors } from '../lib/decks.js';
 import { sheet, toast, errText, copyText, openPhoto } from '../lib/ui.js';
 import { setAvatar, removeAvatar } from '../lib/avatar.js';
 import { t, fmtDate, getLang } from '../i18n/index.js';
@@ -19,17 +19,13 @@ import { BADGES, memberBadges } from '../lib/badges.js';
 import { ensureFacts } from '../lib/badge-facts.js';
 import { badgeGrid, badgeSheet, badgeName } from './badges-ui.js';
 
-// Decks auf- oder zugeklappt: pro Gerät gemerkt (reine Ansichtssache)
-const DECKS_KEY = 'ttg.decksOpen';
-const decksOpenPref = () => { try { return localStorage.getItem(DECKS_KEY) !== '0'; } catch { return true; } };
-const setDecksOpenPref = (v) => { try { localStorage.setItem(DECKS_KEY, v ? '1' : '0'); } catch { /* egal */ } };
 // „Erweitert“ (Zugzeiten, Spieldauer; Spec P1): Standard zu, pro Gerät gemerkt, gilt für alle Profile
 const MORE_KEY = 'ttg.statsMore';
 const moreOpenPref = () => { try { return localStorage.getItem(MORE_KEY) === '1'; } catch { return false; } };
 const setMoreOpenPref = (v) => { try { localStorage.setItem(MORE_KEY, v ? '1' : '0'); } catch { /* egal */ } };
-// Abzeichen (P4): Standard offen, pro Gerät gemerkt (Muster ttg.decksOpen)
+// Abzeichen (P4): pro Gerät gemerkt. P12: Standard zu — eine Zeile „Abzeichen n von 20“, die Decks stehen vorn
 const BADGES_KEY = 'ttg.badgesOpen';
-const badgesOpenPref = () => { try { return localStorage.getItem(BADGES_KEY) !== '0'; } catch { return true; } };
+const badgesOpenPref = () => { try { return localStorage.getItem(BADGES_KEY) === '1'; } catch { return false; } };
 const setBadgesOpenPref = (v) => { try { localStorage.setItem(BADGES_KEY, v ? '1' : '0'); } catch { /* egal */ } };
 // Wie MEMBER_SELECT (groups.js) + is_superadmin des Zielprofils: kein Entfernen-Knopf beim Superadmin (P10 B1)
 const PROFILE_MEMBER_SELECT = '*, profiles!members_profile_id_fkey(display_name, avatar_path, is_superadmin)';
@@ -139,7 +135,6 @@ export default async function profile(el, { params, isStale, fail }) {
     target = isMe ? { kind: 'profile', id: state.profile.id } : { kind: 'member', id: m.id };
 
     avUrl = urls[avPath] || '';
-    const decksOpen = decksOpenPref(); // beim Neuzeichnen gilt der zuletzt gewählte Zustand
     const av = pathAvatar({ name, path: avPath, urls, size: 72 });
     const avView = html`<button type="button" class="avatar-view" data-act="avatar-zoom" aria-label="${t('avatar.view', { name })}">${av}</button>`;
     paint(html`
@@ -170,28 +165,23 @@ export default async function profile(el, { params, isStale, fail }) {
       </div>
     </div>` : ''}
 
+    <!-- P12: Deck-Regal direkt unter dem Kopf, Statistik danach -->
+    ${decks == null ? html`<div class="section deck-shelf-sec">
+      <div class="section-head"><h3 class="section-title">${t('profile.decks')}</h3></div>
+      <div class="deck-shelf" data-skel aria-hidden="true">${[0, 1, 2].map(() => html`<span class="skel shelf-skel"></span>`)}</div>
+    </div>` : html`<div class="section deck-shelf-sec">
+      <div class="section-head"><h3 class="section-title">${t('profile.decks')} <span class="count">${decks.length}</span></h3></div>
+      ${decks.length || canEdit ? html`<ul class="deck-shelf" aria-label="${t('profile.decks')}">${decks.map((d) => html`<li>
+        <a class="deck-card shelf-card" href="#/deck/${d.id}">
+          <span class="arts ${d.partner_image_url ? 'split' : ''}">${[d.image_url, d.partner_image_url].filter(Boolean).map((a) => html`<span style="background-image:url('${a}')"></span>`)}</span>
+          <span class="info"><b>${d.short_name}</b><span class="meta">${manaPips(sortColors(d.color_identity), 10)}<span>${t('decks.bracket')} ${d.bracket}</span></span>${data ? html`<span class="st-deck-line tiny muted">${deckLine(d.id)}</span>` : ''}</span>
+        </a></li>`)}${canEdit ? html`<li><a class="shelf-add" href="#/deck-neu/${m.id}">${icon('plus', 26)}<span>${t('decks.add')}</span></a></li>` : ''}</ul>`
+        : html`<div class="card">${empty('play', t('decks.none'), t('decks.noneOther', { name }))}</div>`}
+    </div>`}
+
     ${statsHtml}
 
     <div id="prof-bdg-wrap">${badgesHtml()}</div>
-
-    ${decks == null ? html`<div class="section">
-      <div class="section-head"><h3 class="section-title">${t('profile.decks')}</h3></div>
-      ${skel.rows(2)}
-    </div>` : html`<div class="section">
-      <button type="button" class="collapse-head" data-act="toggle-decks" aria-expanded="${decksOpen}" aria-controls="prof-decks">
-        <h3 class="section-title">${t('profile.decks')} <span class="count">${decks.length}</span></h3>
-        ${decks.length ? html`<span class="deck-minis" aria-hidden="true">${decks.slice(0, 5).map((d) => html`<i style="background-image:url('${d.image_url}')"></i>`)}</span>` : ''}
-        <span class="chev">${icon('chevDown', 20)}</span>
-      </button>
-      <div id="prof-decks" class="section" ${decksOpen ? '' : html`hidden`}>
-      ${decks.length ? html`<div class="decks">${decks.map((d) => html`
-        <a class="deck-card" href="#/deck/${d.id}">
-          <span class="arts ${d.partner_image_url ? 'split' : ''}">${[d.image_url, d.partner_image_url].filter(Boolean).map((a) => html`<span style="background-image:url('${a}')"></span>`)}</span>
-          <span class="info"><b>${d.short_name}</b><span class="meta">${manaPips(sortColors(d.color_identity), 10)}<span>${t('decks.bracket')} ${d.bracket} · ${bracketName(d.bracket)}</span></span>${data ? html`<span class="st-deck-line tiny muted">${deckLine(d.id)}</span>` : ''}</span>
-        </a>`)}</div>` : html`<div class="card">${empty('play', t('decks.none'), isMe || isGuest ? '' : t('decks.noneOther', { name }))}</div>`}
-      ${canEdit ? html`<a class="btn soft" href="#/deck-neu/${m.id}">${icon('plus', 20)}${t('decks.add')}</a>` : ''}
-      </div>
-    </div>`}
 
     ${!isGuest && !isMe && (m.role === 'admin' ? isAdmin() || isSuperadmin() : isSuperadmin()) ? html`
     <button type="button" class="btn soft" data-act="role">${icon('shield', 18)}${m.role === 'admin' ? t('profile.removeAdmin') : t('profile.makeAdmin')}</button>` : ''}
@@ -267,12 +257,6 @@ export default async function profile(el, { params, isStale, fail }) {
   on(el, 'click', '[data-act="photo"]', () => openAvatarSheet({ name, url: urls[avPath], has: !!avPath, path: avPath, target, isMe, onDone: () => { groupData.invalidate(m.playgroup_id || state.groupId); rerender(); } })); // P12 Nachtrag 1 (B2)
   on(el, 'click', '[data-act="rename"]', () => openRename({ name, isMe, member: m, onDone: rerender }));
   on(el, 'click', '[data-act="claim-link"]', () => copyText(appUrl(`#/code/${m.claim_code}`)));
-  on(el, 'click', '[data-act="toggle-decks"]', (e, b) => {
-    const open = b.getAttribute('aria-expanded') !== 'true';
-    b.setAttribute('aria-expanded', String(open));
-    el.querySelector('#prof-decks').hidden = !open;
-    setDecksOpenPref(open);
-  });
   on(el, 'click', '[data-act="toggle-badges"]', (e, b) => {
     const open = b.getAttribute('aria-expanded') !== 'true';
     b.setAttribute('aria-expanded', String(open));
