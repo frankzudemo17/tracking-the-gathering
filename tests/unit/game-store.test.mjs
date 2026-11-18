@@ -722,3 +722,30 @@ test('P3 takeFreshStart: RPC-Fehler ⇒ startGame wirft, kein Merker', async () 
   await assert.rejects(store.startGame(startInput()), /Deck nicht verfügbar/);
   for (const id of ['g-new', 'g-zwei', 'undefined', 'null']) assert.equal(takeFreshStart(id), null, id);
 });
+
+// P16 Star: Modus als global-Ereignis direkt nach dem Startwurf; nur bei genau 5 Spielern
+const FIVE_IN = [...PLAYERS.map((p) => ({ memberId: p.id, deckId: p.deck, seat: p.seat })), { memberId: 'E', deckId: 'dE', seat: 4 }];
+
+test('G13c Star mit Wurf: roll seq 1, global star seq 2 in einem Schreibvorgang', async () => {
+  const { sb, t, store } = await setup({ rpc: startRpc });
+  await store.startGame(startInput({ players: FIVE_IN, star: true, startRoll: { values: [3, 5, 6, 2, 1], winnerSeat: 2 } }));
+  await t.advance(300);
+  const rows = sb.upserts().flatMap((u) => u.rows);
+  assert.deepEqual(rows.map((r) => [r.seq, r.type, r.payload.key ?? r.payload.kind]), [[1, 'roll', 'start'], [2, 'global', 'star']]);
+  assert.equal(rows[1].payload.value, true);
+});
+
+test('G13d Star ohne Wurf: genau ein global-star-Ereignis seq 1', async () => {
+  const { sb, t, store } = await setup({ rpc: startRpc });
+  await store.startGame(startInput({ players: FIVE_IN, star: true }));
+  await t.advance(300);
+  const rows = sb.upserts().flatMap((u) => u.rows);
+  assert.deepEqual(rows.map((r) => [r.seq, r.type, r.payload.key]), [[1, 'global', 'star']]);
+});
+
+test('G13e Star bei 4 Spielern: kein Star-Ereignis (Gegenprobe)', async () => {
+  const { sb, t, store } = await setup({ rpc: startRpc });
+  await store.startGame(startInput({ star: true }));
+  await t.advance(1000);
+  assert.equal(sb.upserts().length, 0);
+});

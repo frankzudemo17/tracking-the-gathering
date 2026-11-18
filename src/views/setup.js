@@ -17,6 +17,7 @@ import {
   PALETTE, PALETTE_KEYS, COLORLESS, commanderColors, fieldColors, fieldMode, modeColors, fieldBg, fieldStyle, styleText, swatchBg, frameColor,
 } from '../lib/field-color.js';
 import { LAYOUTS, layoutFor } from '../game/layouts.js';
+import { STAR_PLAYERS } from '../game/engine.js';
 import { t } from '../i18n/index.js';
 import { go } from '../router.js';
 import { MEMBER_SELECT } from './groups.js';
@@ -58,7 +59,7 @@ export default async function setup(el, { isStale }) {
   // roll = letzter übernommener Startwurf (P9) { key: Sitzbelegung, startRoll } ⇒ roll-Ereignis beim Start
   // Standards je Gerät (P7); layoutFor() fällt beim Start auf ein passendes Layout zurück, wenn es zur Spielerzahl nicht passt
   const std = getPrefs();
-  const s = { sel: [], deck: {}, layout: std.layout, life: std.startLife, layoutSet: false, lifeSet: false, start: null, roll: null, swap: null, starting: false, error: '' };
+  const s = { sel: [], deck: {}, layout: std.layout, life: std.startLife, layoutSet: false, lifeSet: false, star: false, start: null, roll: null, swap: null, starting: false, error: '' };
   const draft = readDraft(gid);
   if (draft) {
     s.sel = (Array.isArray(draft.sel) ? draft.sel : []).filter((id, i, a) => byId.has(id) && a.indexOf(id) === i).slice(0, MAX);
@@ -66,6 +67,7 @@ export default async function setup(el, { isStale }) {
     // Nur hier angefasste Werte gehen dem Standard vor (sonst wirkt eine neue Einstellung erst mit neuem Tab)
     if (draft.layoutSet === true && LAYOUTS.includes(draft.layout)) { s.layout = draft.layout; s.layoutSet = true; }
     if (draft.lifeSet === true && Number.isInteger(draft.life) && draft.life >= 5 && draft.life <= 99) { s.life = draft.life; s.lifeSet = true; } // ungültig ⇒ Standard
+    s.star = draft.star === true; // P16: gilt nur bei genau 5 Spielern (Ansicht + Start prüfen)
     s.start = Number.isInteger(draft.start) && draft.start < s.sel.length ? draft.start : null;
     // Wurf übersteht Umweg und Neuladen, aber nur passend zu Sitzbelegung und Startspieler (sonst verfallen)
     const r = draft.roll, v = r?.startRoll?.values;
@@ -177,6 +179,7 @@ export default async function setup(el, { isStale }) {
       <section class="su-sec"><div class="su-sec-head"><span class="su-eyebrow">${t('setup.seats')}</span><span class="su-mu">${n >= 2 ? swapHint : ''}</span></div>
         <div class="su-layouts">${LAYOUTS.map((k) => html`<button type="button" class="su-pill" data-act="layout" data-l="${k}" aria-pressed="${String(s.layout === k)}">${t(`setup.layouts.${k}`)}</button>`)}</div>
         ${seatsHtml()}</section>
+      ${n === STAR_PLAYERS ? starHtml() : ''}
 
       <section class="su-sec"><span class="su-eyebrow">${t('setup.decks')}</span>
         ${noDecks ? html`<div class="su-empty">${icon('palette', 20)}<span>${t('setup.noDecks')}</span></div>` : ''}
@@ -196,6 +199,13 @@ export default async function setup(el, { isStale }) {
         ${why ? html`<span class="su-why" data-why>${icon('warn', 16)}${why}</span>` : ''}
         ${s.error ? html`<p class="error" role="alert">${s.error}</p>` : ''}</div>
     </div>`;
+  }
+
+  /** Star-Schalter (P16): nur bei genau 5 Spielern; Feinde = die zwei Plätze gegenüber in der Sitzreihenfolge. */
+  function starHtml() {
+    return html`<div class="su-card" data-star><div class="su-liferow"><span class="grow"><span class="su-eyebrow" id="su-star-l">${t('setup.star.title')}</span>
+      <span class="su-mu su-small">${t('setup.star.desc')}</span></span>
+      <button type="button" class="tb-switch" role="switch" data-act="star" aria-checked="${String(s.star)}" aria-labelledby="su-star-l"><i></i></button></div></div>`;
   }
 
   /** Bracket-Hinweis (P7): unaufdringlich über dem Start-Knopf, nur bei ≥ 2 Stufen bzw. höher geprüftem Deck. */
@@ -234,6 +244,7 @@ export default async function setup(el, { isStale }) {
       s.deck[id] = list[(at + 1) % list.length].id;
     } else if (act === 'life') { s.life = clampLife(s.life + Number(b.dataset.v)); s.lifeSet = true; }
     else if (act === 'lifeset') { s.life = clampLife(b.dataset.v); s.lifeSet = true; }
+    else if (act === 'star') { s.star = !s.star; }
     else if (act === 'roll') {
       if (s.sel.length < 2) return;
       const sel = s.sel.slice(); // Würfeltisch (P9); Schließen ohne Übernehmen ändert nichts
@@ -262,6 +273,7 @@ export default async function setup(el, { isStale }) {
         firstSeat: firstSeat(),
         startRoll: s.roll && s.roll.key === s.sel.join() && s.roll.startRoll.winnerSeat === s.start ? s.roll.startRoll : null,
         players: s.sel.map((id, seat) => ({ memberId: id, deckId: s.deck[id], seat })),
+        star: n === STAR_PLAYERS && s.star,
       });
       clearDraft(gid);
       go(`/spiel/${gameId}`, { replace: true });

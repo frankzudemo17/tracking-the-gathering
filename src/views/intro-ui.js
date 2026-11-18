@@ -42,8 +42,8 @@ const cp = (s) => [...String(s)].length;
 
 /**
  * Startbedingung (Entscheid 1 a, d–f): Schalter an, Merker 0…60 s alt, Spiel live und offen,
- * kein Ereignis außer dem Startwurf (`roll`).
- * @param {{ enabled: boolean, mark: number | null | undefined, now: number, status: string, finished: boolean, events: { type: string }[] }} o
+ * kein Ereignis außer dem Startwurf (`roll`) und dem Star-Modus (P16, global `star`).
+ * @param {{ enabled: boolean, mark: number | null | undefined, now: number, status: string, finished: boolean, events: { type: string, payload?: { key?: unknown } | null }[] }} o
  */
 export function introDue({ enabled, mark, now, status, finished, events }) {
   if (enabled !== true) return false;
@@ -51,7 +51,7 @@ export function introDue({ enabled, mark, now, status, finished, events }) {
   const age = now - mark;
   if (!(age >= 0 && age <= INTRO_FRESH_MS)) return false;
   if (status !== 'live' || finished) return false;
-  return (events || []).every((e) => e?.type === 'roll');
+  return (events || []).every((e) => e?.type === 'roll' || (e?.type === 'global' && e.payload?.key === 'star'));
 }
 
 /**

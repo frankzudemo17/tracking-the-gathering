@@ -19,6 +19,7 @@ export default {
     gegenueber: 'Two rows facing each other. The top row reads its numbers from the other side.',
     unten: 'Everything readable from below, e.g. when the phone lies in front of one person.',
   },
+  star: { title: 'Star', desc: 'Your enemies are the two players across from you, your neighbours are allies. Knock out both enemies to win.' },
   twoAuto: 'With two players "Facing" is used automatically.',
   decks: 'Decks',
   noDecks: 'No decks in this group yet. "+ Commander" finds any commander via Scryfall, partners included.',

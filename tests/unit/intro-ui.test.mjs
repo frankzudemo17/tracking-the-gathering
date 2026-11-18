@@ -135,6 +135,9 @@ test('P3 introDue: Startbedingung (Entscheid 1 d–f + Schalter)', async () => {
   assert.equal(due({ events: [{ type: 'roll' }, { type: 'life' }] }), false, 'schon gespielt (life)');
   assert.equal(due({ events: [{ type: 'turn_end' }] }), false, 'schon gespielt (turn_end)');
   assert.equal(due({ events: [{ type: 'undo' }] }), false, 'schon gespielt (undo)');
+  // P16 Star: das Modus-Ereignis beim Start hält das Intro nicht auf, andere global-Ereignisse schon
+  assert.equal(due({ events: [{ type: 'roll' }, { type: 'global', payload: { key: 'star', value: true } }] }), true, 'Star-Modus');
+  assert.equal(due({ events: [{ type: 'global', payload: { key: 'storm', value: 1 } }] }), false, 'Sturm');
 });
 
 // ---------------------------------------------------------------- Reihenfolge / Bilanz / Salz

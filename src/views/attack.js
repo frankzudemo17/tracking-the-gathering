@@ -17,7 +17,13 @@
 import { html, mount, $ } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { sheet } from '../lib/ui.js';
-import { previewAttack } from '../game/engine.js';
+import { previewAttack, starFoes } from '../game/engine.js';
+
+/** Wer als Ziel infrage kommt: Star (P16) ⇒ nur der Angreifer und seine zwei Feinde, sonst alle. */
+const pool = (s, from) => {
+  const foes = starFoes(s, from);
+  return foes.length ? s.players.filter((p) => p.id === from || foes.includes(p.id)) : s.players;
+};
 import { t } from '../i18n/index.js';
 import { shortCmd } from './life-ui.js';
 import {
@@ -141,7 +147,7 @@ export function attachAttack(root, { getState, onApply, name, deck, busy = () =>
       startFx(dd);
     }
     e.preventDefault();
-    dd.over = hoverTarget(pidAt(e.clientX, e.clientY), dd.pid, getState().players);
+    dd.over = hoverTarget(pidAt(e.clientX, e.clientY), dd.pid, pool(getState(), dd.pid));
     moveFx(e.clientX, e.clientY, dd.over);
   }, { passive: false });
 
@@ -152,7 +158,7 @@ export function attachAttack(root, { getState, onApply, name, deck, busy = () =>
     lastDrag = Date.now();
     endFx();
     if (blocked()) return;
-    const to = dropTargets(pidAt(e.clientX, e.clientY), d.pid, getState().players);
+    const to = dropTargets(pidAt(e.clientX, e.clientY), d.pid, pool(getState(), d.pid));
     if (!to.length) return;
     hideBanner(true);
     openAttack(d.pid, to);
@@ -181,7 +187,7 @@ export function attachAttack(root, { getState, onApply, name, deck, busy = () =>
     const body = () => {
       const s = getState();
       const me = s.players.find((p) => p.id === A.from);
-      const opps = opponents(s.players, A.from).map((p) => p.id);
+      const opps = opponents(pool(s, A.from), A.from).map((p) => p.id);
       const tg = validTo(A.to, opps);
       const d = deck(A.from);
       const partner = me?.partner && d?.partner_name ? [shortCmd(d.commander_name || d.short_name), shortCmd(d.partner_name)] : null;
@@ -233,7 +239,7 @@ export function attachAttack(root, { getState, onApply, name, deck, busy = () =>
         const b = e.target.closest('[data-a]');
         if (!b || b.disabled) return;
         const a = b.dataset.a;
-        const opps = opponents(getState().players, A.from).map((p) => p.id);
+        const opps = opponents(pool(getState(), A.from), A.from).map((p) => p.id);
         if (a === 'all') A.to = toggleAll(validTo(A.to, opps), opps);
         else if (a === 'tgt') A.to = toggleTarget(validTo(A.to, opps), b.dataset.id);
         else if (a === 'kind') A.kind = b.dataset.k;
