@@ -524,15 +524,22 @@ export function history(state) {
   return merged.filter((en) => !((en.type === 'life' || en.type === 'counter') && en.amount === 0));
 }
 
+/** Siegbedingungen (DB-Enum `win_condition`, init.sql:15); gleiche Liste in views/result-ui.js und history-ui.js. */
+export const WINCONS = ['kampfschaden', 'commander', 'kombo', 'gift', 'alternativ', 'aufgabe'];
+
 /**
  * Ergebnis fürs Spielende (Sitzreihenfolge). Noch Lebende ohne Platz werden nach Leben
  * absteigend auf die freien Plätze verteilt, Gleichstand ⇒ Sitz (Main.dc.html:2097–2101).
  * Frei = von keinem anderen belegt (Star P16: der Sieger hat Platz 1, die übrigen Lebenden ab 2).
+ * `winner` (P17, „Spiel beenden“ bei Kombo/Alternativsieg/Aufgabe): ein Lebender ohne Platz rückt
+ * vor alle anderen Lebenden; ungültig (raus, unbekannt, Spiel entschieden) ⇒ ohne Wirkung.
  */
-export function results(state) {
+export function results(state, winner = null) {
   const place = new Map(state.players.map((p) => [p.id, p.place]));
+  const w = state.finished ? null : winner;
+  const first = (p) => (p.id === w ? 1 : 0);
   const alive = state.players.filter((p) => !p.out && p.place == null)
-    .slice().sort((a, b) => b.life - a.life || a.seat - b.seat);
+    .slice().sort((a, b) => first(b) - first(a) || b.life - a.life || a.seat - b.seat);
   const taken = new Set(state.players.map((p) => p.place).filter((v) => v != null));
   const free = [];
   for (let v = 1; free.length < alive.length; v++) if (!taken.has(v)) free.push(v);

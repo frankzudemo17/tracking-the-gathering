@@ -10,7 +10,7 @@
 // 23505 entscheidet das Lesen der Server-Zeilen: eigene cid ⇒ bestätigt, fremde cid ⇒
 // eigene Zeilen ab dort hinter das Server-Ende umnummerieren (Undo-Verweise ziehen mit).
 // subscribe() hält per Realtime + Nachholen den neu abgespielten Zustand aktuell.
-import { createGame, replay, act, snapshot, results, STAR, STAR_PLAYERS } from '../game/engine.js';
+import { createGame, replay, act, snapshot, results, STAR, STAR_PLAYERS, WINCONS } from '../game/engine.js';
 
 const BATCH_MS = 300;
 const PUBLISH_MS = 1000;
@@ -791,18 +791,26 @@ export function createStore(sb, {
   // -------------------------------------------------------------------------
   // Ende
 
-  async function finishGame(gameId, state, status) {
+  /**
+   * Spielende. P17: `winner` = gewählter Sieger (results), `wincon` = Siegbedingung (games.wincon,
+   * nur bei „finished“, nur gültige Werte; Schreibfehler ⇒ still, die Ergebnisseite kann nachtragen).
+   * @param {{ winner?: string|null, wincon?: string|null }} [opts]
+   */
+  async function finishGame(gameId, state, status, { winner = null, wincon = null } = {}) {
     if (status !== 'finished' && status !== 'aborted') throw new Error(`Ungültiger Spielstatus '${status}'`);
     const rec = recorder(gameId);
     await rec.flush(); // scheitert ⇒ wirft, Spiel bleibt live
     const pResults = status === 'finished'
-      ? results(state).map((r) => ({
+      ? results(state, winner).map((r) => ({
         member_id: r.id, place: r.place, eliminated_round: r.eliminatedRound,
         eliminated_by: r.eliminatedBy, final_life: r.finalLife,
       }))
       : null;
     const res = await sb.rpc('finish_game', { p_game: gameId, p_status: status, p_round: state.round, p_results: pResults });
     if (res.error) fail(res, 'Spielende');
+    if (status === 'finished' && wincon && WINCONS.includes(wincon)) {
+      try { await sb.from('games').update({ wincon }).eq('id', gameId); } catch { /* still: Ergebnisseite trägt nach */ }
+    }
     rec.discard();
     recorders.delete(gameId);
     const p = publishers.get(gameId);

@@ -749,3 +749,46 @@ test('G13e Star bei 4 Spielern: kein Star-Ereignis (Gegenprobe)', async () => {
   await t.advance(1000);
   assert.equal(sb.upserts().length, 0);
 });
+
+// ---------------------------------------------------------------------------
+// P17 Gewinner + Siegbedingung beim Beenden
+
+test('G17 finish mit gewähltem Sieger und Siegbedingung: Plätze + games.wincon', async () => {
+  const { sb, store } = await setup({ db: serverDb() });
+  const { state } = play([{ type: 'eliminate', target: 'D', by: 'B' }, { type: 'life', target: 'C', d: -10 }]);
+  await store.finishGame(GAME, state, 'finished', { winner: 'C', wincon: 'kombo' });
+  const places = Object.fromEntries(sb.rpcs('finish_game')[0].params.p_results.map((r) => [r.member_id, r.place]));
+  assert.deepEqual(places, { C: 1, A: 2, B: 3, D: 4 });
+  const u = sb.updates().filter((c) => c.table === 'games');
+  assert.equal(u.length, 1);
+  assert.deepEqual(u[0].values, { wincon: 'kombo' });
+  assert.equal(sb.tables.games[0].wincon, 'kombo');
+  const iRpc = sb.calls.findIndex((c) => c.op === 'rpc' && c.name === 'finish_game');
+  assert.ok(sb.calls.indexOf(u[0]) > iRpc, 'wincon erst nach finish_game');
+});
+
+test('G17b ohne Angaben wie bisher; ungültige Siegbedingung und Verwerfen schreiben kein wincon', async () => {
+  const { sb, store } = await setup({ db: serverDb() });
+  const { state } = play([{ type: 'life', target: 'A', d: -10 }]);
+  await store.finishGame(GAME, state, 'finished');
+  await store.finishGame(GAME, state, 'finished', { wincon: 'zauberei' });
+  await store.finishGame(GAME, state, 'aborted', { winner: 'C', wincon: 'kombo' });
+  assert.equal(sb.updates().filter((c) => c.table === 'games').length, 0);
+  assert.equal(sb.rpcs('finish_game')[0].params.p_results.find((r) => r.place === 1).member_id, 'B');
+  assert.equal(sb.rpcs('finish_game')[2].params.p_results, null);
+});
+
+test('G17c wincon-Schreiben scheitert ⇒ Spiel trotzdem beendet, kein Fehler', async () => {
+  const { createStore } = await load();
+  const sb = fakeSb(serverDb());
+  const orig = sb.from;
+  sb.from = (table) => {
+    const b = orig(table);
+    if (table === 'games') b.update = () => ({ eq: async () => { throw new TypeError('Failed to fetch'); } });
+    return b;
+  };
+  const store = createStore(sb, { storage: memStorage(), online: () => true, timers: clock(), events: null });
+  const { state } = play([{ type: 'life', target: 'A', d: -1 }]);
+  await store.finishGame(GAME, state, 'finished', { winner: 'D', wincon: 'alternativ' });
+  assert.equal(sb.rpcs('finish_game').length, 1);
+});

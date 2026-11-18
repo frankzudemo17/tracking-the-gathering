@@ -197,6 +197,8 @@ html[data-motion="reduce"] .lc-hub.holding .lc-hub-ring circle { transition-dura
 .lc-endopt > span { font-size: 13px; color: var(--mu); }
 .lc-rank { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
 .lc-rank .num { color: var(--mu); }
+.lc-endopt > .lc-endq { font-weight: 650; margin-top: 4px; } /* P17 Gewinner/Siegbedingung: Farbe --mu wie die Unterzeile */
+.lc-endopt .rs-chip { padding: 0 14px; }
 .lc-danger { color: var(--danger) !important; box-shadow: inset 0 0 0 1.5px var(--danger) !important; }
 
 /* ---------- K.O. (einfache Fassung, P11 ersetzt) */
