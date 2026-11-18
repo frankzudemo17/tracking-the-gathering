@@ -34,6 +34,10 @@ html:has(.lc-screen), html:has(.lc-screen) body { overflow: hidden; overscroll-b
 .lc-top .who span { font-size: 12px; color: var(--hero-mu); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lc-top.narrow .who b { font-size: 13px; }
 .lc-top.narrow .who span { display: none; }
+/* P15: neben dem Mittelknopf kein Platz für den Namen (6er-Tisch „Seiten“, kleine Handys) ⇒ Name unten links in der Feldecke (life.js clearHub) */
+.lc-top.who-low { bottom: 0; }
+.lc-top.who-low .who { position: absolute; left: 14px; bottom: 10px; }
+.lc-top.who-low .lc-stat { margin-left: auto; }
 .lc-stat { display: flex; align-items: center; gap: 2px; flex-shrink: 0; pointer-events: auto; }
 .lc-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 46cqw; }
 .lc-badge { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 7px; border-radius: 12px; font-size: 12px; font-weight: 700;
