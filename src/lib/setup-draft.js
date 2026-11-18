@@ -17,6 +17,7 @@ export function writeDraft(gid, s) {
   try {
     /** @type {Record<string, unknown>} */
     const d = { sel: s.sel, deck: s.deck, layout: s.layout, life: s.life, layoutSet: s.layoutSet, lifeSet: s.lifeSet, start: s.start, roll: s.roll };
+    if (s.star === true) d.star = true; // P16
     if (typeof s.rematch === 'string') d.rematch = s.rematch;
     sessionStorage.setItem(draftKey(gid), JSON.stringify(d));
   } catch { /* Privatmodus */ }

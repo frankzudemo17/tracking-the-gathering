@@ -10,7 +10,7 @@
 // 23505 entscheidet das Lesen der Server-Zeilen: eigene cid ⇒ bestätigt, fremde cid ⇒
 // eigene Zeilen ab dort hinter das Server-Ende umnummerieren (Undo-Verweise ziehen mit).
 // subscribe() hält per Realtime + Nachholen den neu abgespielten Zustand aktuell.
-import { createGame, replay, act, snapshot, results } from '../game/engine.js';
+import { createGame, replay, act, snapshot, results, STAR, STAR_PLAYERS } from '../game/engine.js';
 
 const BATCH_MS = 300;
 const PUBLISH_MS = 1000;
@@ -568,7 +568,7 @@ export function createStore(sb, {
   // -------------------------------------------------------------------------
   // Start
 
-  async function startGame({ groupId, layout, startingLife, firstSeat, players, playedOn = localDate(), startRoll = null }) {
+  async function startGame({ groupId, layout, startingLife, firstSeat, players, playedOn = localDate(), startRoll = null, star = false }) {
     const res = await sb.rpc('start_game', {
       p_group: groupId,
       p_layout: layout,
@@ -581,12 +581,18 @@ export function createStore(sb, {
     const game = res.data;
     const gameId = game.id;
     freshStarts.set(gameId, Date.now()); // P3: Spielstart-Intro nur auf diesem Gerät
-    if (startRoll) {
-      const init = createGame({
+    // Startwurf (P9) und Star-Modus (P16) als erste Ereignisse; Star nur bei genau 5 Spielern (Engine prüft)
+    const starOn = star === true && players.length === STAR_PLAYERS;
+    if (startRoll || starOn) {
+      let st = createGame({
         players: players.map((p) => ({ id: p.memberId, seat: p.seat })),
         startingLife, firstSeat, startedAt: Date.parse(game.started_at) || 0,
       });
-      const { events: evs } = act(init, { type: 'roll', kind: 'start', values: startRoll.values, winnerSeat: startRoll.winnerSeat });
+      const evs = [];
+      for (const a of [startRoll && { type: 'roll', kind: 'start', values: startRoll.values, winnerSeat: startRoll.winnerSeat },
+        starOn && { type: 'global', key: STAR, value: true }].filter(Boolean)) {
+        const r = act(st, a); st = r.state; evs.push(...r.events);
+      }
       const rec = recorder(gameId);
       rec.push(evs);
       rec.flush().catch(() => {}); // Fehlschlag: bleibt in der Warteschlange

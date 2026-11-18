@@ -13,8 +13,12 @@ const DAYNIGHT = [null, 'tag', 'nacht'];
 const ROLL_KINDS = ['w6', 'w6x2', 'w20', 'coin', 'player', 'start'];
 const ATTACK_KINDS = ['damage', 'cmd', 'cmd2', 'poison'];
 const TURN_START = 'turnStartedAt'; // global-Schlüssel (P8 Nachtrag 1), nicht rückgängig machbar, nicht im Verlauf
-/** Ereignisse, die Rückgängig nie trifft: Würfe und der Zugbeginn nach dem Intro. */
-const fixedEvent = (e) => e.type === 'roll' || (e.type === 'global' && e.payload?.key === TURN_START);
+/** Star-Format (P16): global-Schlüssel beim Spielstart, nur bei 5 Spielern; nicht rückgängig machbar, nicht im Verlauf. */
+export const STAR = 'star';
+export const STAR_PLAYERS = 5;
+const isKey = (e, key) => e.type === 'global' && e.payload?.key === key;
+/** Ereignisse, die Rückgängig nie trifft: Würfe, der Zugbeginn nach dem Intro und der Star-Modus. */
+const fixedEvent = (e) => e.type === 'roll' || isKey(e, TURN_START) || isKey(e, STAR);
 
 // ---------------------------------------------------------------------------
 // Aufbau
@@ -47,6 +51,7 @@ function fresh(setup) {
     turn: setup.firstSeat,
     first: setup.firstSeat,
     finished: false,
+    star: false,
     daynight: null,
     storm: 0,
     turnStartedAt: setup.startedAt,
@@ -92,6 +97,25 @@ export function newlyLethal(prev, next) {
       return !q || !isLethal(q);
     })
     .map((p) => p.id);
+}
+
+/**
+ * Star (P16): Feinde eines Spielers sind die beiden Sitze gegenüber (Sitzreihenfolge +2 und +3 von 5),
+ * die Nachbarn sind Verbündete. Ohne Star-Modus oder unbekannte ID ⇒ [].
+ * @returns {string[]} IDs in Sitzreihenfolge
+ */
+export function starFoes(state, id) {
+  const n = state.players.length;
+  const i = state.players.findIndex((p) => p.id === id);
+  if (!state.star || n !== STAR_PLAYERS || i < 0) return [];
+  return [(i + 2) % n, (i + 3) % n].sort((a, b) => a - b).map((j) => state.players[j].id);
+}
+
+/** Star-Sieger nach einem K.O.: Lebende, deren beide Feinde ausgeschieden sind; mehrere ⇒ mehr Leben, dann Sitz. */
+function starWinner(s) {
+  const done = s.players.filter((p) => !p.out && starFoes(s, p.id).every((f) => byId(s, f).out));
+  done.sort((a, b) => b.life - a.life || a.seat - b.seat);
+  return done[0] || null;
 }
 
 /** Nächster nicht ausgeschiedener Sitz; Runde +1 beim Erreichen von `first` (Main.dc.html:2077–2081). */
@@ -155,7 +179,9 @@ function effect(s, ev) {
       const wasTurn = t.seat === s.turn;
       t.out = true; t.outBy = ev.source ?? null; t.outRound = s.round; t.place = pl.place;
       const rest = s.players.filter((p) => !p.out);
+      const starWin = rest.length > 1 && s.star ? starWinner(s) : null;
       if (rest.length === 1) { rest[0].place = 1; s.finished = true; }
+      else if (starWin) { starWin.place = 1; s.finished = true; }
       else if (wasTurn) {
         advance(s);
         // Folgezug beginnt beim K.O. (payload.at, Gerätezeit); nie vor dem bisherigen Zugbeginn. Alte Ereignisse ohne at: wie bisher.
@@ -324,8 +350,14 @@ function plan(s, action) {
         // Runde 1, Startspieler am Zug, bisher nur Würfe (Startwurf); sonst still nichts.
         const v = action.value;
         if (typeof v !== 'number' || !Number.isFinite(v)) throw new Error(`Ungültiger Wert für ${TURN_START}: '${v}'`);
-        const fresh0 = s.round === 1 && s.turn === s.first && s.events.every((e) => e.type === 'roll');
+        const fresh0 = s.round === 1 && s.turn === s.first && s.events.every((e) => e.type === 'roll' || isKey(e, STAR));
         return fresh0 ? [draft('global', { payload: { key: TURN_START, value: v } })] : [];
+      }
+      if (action.key === STAR) {
+        // P16: nur bei genau 5 Spielern, nur einmal und nur vor der ersten Spielhandlung (Würfe/Zugbeginn zählen nicht)
+        if (action.value !== true) throw new Error(`Ungültiger Wert für ${STAR}: '${action.value}'`);
+        if (s.players.length !== STAR_PLAYERS) throw new Error(`Star braucht genau ${STAR_PLAYERS} Spieler`);
+        return s.star || !s.events.every(fixedEvent) ? [] : [draft('global', { payload: { key: STAR, value: true } })];
       }
       throw new Error(`Unbekannter globaler Schlüssel '${action.key}'`);
     }
@@ -453,7 +485,7 @@ export function killerCandidates(state, targetId) {
 export function history(state) {
   const undone = undoneSeqs(state.events);
   const live = state.events.filter((e) => e.type !== 'undo' && !undone.has(e.seq)
-    && !(e.type === 'global' && e.payload?.key === TURN_START)); // Zugbeginn ist keine Spielhandlung
+    && !isKey(e, TURN_START) && !isKey(e, STAR)); // Zugbeginn und Star-Modus sind keine Spielhandlung
   const entries = [];
   for (const e of live) {
     const pl = e.payload || {};
@@ -489,12 +521,16 @@ export function history(state) {
 /**
  * Ergebnis fürs Spielende (Sitzreihenfolge). Noch Lebende ohne Platz werden nach Leben
  * absteigend auf die freien Plätze verteilt, Gleichstand ⇒ Sitz (Main.dc.html:2097–2101).
+ * Frei = von keinem anderen belegt (Star P16: der Sieger hat Platz 1, die übrigen Lebenden ab 2).
  */
 export function results(state) {
   const place = new Map(state.players.map((p) => [p.id, p.place]));
   const alive = state.players.filter((p) => !p.out && p.place == null)
     .slice().sort((a, b) => b.life - a.life || a.seat - b.seat);
-  alive.forEach((p, i) => place.set(p.id, i + 1));
+  const taken = new Set(state.players.map((p) => p.place).filter((v) => v != null));
+  const free = [];
+  for (let v = 1; free.length < alive.length; v++) if (!taken.has(v)) free.push(v);
+  alive.forEach((p, i) => place.set(p.id, free[i]));
   return state.players.map((p) => ({
     id: p.id,
     place: place.get(p.id),

@@ -19,6 +19,7 @@ export default {
     gegenueber: 'Zwei Reihen, die sich gegenübersitzen. Die obere Reihe sieht ihre Zahlen von der anderen Seite.',
     unten: 'Alles von unten lesbar, zum Beispiel wenn das Handy bei einer Person liegt.',
   },
+  star: { title: 'Star', desc: 'Eure Feinde sind die zwei gegenüber, die Nachbarn sind Verbündete. Wer beide Feinde rausgeworfen hat, gewinnt.' },
   twoAuto: 'Bei zwei Spielern gilt automatisch „Gegenüber“.',
   decks: 'Decks',
   noDecks: 'Noch keine Decks in der Gruppe. Über „+ Commander“ findest du jeden Commander per Scryfall, inklusive Partner.',

@@ -14,7 +14,7 @@ import { errText, sheet, toast, copyText } from '../lib/ui.js';
 import { sharedStore, takeFreshStart } from '../lib/game-store.js';
 import { appRand } from '../lib/rand.js';
 import { fieldMode, modeColors, fieldStyle, styleText } from '../lib/field-color.js';
-import { act, isLethal, newlyLethal, canUndo, history, killerCandidates, results, COUNTER_MAX, POISON_MAX } from '../game/engine.js';
+import { act, isLethal, newlyLethal, canUndo, history, killerCandidates, results, starFoes, COUNTER_MAX, POISON_MAX } from '../game/engine.js';
 import { LAYOUTS, layoutFor } from '../game/layouts.js';
 import { roll } from '../game/rng.js';
 import { koPick } from '../game/ko.js';
@@ -177,11 +177,14 @@ export default async function life(el, { params, isStale }) {
     const turn = !s.finished && !p.out && p.seat === s.turn;
     const lethal = isLethal(p);
     const winner = s.finished && !p.out && p.place === 1;
+    const onTurn = s.star && !s.finished ? s.players.find((x) => x.seat === s.turn) : null;
+    const foe = !!onTurn && !p.out && starFoes(s, onTurn.id).includes(p.id); // P16 Star
     f.classList.toggle('turn', turn);
+    f.classList.toggle('foe', foe);
     f.classList.toggle('out', p.out);
     f.classList.toggle('lethal', lethal);
     const cmdMax = Object.values(p.cmd).reduce((m, v) => Math.max(m, v), 0);
-    mount($('[data-part="badges"]', f), html`${p.poison > 0 ? html`<span class="lc-badge" title="${t('life.counters.labels.poison')}">${icon('drop', 14)}${p.poison}</span>` : ''}${cmdMax > 0 ? html`<span class="lc-badge">${icon('sword', 14)}${cmdMax}</span>` : ''}${FLAGS.filter(([k]) => p[k]).map(([k, ic]) => html`<span class="lc-badge ${k}" title="${t(`life.counters.flags.${k}`)}">${icon(ic, 15)}</span>`)}`);
+    mount($('[data-part="badges"]', f), html`${foe ? html`<span class="lc-badge foe" data-foe title="${t('life.foe', { name: nm(onTurn.id) })}">${icon('crosshair', 15)}<span>${t('life.foeShort')}</span></span>` : ''}${p.poison > 0 ? html`<span class="lc-badge" title="${t('life.counters.labels.poison')}">${icon('drop', 14)}${p.poison}</span>` : ''}${cmdMax > 0 ? html`<span class="lc-badge">${icon('sword', 14)}${cmdMax}</span>` : ''}${FLAGS.filter(([k]) => p[k]).map(([k, ic]) => html`<span class="lc-badge ${k}" title="${t(`life.counters.flags.${k}`)}">${icon(ic, 15)}</span>`)}`);
     const dl = deltas.get(p.id);
     mount($('[data-part="num"]', f), html`${dl && dl.v ? html`<span class="lc-delta ${dl.v < 0 ? 'neg' : 'pos'}">${signed(dl.v)}</span>` : ''}
       <span class="lc-big ${lowLife(p) ? 'low' : ''}" data-life>${p.life}</span>
@@ -770,9 +773,10 @@ export default async function life(el, { params, isStale }) {
   function openEnd() {
     if (sheetOpen() || stopped) return;
     const rows = byPlace(results(s));
+    const starWin = s.star && s.finished ? s.players.find((p) => !p.out && p.place === 1) : null; // P16
     const body = html`<div class="su-sh-head"><span class="t"><h3>${s.finished ? t('life.end.decided') : t('life.end.title')}</h3>
         <small>${t('life.end.sub', { r: s.round, time: mmss(secondsSince(startedAt, Date.now())) })}</small></span></div>
-      <div class="lc-endopt"><b>${t('life.end.rate')}</b><span>${t('life.end.rateSub')}</span>
+      <div class="lc-endopt"><b>${t('life.end.rate')}</b><span>${starWin ? t('life.end.starSub', { name: nm(starWin.id) }) : t('life.end.rateSub')}</span>
         <div class="lc-rank">${rows.map((r) => html`<span><b>${r.place}.</b> ${nm(r.id)} <span class="num">${pl(r.id)?.out ? t('life.end.out') : r.finalLife}</span></span>`)}</div>
         <button type="button" class="btn" data-e="finished">${icon('trophy', 18)}${t('life.end.rate')}</button></div>
       <div class="lc-endopt"><b>${t('life.end.discard')}</b><span>${t('life.end.discardSub')}</span>
