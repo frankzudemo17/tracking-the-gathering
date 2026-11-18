@@ -236,25 +236,19 @@ export default async function life(el, { params, isStale }) {
     const boxHit = (n, pad) => { const w = n.getBoundingClientRect(); return w.width > 0 && w.left < H.right + pad && w.right > H.left - pad && w.top < H.bottom + pad && w.bottom > H.top - pad; };
     /** @param {Element} n @param {number} pad */
     const roundHit = (n, pad) => { const w = n.getBoundingClientRect(); return Math.hypot(Math.max(w.left, Math.min(cx, w.right)) - cx, Math.max(w.top, Math.min(cy, w.bottom)) - cy) < r + pad; };
-    for (const top of $$('.lc-top', el)) {
-      const who = $('.who', top); const stat = $('.lc-stat', top);
-      top.style.paddingTop = ''; top.style.paddingLeft = ''; top.style.paddingRight = '';
-      if (stat) stat.style.marginTop = '';
-      const narrow = top.offsetWidth < 175;
-      top.classList.toggle('narrow', narrow);
-      if (who && boxHit(who, 8)) {
-        if (narrow) top.style.paddingTop = '46px';
-        else { top.style.paddingLeft = '68px'; if (boxHit(who, 2)) { top.style.paddingLeft = ''; top.style.paddingTop = '52px'; } }
-      }
-      // Abzeichen (Gift, Monarch …) bleiben frei: erst in der Zeile einrücken (breite Felder) bzw. nach unten (schmale), dann der andere Weg
-      if (stat && stat.offsetWidth > 0 && roundHit(stat, 6)) {
-        const undo = () => { top.style.paddingRight = ''; stat.style.marginTop = ''; };
-        const ways = [() => { top.style.paddingRight = '52px'; }, () => { stat.style.marginTop = '44px'; }];
-        if (top.offsetWidth < 260) ways.reverse();
-        for (const way of ways) { undo(); way(); if (!roundHit(stat, 4)) break; }
-      }
-    }
-    // „⋯“ (Spielermenü) unten in der Ecke aus Sicht des Spielers (Franco 12.11.): die Ecke, die weiter vom Mittelknopf weg ist
+    /** @param {Element} a @param {Element} b @param {number} pad */
+    const overlap = (a, b, pad) => { const p = a.getBoundingClientRect(); const q = b.getBoundingClientRect(); return p.width > 0 && q.width > 0 && p.left < q.right + pad && p.right > q.left - pad && p.top < q.bottom + pad && p.bottom > q.top - pad; };
+    /** Breiteste max-width (Halbierungssuche), bei der hit() nicht mehr trifft; Name/Commander kürzen dann mit „…“. @param {HTMLElement} n @param {() => boolean} hit */
+    const fit = (n, hit) => {
+      n.style.maxWidth = '';
+      let lo = 0; let hi = n.offsetWidth;
+      if (!hit()) return hi;
+      while (hi - lo > 2) { const mid = (lo + hi) >> 1; n.style.maxWidth = `${mid}px`; if (hit()) hi = mid; else lo = mid; }
+      n.style.maxWidth = `${lo}px`;
+      return lo;
+    };
+    // „⋯“ (Spielermenü) unten in der Ecke aus Sicht des Spielers (Franco 12.11.): die Ecke, die weiter vom Mittelknopf weg ist.
+    // Steht vor den Namen, weil der Name unten links (P15) dem Knopf ausweichen muss.
     const far = (/** @type {Element} */ n) => { const w = n.getBoundingClientRect(); return Math.hypot(w.left + w.width / 2 - cx, w.top + w.height / 2 - cy); };
     for (const f of $$('.lc-field', el)) {
       const more = $('.lc-more', f);
@@ -263,6 +257,67 @@ export default async function life(el, { params, isStale }) {
       const right = far(more);
       f.classList.toggle('more-left', true);
       if (far(more) <= right) f.classList.toggle('more-left', false);
+    }
+    for (const top of $$('.lc-top', el)) {
+      const who = /** @type {HTMLElement|null} */ ($('.who', top)); const stat = $('.lc-stat', top);
+      top.style.paddingTop = ''; top.style.paddingLeft = ''; top.style.paddingRight = '';
+      top.classList.remove('who-low');
+      const lines = who ? /** @type {HTMLElement[]} */ ([...who.children]) : [];
+      if (who) who.style.maxWidth = '';
+      for (const c of lines) c.style.maxWidth = '';
+      if (stat) stat.style.marginTop = '';
+      const narrow = top.offsetWidth < 175;
+      top.classList.toggle('narrow', narrow);
+      if (who && boxHit(who, 8)) {
+        if (narrow) top.style.paddingTop = '46px';
+        else { top.style.paddingLeft = '68px'; if (boxHit(who, 2)) { top.style.paddingLeft = ''; top.style.paddingTop = '52px'; } }
+        // P15: Nach unten gerückt kann die Zeile neben der großen Zahl landen (6er-Tisch, Feld mit dem Mittelknopf oben
+        // in der Mitte) und lief dann über die Lebenspunkte. Drei Wege, jeweils mit „…“ gekürzt, bis nichts mehr trifft:
+        // oben vor dem Knopf (jede Zeile einzeln am Kreis gemessen — darunter ist er schmaler), unten vor der Zahl,
+        // oder unten links in der Feldecke. Oben bleibt, wenn dort nichts gekürzt werden muss; sonst der Weg mit dem meisten Platz.
+        const field = top.parentElement;
+        const big = field && $('.lc-big', field);
+        const more = field && $('.lc-more', field);
+        const num = field && /** @type {HTMLElement|null} */ ($('.lc-num', field));
+        // Unten links muss der Name auch dem „Am Zug“-Chip unter der Zahl ausweichen. Gemessen wird immer mit Chip (unsichtbar
+        // eingesetzt, falls das Feld gerade nicht am Zug ist), damit der Name beim Zugwechsel nicht zwischen oben und unten springt.
+        const withChip = (/** @type {(c: Element) => number} */ run) => {
+          const real = num && $('.lc-turnchip', num);
+          if (real || !num) return run(real || who);
+          const g = document.createElement('span'); g.className = 'lc-turnchip'; g.style.visibility = 'hidden';
+          g.append(document.createElement('i'), `${t('life.turn')} · 00:00`); num.append(g);
+          try { return run(g); } finally { g.remove(); }
+        };
+        const down = top.style.paddingTop;
+        if (down && big && overlap(who, big, 6)) {
+          const reset = () => { who.style.maxWidth = ''; for (const c of lines) c.style.maxWidth = ''; top.style.paddingTop = ''; top.classList.remove('who-low'); };
+          /** @type {Record<string, () => number>} */
+          const ways = {
+            up: () => withChip(() => { const shown = lines.filter((c) => c.offsetWidth > 0); return shown.length ? Math.min(...shown.map((c) => fit(c, () => roundHit(c, 6) || overlap(c, big, 4)))) : 0; }),
+            down: () => { top.style.paddingTop = down; return fit(who, () => overlap(who, big, 6)); },
+            low: () => {
+              top.classList.add('who-low');
+              const hit = () => roundHit(who, 6) || overlap(who, big, 6) || (!!more && overlap(who, more, 6));
+              // einmal mit Chip (Zahl rückt hoch), einmal ohne (Zahl mittig) — die engere Breite gilt
+              const w1 = withChip((c) => fit(who, () => hit() || (c !== who && overlap(who, c, 0))));
+              const w = Math.min(w1, fit(who, hit));
+              who.style.maxWidth = `${w}px`;
+              return w;
+            },
+          };
+          reset();
+          let pick = 'up'; let w = ways.up();
+          if (lines.some((c) => c.style.maxWidth)) for (const k of ['down', 'low']) { reset(); const kw = ways[k](); if (kw > w + 12) { pick = k; w = kw; } }
+          reset(); ways[pick]();
+        }
+      }
+      // Abzeichen (Gift, Monarch …) bleiben frei: erst in der Zeile einrücken (breite Felder) bzw. nach unten (schmale), dann der andere Weg
+      if (stat && stat.offsetWidth > 0 && roundHit(stat, 6)) {
+        const undo = () => { top.style.paddingRight = ''; stat.style.marginTop = ''; };
+        const ways = [() => { top.style.paddingRight = '52px'; }, () => { stat.style.marginTop = '44px'; }];
+        if (top.offsetWidth < 260) ways.reverse();
+        for (const way of ways) { undo(); way(); if (!roundHit(stat, 4)) break; }
+      }
     }
     aimHub();
   }
