@@ -14,7 +14,7 @@ import { errText, sheet, toast, copyText } from '../lib/ui.js';
 import { sharedStore, takeFreshStart } from '../lib/game-store.js';
 import { appRand } from '../lib/rand.js';
 import { fieldMode, modeColors, fieldStyle, styleText } from '../lib/field-color.js';
-import { act, isLethal, newlyLethal, canUndo, history, killerCandidates, results, starFoes, COUNTER_MAX, POISON_MAX } from '../game/engine.js';
+import { act, isLethal, newlyLethal, canUndo, history, killerCandidates, results, starFoes, WINCONS, COUNTER_MAX, POISON_MAX } from '../game/engine.js';
 import { LAYOUTS, layoutFor } from '../game/layouts.js';
 import { roll } from '../game/rng.js';
 import { koPick } from '../game/ko.js';
@@ -772,12 +772,22 @@ export default async function life(el, { params, isStale }) {
   // ---------- Spiel beenden (E4: werten oder verwerfen)
   function openEnd() {
     if (sheetOpen() || stopped) return;
-    const rows = byPlace(results(s));
     const starWin = s.star && s.finished ? s.players.find((p) => !p.out && p.place === 1) : null; // P16
+    // P17: Sieger wählbar, solange das Spiel nicht entschieden ist (Kombo, Alternativsieg, Aufgabe …)
+    const alive = s.finished ? [] : s.players.filter((p) => !p.out && p.place == null).sort((a, b) => a.seat - b.seat);
+    let pick = alive.length > 1 ? results(s).find((r) => r.place === 1)?.id ?? null : null;
+    let wc = null;
+    const rankHtml = () => byPlace(results(s, pick)).map((r) => html`<span><b>${r.place}.</b> ${nm(r.id)} <span class="num">${pl(r.id)?.out ? t('life.end.out') : r.finalLife}</span></span>`);
+    const winnerHtml = alive.length > 1 ? html`<span class="lc-endq" id="lc-end-win">${t('life.end.winnerQ')}</span>
+        <div class="rs-chips" role="group" aria-labelledby="lc-end-win">${alive.map((p) => html`<button type="button" class="rs-chip" data-w="${p.id}" aria-pressed="${String(p.id === pick)}">${p.id === pick ? icon('crown', 16) : ''}${nm(p.id)}</button>`)}</div>` : '';
+    const winconHtml = html`<span class="lc-endq" id="lc-end-wc">${t('life.end.winconQ')}</span>
+        <div class="rs-chips" role="group" aria-labelledby="lc-end-wc">${WINCONS.map((w) => html`<button type="button" class="rs-chip" data-wc="${w}" aria-pressed="false">${t(`result.wincons.${w}`)}</button>`)}</div>`;
     const body = html`<div class="su-sh-head"><span class="t"><h3>${s.finished ? t('life.end.decided') : t('life.end.title')}</h3>
         <small>${t('life.end.sub', { r: s.round, time: mmss(secondsSince(startedAt, Date.now())) })}</small></span></div>
       <div class="lc-endopt"><b>${t('life.end.rate')}</b><span>${starWin ? t('life.end.starSub', { name: nm(starWin.id) }) : t('life.end.rateSub')}</span>
-        <div class="lc-rank">${rows.map((r) => html`<span><b>${r.place}.</b> ${nm(r.id)} <span class="num">${pl(r.id)?.out ? t('life.end.out') : r.finalLife}</span></span>`)}</div>
+        ${winnerHtml}
+        <div class="lc-rank">${rankHtml()}</div>
+        ${winconHtml}
         <button type="button" class="btn" data-e="finished">${icon('trophy', 18)}${t('life.end.rate')}</button></div>
       <div class="lc-endopt"><b>${t('life.end.discard')}</b><span>${t('life.end.discardSub')}</span>
         <button type="button" class="btn outline lc-danger" data-e="aborted">${icon('trash', 18)}${t('life.end.discard')}</button></div>
@@ -786,6 +796,23 @@ export default async function life(el, { params, isStale }) {
     sheet(t('life.end.title'), html`<div class="su-sheet lc-end" data-sheet="end">${body}</div>`, (sh, close) => {
       const err = $('.error', sh);
       sh.addEventListener('click', async (e) => {
+        const w = e.target.closest('[data-w]');
+        if (w) {
+          pick = w.dataset.w;
+          for (const c of $$('[data-w]', sh)) {
+            const on = c.dataset.w === pick;
+            c.setAttribute('aria-pressed', String(on));
+            mount(c, html`${on ? icon('crown', 16) : ''}${nm(c.dataset.w)}`);
+          }
+          mount($('.lc-rank', sh), html`${rankHtml()}`);
+          return;
+        }
+        const c = e.target.closest('[data-wc]');
+        if (c) {
+          wc = wc === c.dataset.wc ? null : c.dataset.wc;
+          for (const x of $$('[data-wc]', sh)) x.setAttribute('aria-pressed', String(x.dataset.wc === wc));
+          return;
+        }
         const b = e.target.closest('[data-e]');
         if (!b) return;
         const how = b.dataset.e;
@@ -793,7 +820,7 @@ export default async function life(el, { params, isStale }) {
         await busy(b, async () => {
           finishing = true;
           try {
-            await store.finishGame(id, s, how);
+            await store.finishGame(id, s, how, { winner: pick, wincon: wc });
             stop();
             close();
             toast(t(how === 'finished' ? 'life.end.finished' : 'life.end.discarded'));
