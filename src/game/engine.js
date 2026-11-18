@@ -113,6 +113,7 @@ export function starFoes(state, id) {
 
 /** Star-Sieger nach einem K.O.: Lebende, deren beide Feinde ausgeschieden sind; mehrere ⇒ mehr Leben, dann Sitz. */
 function starWinner(s) {
+  if (s.players.length !== STAR_PLAYERS) return null; // ohne genau 5 Spieler keine Feinde ⇒ nie ein Star-Sieg
   const done = s.players.filter((p) => !p.out && starFoes(s, p.id).every((f) => byId(s, f).out));
   done.sort((a, b) => b.life - a.life || a.seat - b.seat);
   return done[0] || null;
@@ -179,8 +180,11 @@ function effect(s, ev) {
       const wasTurn = t.seat === s.turn;
       t.out = true; t.outBy = ev.source ?? null; t.outRound = s.round; t.place = pl.place;
       const rest = s.players.filter((p) => !p.out);
-      const starWin = rest.length > 1 && s.star ? starWinner(s) : null;
-      if (rest.length === 1) { rest[0].place = 1; s.finished = true; }
+      // Schon entschieden (z. B. verspätetes K.O. eines zweiten Geräts nach dem Star-Ende): kein zweiter Platz 1 (Review B1)
+      const decided = s.finished;
+      const starWin = !decided && rest.length > 1 && s.star ? starWinner(s) : null;
+      if (decided) { /* Platz kommt aus dem Ereignis, results() verteilt die Lebenden auf freie Plätze */ }
+      else if (rest.length === 1) { rest[0].place = 1; s.finished = true; }
       else if (starWin) { starWin.place = 1; s.finished = true; }
       else if (wasTurn) {
         advance(s);
@@ -199,7 +203,9 @@ function effect(s, ev) {
 /** Menge der rückgängig gemachten seq. */
 function undoneSeqs(events) {
   const set = new Set();
-  for (const e of events) if (e.type === 'undo' && e.payload?.seq != null) set.add(e.payload.seq);
+  // Star-Modus ist nie rückgängig zu machen, auch nicht durch ein undo einer älteren App-Version (Review B2)
+  const keep = new Set(events.filter((e) => isKey(e, STAR)).map((e) => e.seq));
+  for (const e of events) if (e.type === 'undo' && e.payload?.seq != null && !keep.has(e.payload.seq)) set.add(e.payload.seq);
   return set;
 }
 

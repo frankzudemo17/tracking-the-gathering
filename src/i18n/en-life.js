@@ -99,7 +99,7 @@ export default {
     sub: 'Round {r} · {time}',
     rate: 'Score and end',
     rateSub: 'Places by life; the game counts for leaderboard and stats.',
-    starSub: '{name} knocked out both enemies. Other places by life; the game counts for leaderboard and stats.',
+    starSub: '{name} wins, both enemies are out. Other places by life; the game counts for leaderboard and stats.',
     discard: 'Discard',
     discardSub: 'The game is aborted and does not count.',
     keep: 'Keep playing',

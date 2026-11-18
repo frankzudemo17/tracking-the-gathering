@@ -56,7 +56,7 @@ test('Star Gegenprobe: ohne Star endet das Spiel bei zwei K.O. nicht', async () 
   assert.equal(t.s.finished, false);
 });
 
-test('Star kein Sieg durch Verbündete: Nachbarn A und B raus ⇒ weiter', async () => {
+test('Star kein Sieg, solange niemand beide Feinde raus hat (B, E raus ⇒ weiter)', async () => {
   const E = await load();
   const t = star(E);
   t.out('B'); // B ist Feind von D und E
@@ -135,4 +135,36 @@ test('results ohne Star unverändert: Lebende ohne Platz bekommen die freien Pl�
   t.out('E');
   const r = Object.fromEntries(E.results(t.s).map((x) => [x.id, x.place]));
   assert.deepEqual(r, { A: 1, C: 2, D: 3, B: 4, E: 5 });
+});
+
+// Review B1: ein verspätetes K.O. (zweites Gerät, Sync) nach dem Star-Ende vergibt Platz 1 kein zweites Mal
+test('Star nach Spielende: weiteres K.O. per Replay ⇒ Sieger bleibt allein auf Platz 1, Plätze eindeutig', async () => {
+  const E = await load();
+  const t = star(E);
+  t.run({ type: 'life', target: 'E', d: 5 }); // E 45 > A 40
+  t.out('C'); t.out('D'); // A gewinnt
+  const late = { seq: 99, type: 'eliminate', round: 1, actor: null, source: null, target: 'B', amount: null, payload: { place: 3, act: 99 } };
+  const re = E.replay({ players: FIVE, startingLife: 40, firstSeat: 0, startedAt: 0 }, [...t.all, late]);
+  const r = Object.fromEntries(E.results(re).map((x) => [x.id, x.place]));
+  assert.equal(r.A, 1);
+  assert.deepEqual(Object.values(r).sort(), [1, 2, 3, 4, 5]);
+});
+
+// Review B2: ein undo, das (von einer alten App-Version) das Star-Ereignis trifft, bleibt wirkungslos
+test('Star undo auf das Modus-Ereignis ⇒ Star bleibt an', async () => {
+  const E = await load();
+  const t = star(E);
+  const starSeq = t.all[0].seq;
+  const undo = { seq: 2, type: 'undo', round: 1, actor: null, source: null, target: null, amount: null, payload: { seq: starSeq, act: 2 } };
+  const re = E.replay({ players: FIVE, startingLife: 40, firstSeat: 0, startedAt: 0 }, [...t.all, undo]);
+  assert.equal(re.star, true);
+});
+
+test('Star-Siegprüfung nur bei genau 5 Spielern (fremd eingefügtes Ereignis bei 4)', async () => {
+  const E = await load();
+  const four = FIVE.slice(0, 4);
+  const ev = (seq, type, extra) => ({ seq, type, round: 1, actor: null, source: null, target: null, amount: null, ...extra });
+  const re = E.replay({ players: four, startingLife: 40, firstSeat: 0, startedAt: 0 },
+    [ev(1, 'global', { payload: { key: 'star', value: true, act: 1 } }), ev(2, 'eliminate', { target: 'A', payload: { place: 4, act: 2 } })]);
+  assert.equal(re.finished, false);
 });

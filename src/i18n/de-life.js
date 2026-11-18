@@ -99,7 +99,7 @@ export default {
     sub: 'Runde {r} · {time}',
     rate: 'Werten und beenden',
     rateSub: 'Plätze nach Leben, das Spiel zählt für Rangliste und Statistik.',
-    starSub: '{name} hat beide Feinde rausgeworfen. Die übrigen Plätze nach Leben, das Spiel zählt für Rangliste und Statistik.',
+    starSub: '{name} gewinnt, beide Feinde sind raus. Die übrigen Plätze nach Leben, das Spiel zählt für Rangliste und Statistik.',
     discard: 'Verwerfen',
     discardSub: 'Das Spiel wird abgebrochen und zählt nicht.',
     keep: 'Weiterspielen',
