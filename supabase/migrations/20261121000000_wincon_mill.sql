@@ -1,0 +1,30 @@
+-- ============================================================================
+-- Tracking the Gathering · Siegbedingung „Mill“ (P18, Franco 19.11.2026)
+-- Stand: 19.11.2026
+--
+-- Zweck: Wer gewinnt, weil die anderen aus leerer Bibliothek ziehen mussten, soll das als
+-- eigene Siegbedingung angeben können (Fenster „Spiel beenden?“ und Ergebnisseite).
+--
+-- Regel: Enum public.win_condition (20261106000000_init.sql:15) bekommt den Wert 'mill',
+-- einsortiert hinter 'gift' (Reihenfolge = Chips in der App, src/game/engine.js WINCONS).
+-- Reine Erweiterung: keine Zeile ändert sich, keine Policy, kein Grant, keine Funktion.
+-- games.wincon schreibt der Client weiter direkt (Policy games_update, 20261109000000_sicherheit.sql).
+--
+-- Übergang: Die App mit „Mill“ erst NACH diesem db push ausliefern. Alte App + neue Datenbank:
+-- der Wert ist nur nicht wählbar. Neue App + alte Datenbank: Speichern von 'mill' scheitert
+-- (beim Beenden still, auf der Ergebnisseite mit Fehlermeldung).
+--
+-- Rückwärts: Postgres kann einen Enum-Wert nicht entfernen (Typ neu anlegen ginge nur über alle
+-- abhängigen Views). Der Block unten setzt deshalb nur Spiele mit 'mill' auf „keine Angabe“;
+-- der Wert bleibt ungenutzt im Typ und stört nicht. Danach die App ohne „Mill“ ausliefern.
+-- ============================================================================
+
+alter type public.win_condition add value if not exists 'mill' after 'gift';
+
+-- ============================================================================
+-- Rückwärts (zum Zurücknehmen; Zeilen ohne „-- “ ausführen).
+-- Preis: Spiele mit Siegbedingung Mill verlieren die Angabe (null).
+-- RÜCKWÄRTS-BEGINN
+-- update public.games set wincon = null where wincon = 'mill';
+-- RÜCKWÄRTS-ENDE
+-- ============================================================================

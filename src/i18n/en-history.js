@@ -27,7 +27,7 @@ export default {
   detailTitle: 'Game',
   wincon: {
     kampfschaden: 'Combat damage', commander: 'Commander damage', kombo: 'Combo',
-    gift: 'Poison', alternativ: 'Alternate win', aufgabe: 'Concession',
+    gift: 'Poison', mill: 'Mill', alternativ: 'Alternate win', aufgabe: 'Concession',
   },
   winconLabel: 'Win condition',
   roundsLabel: 'Rounds',

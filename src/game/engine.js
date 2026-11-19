@@ -525,7 +525,7 @@ export function history(state) {
 }
 
 /** Siegbedingungen (DB-Enum `win_condition`, init.sql:15); gleiche Liste in views/result-ui.js und history-ui.js. */
-export const WINCONS = ['kampfschaden', 'commander', 'kombo', 'gift', 'alternativ', 'aufgabe'];
+export const WINCONS = ['kampfschaden', 'commander', 'kombo', 'gift', 'mill', 'alternativ', 'aufgabe'];
 
 /**
  * Ergebnis fürs Spielende (Sitzreihenfolge). Noch Lebende ohne Platz werden nach Leben

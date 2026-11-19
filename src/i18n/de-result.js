@@ -26,7 +26,7 @@ export default {
   wincon: 'Siegbedingung',
   wincons: {
     kampfschaden: 'Kampfschaden', commander: 'Commander-Schaden', kombo: 'Kombo',
-    gift: 'Gift', alternativ: 'Alternativsieg', aufgabe: 'Aufgabe',
+    gift: 'Gift', mill: 'Mill', alternativ: 'Alternativsieg', aufgabe: 'Aufgabe',
   },
   rating: 'Deine Bewertung',
   ratingSub: 'Die anderen bewerten auf ihrem Handy',
