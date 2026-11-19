@@ -13,7 +13,7 @@ export const FILTER_KEY = 'ttg.histFilter';
 /** Kunst-Abend für Spiele ohne Abend (`sessionId = null`), nur innerhalb der Historie. */
 export const NO_SESSION = '__ohne-abend';
 /** Siegbedingungen (DB-Enum `win_condition`, init.sql:15) ⇒ i18n-Schlüssel `history.wincon.<w>`. */
-export const WINCONS = ['kampfschaden', 'commander', 'kombo', 'gift', 'alternativ', 'aufgabe'];
+export const WINCONS = ['kampfschaden', 'commander', 'kombo', 'gift', 'mill', 'alternativ', 'aufgabe'];
 
 /** @param {unknown} f @returns {string} gültiger Filter, sonst 'alle' */
 export const validFilter = (f) => (typeof f === 'string' && /** @type {readonly string[]} */ (FILTERS).includes(f) ? f : 'alle');

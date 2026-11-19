@@ -25,7 +25,7 @@ export default {
   wincon: 'Win condition',
   wincons: {
     kampfschaden: 'Combat damage', commander: 'Commander damage', kombo: 'Combo',
-    gift: 'Poison', alternativ: 'Alt win', aufgabe: 'Concession',
+    gift: 'Poison', mill: 'Mill', alternativ: 'Alt win', aufgabe: 'Concession',
   },
   rating: 'Your rating',
   ratingSub: 'Everyone else rates on their own phone',

@@ -12,7 +12,7 @@
  */
 
 /** Siegbedingungen (DB-Enum `win_condition`, init.sql:15), Reihenfolge = Chips. */
-export const WINCONS = ['kampfschaden', 'commander', 'kombo', 'gift', 'alternativ', 'aufgabe'];
+export const WINCONS = ['kampfschaden', 'commander', 'kombo', 'gift', 'mill', 'alternativ', 'aufgabe'];
 export const POTG_MAX = 200;
 export const NOTE_MAX = 500;
 export const PHOTO_EDGE = 1600;
