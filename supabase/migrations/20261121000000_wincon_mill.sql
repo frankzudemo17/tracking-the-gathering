@@ -10,8 +10,11 @@
 -- Reine Erweiterung: keine Zeile ändert sich, keine Policy, kein Grant, keine Funktion.
 -- games.wincon schreibt der Client weiter direkt (Policy games_update, 20261109000000_sicherheit.sql).
 --
--- Übergang: Die App mit „Mill“ erst NACH diesem db push ausliefern. Alte App + neue Datenbank:
--- der Wert ist nur nicht wählbar. Neue App + alte Datenbank: Speichern von 'mill' scheitert
+-- Übergang: Die App mit „Mill“ erst NACH diesem db push ausliefern, nicht während eines laufenden
+-- Spieleabends (eine App lädt im Spiel nie neu). Alte App (≤ v61) + neue Datenbank: 'mill' ist
+-- nicht wählbar, und speichert jemand mit der alten App die Ergebnisseite eines Mill-Spiels,
+-- setzt sie games.wincon still auf null (result-ui.js initialForm kennt den Wert nicht,
+-- gamePatch schreibt wincon immer mit). Neue App + alte Datenbank: Speichern von 'mill' scheitert
 -- (beim Beenden still, auf der Ergebnisseite mit Fehlermeldung).
 --
 -- Rückwärts: Postgres kann einen Enum-Wert nicht entfernen (Typ neu anlegen ginge nur über alle
